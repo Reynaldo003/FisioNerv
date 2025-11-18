@@ -12,27 +12,26 @@ export default function DockBar() {
             >
                 <DockIcon className="flex items-center gap-3 ml-2">
                     <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Ir al inicio" className="flex items-center justify-center">
-                        <Home className="h-5 w-5" />
+                        <Home className="h-5 w-5 hover:w-6 hover:h-6" />
                     </button>
                 </DockIcon>
 
                 <div role="separator" aria-orientation="vertical" className="mx-2 h-10 w-px bg-black/15 self-stretch" />
 
-                <DockIcon>
+                <DockIcon className="bg-blue-700/90 ">
                     <a href="https://www.facebook.com/Fisionerv.mx" target="_blank" rel="noreferrer">
-                        <Facebook className="w-5 h-5" />
+                        <Facebook className="w-5 h-5 hover:w-6 hover:h-6 text-white" />
                     </a>
                 </DockIcon>
-                <DockIcon>
+                <DockIcon className="bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7]">
                     <a href="https://www.instagram.com/fisionerv.mx/" target="_blank" rel="noreferrer">
-                        <Instagram className="w-5 h-5" />
+                        <Instagram className="w-5 h-5 hover:w-6 hover:h-6 text-white" />
                     </a>
                 </DockIcon>
-
                 <div role="separator" aria-orientation="vertical" className="mx-2 h-10 w-px bg-black/15 self-stretch" />
 
                 <DockIcon className="flex items-center gap-3 mr-2">
-                    <AnimatedThemeToggler className="h-5 w-5" />
+                    <AnimatedThemeToggler className="h-5 w-5 hover:w-6 hover:h-6" />
                 </DockIcon>
             </Dock>
         </div>

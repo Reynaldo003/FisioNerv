@@ -28,7 +28,7 @@ export default function AgendaV2({ CLINIC, SERVICES, PRIMARY = "#1E63C5" }) {
     return (
         <section id="agenda" className="mx-auto mt-16 max-w-6xl px-4">
             <div className="mb-6 flex items-center gap-3">
-                <CalendarDays className="h-6 w-6" style={{ color: PRIMARY }} />
+                <CalendarDays className="h-6 w-6 text-[#004aad]" />
                 <h3 className="text-2xl font-bold">Agenda tu cita</h3>
             </div>
 
@@ -40,7 +40,7 @@ export default function AgendaV2({ CLINIC, SERVICES, PRIMARY = "#1E63C5" }) {
                     return (
                         <div key={t} className="flex items-center gap-2">
                             <div className={`h-7 w-7 rounded-full grid place-items-center text-white
-                ${active ? "bg-slate-900" : done ? "bg-green-600" : "bg-slate-300"}`}>
+                ${active ? "bg-[#004aad]" : done ? "bg-green-600" : "bg-slate-300"}`}>
                                 {i + 1}
                             </div>
                             <span className={active ? "font-semibold" : "text-slate-500"}>{t}</span>
@@ -52,7 +52,6 @@ export default function AgendaV2({ CLINIC, SERVICES, PRIMARY = "#1E63C5" }) {
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
                 <div className="p-4 sm:p-6">
-                    {/* Paso 1 - Servicio */}
                     <AnimatePresence initial={false}>
                         {step === 1 && (
                             <motion.div
@@ -78,7 +77,7 @@ export default function AgendaV2({ CLINIC, SERVICES, PRIMARY = "#1E63C5" }) {
 
                                 <button
                                     onClick={() => setStep(2)}
-                                    className="rounded-xl bg-slate-900 px-4 py-4 font-medium text-white shadow hover:brightness-110"
+                                    className="rounded-xl bg-[#004aad] px-4 py-4 font-medium text-white shadow hover:brightness-110"
                                 >
                                     Continuar
                                 </button>
@@ -157,7 +156,7 @@ export default function AgendaV2({ CLINIC, SERVICES, PRIMARY = "#1E63C5" }) {
 
                                 <div className="mt-4 flex justify-between">
                                     <p className="text-sm text-slate-600">Seleccionado: <span className="font-medium">{formatDateLong(selectedDate)}</span></p>
-                                    <button onClick={() => setStep(3)} className="rounded-xl bg-slate-900 px-4 py-2 text-white">Elegir hora</button>
+                                    <button onClick={() => setStep(3)} className="rounded-xl bg-[#004aad] px-4 py-2 text-white">Elegir hora</button>
                                 </div>
                             </motion.div>
                         )}
@@ -226,7 +225,7 @@ export default function AgendaV2({ CLINIC, SERVICES, PRIMARY = "#1E63C5" }) {
                             onClick={bookWhatsApp}
                             disabled={!selectedSlot}
                             className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 font-medium transition
-                ${selectedSlot ? "bg-blue-600 text-white hover:brightness-110" : "cursor-not-allowed bg-slate-300 text-slate-600"}`}
+                ${selectedSlot ? "bg-[#004aad] text-white hover:brightness-110" : "cursor-not-allowed bg-slate-300 text-slate-600"}`}
                         >
                             <PhoneCall className="h-4 w-4" />
                             Confirmar por WhatsApp

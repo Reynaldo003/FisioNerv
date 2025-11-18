@@ -1,22 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffectEvent } from "react";
 import { Clock3, MapPin, PhoneCall, Share2, Star, Navigation, Image as ImageIcon } from "lucide-react";
-
-/**
- * Ejemplo de props esperadas:
- * CLINIC = {
- *   name: "FisioNerv Fisioterapia",
- *   address: "Calle 15 entre Av. 2 y 4, Córdoba, Veracruz",
- *   phone: "+52 271 122 4494",
- *   mapQuery: "Fisionerv Fisioterapia, Córdoba, Veracruz",
- *   rating: 5.0,
- *   reviews: 110,
- *   photos: ["/img/clinica1.jpg", "/img/clinica2.jpg", "/img/clinica3.jpg"],
- *   hours: { // opcional; simple
- *     mon: "09:00–18:00", tue: "09:00–18:00", wed: "09:00–18:00",
- *     thu: "09:00–18:00", fri: "09:00–18:00", sat: "09:00–14:00", sun: "Cerrado"
- *   }
- * }
- */
 
 export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
     const [layer, setLayer] = useState("map"); // "map" | "sat"
@@ -25,14 +8,23 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
     const embedSat = `https://maps.app.goo.gl/GYmJHJ1vUh2rB4yG9&t=k&output=embed`; // satélite (t=k)
     const mapsLink = `https://maps.app.goo.gl/GYmJHJ1vUh2rB4yG9`;
 
-    const today = useMemo(() => {
-        const d = new Date();
-        const dow = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][d.getDay()];
-        return { key: dow, label: ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][d.getDay()] };
-    }, []);
+    const TZ_OFFSET = -6;
 
+    function nowInClinicTZ() {
+        const now = new Date();
+        const utcMs = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
+        return new Date(utcMs + TZ_OFFSET * 60 * 60 * 1000);
+    }
+
+    const today = useMemo(() => {
+        const d = nowInClinicTZ();
+        const keys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+        const labels = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
+
+        const idx = d.getDay();
+        return { key: keys[idx], label: labels[idx] };
+    }, []);
     const isOpenNow = useMemo(() => {
-        // Heurística muy simple: si NO hay hours -> desconocido
         if (!CLINIC.hours) return null;
         const key = today.key;
         const slot = CLINIC.hours[key];
@@ -58,12 +50,10 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
     };
 
     return (
-        <section id="ubicacion" className="mx-auto mt-16 max-w-7xl px-4">
+        <section id="ubicacion" className="mx-auto mt-16 max-w-6xl px-4">
             <div className="grid gap-8 lg:grid-cols-5">
-                {/* Panel de info (sticky en desktop) */}
                 <div className="lg:col-span-2">
                     <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                        {/* Aura sutil */}
                         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_300px_at_-10%_-10%,rgba(30,99,197,.08),transparent_60%)]" />
                         <div className="relative p-6">
                             <div className="flex items-start justify-between gap-3">
@@ -74,7 +64,6 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
                                     </p>
                                 </div>
 
-                                {/* Rating */}
                                 {(CLINIC.rating || CLINIC.reviews) && (
                                     <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
                                         <div className="flex items-center gap-1">
@@ -87,7 +76,6 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
                                 )}
                             </div>
 
-                            {/* Datos clave */}
                             <div className="mt-6 grid gap-4">
                                 <div className="flex items-start gap-3">
                                     <Clock3 className="mt-1 h-5 w-5" style={{ color: PRIMARY }} />
@@ -97,14 +85,14 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
                                             <div className="mt-1 text-sm text-slate-600">
                                                 <p><b>{today.label}:</b> {CLINIC.hours[today.key] || "—"}</p>
                                                 <p className="mt-1 text-slate-500">
-                                                    {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((lab, i) => {
-                                                        const k = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][i];
+                                                    {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab"].map((lab, i) => {
+                                                        const k = ["mon", "tue", "wed", "thu", "fri", "sat"][i];
                                                         return <span key={k} className="mr-3">{lab}: {CLINIC.hours[k] || "—"}</span>;
                                                     })}
                                                 </p>
                                             </div>
                                         ) : (
-                                            <p className="text-sm text-slate-600">Lun–Sáb · 9:00–18:00</p>
+                                            <p className="text-sm text-slate-600">Lun–Sab · 9:00–18:00</p>
                                         )}
                                     </div>
                                 </div>
@@ -182,7 +170,7 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
                                     href={mapsLink}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:brightness-110"
+                                    className="rounded-xl bg-[#004aad] px-4 py-2 text-sm font-medium text-white shadow hover:brightness-110"
                                 >
                                     Abrir en Google Maps
                                 </a>

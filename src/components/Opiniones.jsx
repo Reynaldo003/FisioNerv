@@ -7,9 +7,9 @@ export default function Opiniones() {
         { name: "Ana L.", rating: 5, quote: "Clave para volver a correr. Atención de 10." },
     ];
     return (
-        <section id="opiniones" className="mx-auto mt-16 max-w-7xl px-4">
+        <section id="opiniones" className="mx-auto mt-16 max-w-6xl px-4">
             <div className="mb-6 flex items-center gap-3">
-                <Quote className="h-6 w-6 text-[--primary]" />
+                <Quote className="h-6 w-6 text-[#004aad]" />
                 <h3 className="text-2xl font-bold">Opiniones</h3>
             </div>
             <div className="grid gap-6 md:grid-cols-3">

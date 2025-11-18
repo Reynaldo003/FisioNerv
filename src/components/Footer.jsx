@@ -2,7 +2,7 @@ import { MapPin } from "lucide-react";
 
 export default function Footer({ CLINIC }) {
     return (
-        <footer className="mx-auto mt-20 max-w-7xl px-4 pb-24 sm:pb-24">
+        <footer className="mx-auto mt-20 max-w-6xl px-4 pb-24 sm:pb-24">
             <div className="rounded-2xl border border-slate-300 bg-white p-6 text-sm text-slate-600 shadow-lg">
                 <div className="grid gap-6 md:grid-cols-3 md:items-center">
                     <div>

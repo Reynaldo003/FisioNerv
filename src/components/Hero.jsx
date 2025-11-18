@@ -1,11 +1,13 @@
 import { Sparkles, CalendarDays, ShieldCheck, Activity, HandHeart } from "lucide-react";
+import { NumberTicker } from "@/components/ui/number-ticker";
+import { TextAnimate } from "@/components/ui/text-animate"
 
 function StatCard({ label, value, showPlus = false }) {
     return (
         <div className="relative overflow-hidden rounded-2xl bg-white/10 p-3 text-center backdrop-blur ring-1 ring-white/20">
             <div className="mb-1 flex items-baseline justify-center gap-1">
                 {showPlus && <span className="text-2xl font-extrabold text-emerald-300">+</span>}
-                <span className="text-2xl font-extrabold text-white">{value}</span>
+                <NumberTicker className="text-2xl font-extrabold text-white" value={value} />
             </div>
             <p className="text-[11px] leading-4 text-white/90">{label}</p>
         </div>
@@ -36,10 +38,19 @@ export default function Hero({ THERAPIST }) {
                     <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs ring-1 ring-white/20">
                         <Sparkles className="h-3.5 w-3.5" /> Sobre mí
                     </p>
-                    <h1 className="mt-3 text-3xl font-bold leading-tight md:text-4xl">{THERAPIST.name}</h1>
-                    <h2 className="text-4xl font-bold leading-tight tracking-tight md:text-5xl">FisioNerv</h2>
-                    <p className="mt-1 text-sm/relaxed opacity-90">{THERAPIST.credentials}</p>
-                    <p className="mt-4 max-w-2xl text-white/90">{THERAPIST.about}</p>
+                    <TextAnimate animation="blurInUp" className="mt-3 text-3xl font-bold leading-tight md:text-4xl" by="word">
+                        {THERAPIST.name}
+                    </TextAnimate>
+                    <TextAnimate animation="blurInUp" className="text-4xl font-bold leading-tight tracking-tight md:text-5xl" by="word">
+                        FisioNerv
+                    </TextAnimate>
+                    <TextAnimate animation="blurInUp" className="mt-1 text-sm/relaxed opacity-90" by="word">
+                        {THERAPIST.credentials}
+                    </TextAnimate>
+                    <TextAnimate animation="blurInUp" className="mt-4 max-w-2xl text-white/90" by="word">
+                        {THERAPIST.about}
+                    </TextAnimate>
+
                     <ul className="mt-4 flex flex-wrap gap-2">
                         {THERAPIST.badges.map((b) => (
                             <li key={b} className="rounded-full bg-white/10 px-3 py-1 text-xs ring-1 ring-white/20">{b}</li>

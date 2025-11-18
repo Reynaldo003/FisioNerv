@@ -14,6 +14,7 @@ const CLINIC = {
     address: "Calle 15 entre Av. 2 y 4, Córdoba, Veracruz",
     phone: "+52 271 122 4494",
     mapQuery: "FisioNerv, Calle 15 entre Avenidas 2 y 4, Córdoba, Veracruz",
+    hours: { mon: "8:00-21:00", tue: "8:00-21:00", wed: "8:00-21:00", thu: "8:00-21:00", fri: "8:00-21:00", sat: "10:00-15:00" },
 };
 
 const THERAPIST = {

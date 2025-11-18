@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Clock3, Play } from "lucide-react";
+import { CalendarDays, Clock3, Play, HandHeart } from "lucide-react";
 
 export default function ServiciosShowcase({ SERVICES = [], PRIMARY = "#1E63C5" }) {
     const cats = useMemo(() => ["Todas", ...Array.from(new Set(SERVICES.map(s => s.tag)))], [SERVICES]);
@@ -15,7 +15,7 @@ export default function ServiciosShowcase({ SERVICES = [], PRIMARY = "#1E63C5" }
         <section id="servicios" className="mx-auto mt-16 max-w-6xl px-4">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="h-6 w-6 rounded bg-[--primary]/10" />
+                    <HandHeart className="h-6 w-6 text-[#004aad]" />
                     <h3 className="text-2xl font-bold">Servicios</h3>
                 </div>
                 <div className="flex w-full flex-wrap gap-2 sm:w-auto">
@@ -74,7 +74,7 @@ export default function ServiciosShowcase({ SERVICES = [], PRIMARY = "#1E63C5" }
                                     </div>
                                     <a
                                         href="#agenda"
-                                        className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow hover:brightness-110 sm:mt-2"
+                                        className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-[#004aad] px-4 py-2.5 text-sm font-medium text-white shadow hover:brightness-110 sm:mt-2"
                                     >
                                         <CalendarDays className="mr-2 h-4 w-4" />
                                         Agendar

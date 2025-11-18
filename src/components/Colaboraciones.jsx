@@ -37,9 +37,9 @@ export default function Colaboraciones({ images }) {
     const size = Math.max(260, Math.min(w, h)) || 320;
 
     return (
-        <section id="collabs" className="mx-auto mt-16 max-w-7xl px-4">
+        <section id="collabs" className="mx-auto mt-16 max-w-6xl px-4">
             <div className="mb-6 flex items-center gap-3">
-                <Dumbbell className="h-6 w-6 text-[--primary]" />
+                <Dumbbell className="h-6 w-6 text-[#004aad]" />
                 <h3 className="text-2xl font-bold">Colaboraciones</h3>
             </div>
 
