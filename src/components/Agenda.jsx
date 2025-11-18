@@ -33,12 +33,12 @@ export default function AgendaV2({ CLINIC, SERVICES, PRIMARY = "#1E63C5" }) {
             </div>
 
             {/* Wizard header */}
-            <div className="mb-4 flex items-center gap-2 text-sm">
+            <div className="mb-4 flex items-center gap-1 text-sm">
                 {["Servicio", "Día", "Hora"].map((t, i) => {
                     const active = step === i + 1;
                     const done = step > i + 1;
                     return (
-                        <div key={t} className="flex items-center gap-2">
+                        <div key={t} className="flex items-center gap-1">
                             <div className={`h-7 w-7 rounded-full grid place-items-center text-white
                 ${active ? "bg-[#004aad]" : done ? "bg-green-600" : "bg-slate-300"}`}>
                                 {i + 1}
