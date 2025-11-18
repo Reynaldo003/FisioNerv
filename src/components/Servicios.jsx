@@ -36,9 +36,9 @@ export default function ServiciosShowcase({ SERVICES = [], PRIMARY = "#1E63C5" }
                 <FeaturedMedia card={active} color={PRIMARY} />
 
                 <div className="lg:col-span-3">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                    <div className="rounded-2xl border overflow-auto border-slate-200 bg-white p-3 shadow-xl">
                         <div
-                            className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
+                            className="relative gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
                             style={{ WebkitOverflowScrolling: "touch" }}
                             aria-label="Lista de servicios"
                         >
