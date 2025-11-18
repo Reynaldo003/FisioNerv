@@ -38,7 +38,7 @@ export default function ServiciosShowcase({ SERVICES = [], PRIMARY = "#1E63C5" }
                 <div className="lg:col-span-3">
                     <div className="rounded-2xl border overflow-auto border-slate-200 bg-white p-3 shadow-xl">
                         <div
-                            className="relative gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
+                            className="lg:flex sm:relative gap-3 overflow-x-auto pb-2snap-x snap-mandatory"
                             style={{ WebkitOverflowScrolling: "touch" }}
                             aria-label="Lista de servicios"
                         >
@@ -127,7 +127,7 @@ function ServiceThumb({ service, active, onSelect, color }) {
     return (
         <button
             onClick={onSelect}
-            className={`group relative shrink-0 snap-center overflow-hidden rounded-xl border text-left transition
+            className={`group relative shrink-0 snap-center overflow-hidden rounded-xl border text-left transition m-2
         ${active ? "border-slate-900 bg-slate-900/5" : "border-slate-200 bg-white hover:bg-slate-50 shadow-sm"}`}
             aria-pressed={active}
             style={{ width: "78vw", maxWidth: 320 }}
