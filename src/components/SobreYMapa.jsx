@@ -24,22 +24,37 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
         const idx = d.getDay();
         return { key: keys[idx], label: labels[idx] };
     }, []);
+
     const isOpenNow = useMemo(() => {
         if (!CLINIC.hours) return null;
+
         const key = today.key;
-        const slot = CLINIC.hours[key];
-        if (!slot || /cerrado/i.test(slot)) return false;
+        const rawSlot = CLINIC.hours[key];
+
+        if (!rawSlot || /cerrado/i.test(rawSlot)) return false;
+
         try {
-            const [start, end] = slot.split("–");
-            const pad = v => v.toString().padStart(2, "0");
+            const slot = rawSlot.replace(/\s/g, "");
+            const [start, end] = slot.split(/[-–—]/);
+
+            if (!start || !end) return null;
+
             const toMin = (hhmm) => {
                 const [hh, mm] = hhmm.split(":").map(Number);
                 return hh * 60 + (mm || 0);
             };
-            const now = new Date();
+
+            const now = nowInClinicTZ();
             const nowMin = now.getHours() * 60 + now.getMinutes();
-            return nowMin >= toMin(start) && nowMin <= toMin(end);
-        } catch { return null; }
+
+            const startMin = toMin(start);
+            const endMin = toMin(end);
+
+            // abierto entre start y end (puedes cambiar el <= por < si quieres cerrar justo a la hora)
+            return nowMin >= startMin && nowMin <= endMin;
+        } catch {
+            return null;
+        }
     }, [CLINIC.hours, today.key]);
 
     const copyAddress = async () => {
@@ -53,19 +68,19 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
         <section id="ubicacion" className="mx-auto mt-16 max-w-6xl px-4">
             <div className="grid gap-8 lg:grid-cols-5">
                 <div className="lg:col-span-2">
-                    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                    <div className="relative overflow-hidden rounded-2xl border dark:bg-neutral-800 border-slate-200 dark:border-neutral-500 shadow-xl dark:shadow-neutral-800">
                         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_300px_at_-10%_-10%,rgba(30,99,197,.08),transparent_60%)]" />
                         <div className="relative p-6">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <h3 className="text-2xl font-bold tracking-tight">{CLINIC.name}</h3>
-                                    <p className="mt-1 max-w-md text-slate-600">
+                                    <p className="mt-1 max-w-md text-slate-600 dark:text-neutral-300">
                                         Consultorio especializado en fisioterapia y rehabilitación con enfoque humano y educación del paciente.
                                     </p>
                                 </div>
 
                                 {(CLINIC.rating || CLINIC.reviews) && (
-                                    <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
+                                    <div className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm ">
                                         <div className="flex items-center gap-1">
                                             <Star className="h-4 w-4" style={{ color: PRIMARY }} />
                                             <span className="font-semibold">{CLINIC.rating?.toFixed?.(1) || "5.0"}</span>
@@ -78,13 +93,13 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
 
                             <div className="mt-6 grid gap-4">
                                 <div className="flex items-start gap-3">
-                                    <Clock3 className="mt-1 h-5 w-5" style={{ color: PRIMARY }} />
+                                    <Clock3 className="mt-1 h-6 w-6" style={{ color: PRIMARY }} />
                                     <div>
                                         <p className="font-medium">Horarios</p>
                                         {CLINIC.hours ? (
-                                            <div className="mt-1 text-sm text-slate-600">
+                                            <div className="mt-1 text-sm text-slate-600 dark:text-neutral-300">
                                                 <p><b>{today.label}:</b> {CLINIC.hours[today.key] || "—"}</p>
-                                                <p className="mt-1 text-slate-500">
+                                                <p className="mt-1 text-slate-500 dark:text-neutral-300">
                                                     {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab"].map((lab, i) => {
                                                         const k = ["mon", "tue", "wed", "thu", "fri", "sat"][i];
                                                         return <span key={k} className="mr-3">{lab}: {CLINIC.hours[k] || "—"}</span>;
@@ -101,26 +116,26 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
                                     <MapPin className="mt-1 h-5 w-5" style={{ color: PRIMARY }} />
                                     <div>
                                         <p className="font-medium">Dirección</p>
-                                        <p className="text-sm text-slate-600">{CLINIC.address}</p>
+                                        <p className="text-sm text-slate-600 dark:text-neutral-300">{CLINIC.address}</p>
                                         <div className="mt-2 flex flex-wrap gap-2 text-sm">
                                             <a
                                                 href={mapsLink}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 hover:bg-slate-50"
+                                                className="inline-flex items-center gap-2 rounded-xl border dark:border-neutral-300 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-500"
                                             >
                                                 <Navigation className="h-4 w-4" /> Cómo llegar
                                             </a>
                                             <button
                                                 onClick={copyAddress}
-                                                className="inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 hover:bg-slate-50"
+                                                className="inline-flex items-center gap-2 rounded-xl border dark:border-neutral-300 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-500"
                                             >
                                                 <Share2 className="h-4 w-4" /> Compartir
                                             </button>
                                             {CLINIC.phone && (
                                                 <a
                                                     href={`tel:${CLINIC.phone.replace(/\s+/g, "")}`}
-                                                    className="inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 hover:bg-slate-50"
+                                                    className="inline-flex items-center gap-2 rounded-xl border dark:border-neutral-300 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-500"
                                                 >
                                                     <PhoneCall className="h-4 w-4" /> Llamar
                                                 </a>
@@ -129,39 +144,20 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
                                     </div>
                                 </div>
 
-                                {/* Amenidades rápidas (ejemplo) */}
                                 <div className="mt-1 flex flex-wrap gap-2 text-xs">
                                     {["Acceso para silla de ruedas", "Estacionamiento cercano", "Pago con tarjeta", "Wi-Fi"].map((a) => (
-                                        <span key={a} className="rounded-full border px-2 py-1 text-slate-600">{a}</span>
+                                        <span key={a} className="rounded-full border px-2 py-1 text-slate-600 dark:text-neutral-300">{a}</span>
                                     ))}
                                 </div>
 
-                                {/* Mini-galería */}
-                                {CLINIC.photos?.length > 0 && (
-                                    <div className="mt-2">
-                                        <p className="mb-2 text-sm font-medium">Dentro del consultorio</p>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {CLINIC.photos.slice(0, 3).map((src, i) => (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img key={i} src={src} alt="" className="h-28 w-full rounded-xl object-cover" />
-                                            ))}
-                                        </div>
-                                        <div className="mt-2 text-right">
-                                            <a href="#galeria" className="inline-flex items-center gap-2 text-sm text-slate-700 hover:underline">
-                                                <ImageIcon className="h-4 w-4" /> Ver más fotos
-                                            </a>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
 
-                        {/* Barra de estado sticky en bottom del panel */}
-                        <div className="border-t border-slate-200 bg-white/90 p-3 backdrop-blur">
+                        <div className="border-t border-slate-200 bg-white/90 dark:bg-neutral-800 dark:border-neutral-500 p-3 backdrop-blur">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-sm">
                                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${isOpenNow === null ? "bg-slate-100 text-slate-700"
-                                        : isOpenNow ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
+                                        : isOpenNow ? "bg-emerald-100 text-emerald-800 font-bold" : "bg-rose-100 text-rose-700"
                                         }`}>
                                         {isOpenNow === null ? "Horario no disponible" : isOpenNow ? "Abierto ahora" : "Cerrado temporalmente"}
                                     </span>
@@ -179,19 +175,16 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
                     </div>
                 </div>
 
-                {/* Mapa con capas y overlays */}
                 <div className="lg:col-span-3">
-                    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                        {/* Header del mapa */}
+                    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white dark:bg-neutral-800 shadow-xl dark:shadow-neutral-700">
                         <div className="flex items-center justify-between gap-3 border-b border-slate-200 p-3">
-                            <div className="flex items-center gap-2 text-sm text-slate-700">
+                            <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-neutral-200">
                                 <MapPin className="h-4 w-4" style={{ color: PRIMARY }} />
                                 <span>{CLINIC.address}</span>
                             </div>
                         </div>
 
-                        {/* contenedor del iframe */}
-                        <div className="relative aspect-[16/10]">
+                        <div className="relative aspect-[16/13]">
                             <iframe
                                 title="Mapa FisioNerv"
                                 loading="lazy"

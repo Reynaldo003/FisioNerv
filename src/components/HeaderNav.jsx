@@ -2,7 +2,7 @@ import { Stethoscope, PhoneCall } from "lucide-react";
 
 export default function HeaderNav() {
     return (
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
+        <header className="sticky top-0 z-40 border-b border-slate-200 bg-neutral-100 dark:bg-black/80 dark:border-slate-800 backdrop-blur">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-3">
                     <div className="grid h-10 w-10 place-items-center rounded-xl bg-[--primary]/10 ring-1 ring-[--primary]/20">

@@ -44,7 +44,7 @@ const images = ["/oxygen.png", "/DENTISTA.png", "/auFitness.png", "/onerv.png", 
 export default function FisioNervLanding() {
     const PRIMARY = "#1E63C5";
     return (
-        <div className="min-h-screen bg-white text-slate-800 pb-28" style={{ "--primary": PRIMARY }}>
+        <div className="min-h-screen bg-neutral-100 dark:bg-[#0b0b0c] dark:text-neutral-200 text-slate-800 pb-28" style={{ "--primary": PRIMARY }}>
             <HeaderNav />
             <Hero THERAPIST={THERAPIST} />
             <SobreYMapa CLINIC={CLINIC} />
