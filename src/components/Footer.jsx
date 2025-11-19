@@ -44,7 +44,7 @@ export default function Footer({ CLINIC }) {
                                 href={`https://wa.me/${CLINIC.whatsapp || ""}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-2 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-950 dark:hover:bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-[#004aad] shadow-lg shadow-[--primary]/30 transition hover:-translate-y-0.5"
+                                className="inline-flex items-center gap-2 rounded-full bg-neutral-100 hover:bg-neutral-200 border order-neutral-700 dark:border-neutral-500 dark:bg-neutral-800 dark:hover:bg-neutral-900 px-5 py-2.5 text-sm font-bold text-[#004aad] shadow-lg shadow-[--primary]/30 transition hover:-translate-y-0.5"
                             >
                                 Agendar por WhatsApp
                             </a>
