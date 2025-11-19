@@ -1,0 +1,184 @@
+import {
+    Sparkles,
+    CalendarDays,
+    ShieldCheck,
+    Activity,
+    HandHeart,
+} from "lucide-react";
+import { NumberTicker } from "@/components/ui/number-ticker";
+import { TextAnimate } from "@/components/ui/text-animate";
+
+
+
+export default function Hero({ THERAPIST }) {
+    return (
+        <section
+            id="nosotros"
+            className="relative w-full overflow-hidden bg-gradient-to-b from-[#004aad] via-[#003a96] to-[#001f5f] text-white"
+        >
+            {/* halos de fondo */}
+            <div className="pointer-events-none absolute -left-32 top-10 h-64 w-64 rounded-full bg-sky-400/30 blur-3xl" />
+            <div className="pointer-events-none absolute right-[-6rem] bottom-[-6rem] h-80 w-80 rounded-full bg-emerald-400/25 blur-3xl" />
+
+            <div className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-12 lg:flex-row lg:items-center lg:py-20">
+                {/* COLUMNA IZQUIERDA */}
+                <div className="relative z-10 flex-1">
+                    <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs ring-1 ring-white/20">
+                        <Sparkles className="h-3.5 w-3.5" /> Sobre mí
+                    </p>
+
+                    <TextAnimate
+                        animation="blurInUp"
+                        className="mt-4 text-3xl font-bold leading-tight md:text-4xl"
+                        by="word"
+                    >
+                        {THERAPIST.name}
+                    </TextAnimate>
+
+                    <TextAnimate
+                        animation="blurInUp"
+                        className="mt-1 bg-gradient-to-r from-white via-sky-100 to-emerald-200 bg-clip-text text-4xl font-extrabold leading-tight tracking-tight text-transparent md:text-5xl"
+                        by="word"
+                    >
+                        FisioNerv
+                    </TextAnimate>
+
+                    <TextAnimate
+                        animation="blurInUp"
+                        className="mt-2 text-sm/relaxed text-white/80"
+                        by="word"
+                    >
+                        {THERAPIST.credentials}
+                    </TextAnimate>
+
+                    <TextAnimate
+                        animation="blurInUp"
+                        className="mt-4 max-w-2xl text-white/90"
+                        by="word"
+                    >
+                        {THERAPIST.about}
+                    </TextAnimate>
+
+                    {/* badges */}
+                    <ul className="mt-4 flex flex-wrap gap-2">
+                        {THERAPIST.badges.map((b) => (
+                            <li
+                                key={b}
+                                className="rounded-full bg-white/10 px-3 py-1 text-xs ring-1 ring-white/20"
+                            >
+                                {b}
+                            </li>
+                        ))}
+                    </ul>
+
+                    {/* CTAs */}
+                    <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                        <a
+                            href="#agenda"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 via-emerald-300 to-lime-300 px-5 py-3 text-sm font-semibold text-slate-900 shadow-lg shadow-emerald-500/40 transition hover:-translate-y-0.5 hover:brightness-110"
+                        >
+                            <CalendarDays className="h-4 w-4" />
+                            Ver disponibilidad
+                        </a>
+                        <a
+                            href="#ubicacion"
+                            className="inline-flex w-full items-center justify-center rounded-full border border-white/30 bg-white/10 px-5 py-3 text-sm font-semibold text-white/90 backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/15"
+                        >
+                            Conocer más
+                        </a>
+                    </div>
+
+                    <p className="mt-3 text-xs text-white/70">
+                        Atención especializada en neurorehabilitación, dolor musculoesquelético
+                        y retorno seguro a la actividad.
+                    </p>
+                </div>
+
+                {/* COLUMNA DERECHA: CARD DEL TERAPEUTA */}
+                <div className="relative z-10 flex-1">
+                    <div className="relative mx-auto w-full max-w-md">
+                        {/* brillo detrás de la card */}
+                        <div className="pointer-events-none absolute inset-x-0 -top-10 h-32 bg-gradient-to-b from-white/40 via-white/5 to-transparent blur-2xl" />
+
+                        <div className="relative overflow-hidden rounded-[32px] border border-white/20 bg-white/5 px-4 pb-5 pt-6 shadow-2xl backdrop-blur-xl">
+                            {/* label superior */}
+                            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] ring-1 ring-white/20">
+                                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                                <span>Tu fisioterapeuta de confianza</span>
+                            </div>
+
+                            {/* stats flotando en desktop */}
+                            <div className="pointer-events-none absolute -left-4 top-16 hidden w-32 flex-col gap-3 lg:flex">
+                                {THERAPIST.stats.slice(0, 2).map((s) => (
+                                    <StatCard
+                                        key={s.v}
+                                        value={s.k}
+                                        label={s.v}
+                                        showPlus={String(s.v)
+                                            .toLowerCase()
+                                            .includes("paciente")}
+                                    />
+                                ))}
+                            </div>
+                            <div className="pointer-events-none absolute -right-4 bottom-16 hidden w-32 lg:block">
+                                {THERAPIST.stats[2] && (
+                                    <StatCard
+                                        value={THERAPIST.stats[2].k}
+                                        label={THERAPIST.stats[2].v}
+                                        showPlus={String(THERAPIST.stats[2].v)
+                                            .toLowerCase()
+                                            .includes("paciente")}
+                                    />
+                                )}
+                            </div>
+
+                            {/* imagen */}
+                            <div className="relative mt-2 flex items-end justify-center">
+                                <img
+                                    src="/info.png"
+                                    alt="Información del fisioterapeuta"
+                                    className="h-auto max-h-[420px] w-full object-contain drop-shadow-2xl"
+                                />
+                            </div>
+
+                            {/* stats en móvil / tablets */}
+                            <div className="mt-4 grid grid-cols-3 gap-3 lg:hidden">
+                                {THERAPIST.stats.map((s) => (
+                                    <StatCard
+                                        key={s.v}
+                                        value={s.k}
+                                        label={s.v}
+                                        showPlus={String(s.v)
+                                            .toLowerCase()
+                                            .includes("paciente")}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* FEATURES INFERIORES */}
+            <div className="mx-auto max-w-7xl px-4 pb-10">
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <FeatureCard
+                        icon={ShieldCheck}
+                        title="Atención certificada"
+                        desc="Profesionales con aval y actualización constante."
+                    />
+                    <FeatureCard
+                        icon={Activity}
+                        title="Planes a medida"
+                        desc="Protocolos personalizados según tus objetivos."
+                    />
+                    <FeatureCard
+                        icon={HandHeart}
+                        title="Enfoque humano"
+                        desc="Acompañamiento cercano y educación al paciente."
+                    />
+                </div>
+            </div>
+        </section>
+    );
+}

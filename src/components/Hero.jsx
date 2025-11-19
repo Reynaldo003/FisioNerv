@@ -2,12 +2,22 @@ import { Sparkles, CalendarDays, ShieldCheck, Activity, HandHeart } from "lucide
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { TextAnimate } from "@/components/ui/text-animate"
 
-function StatCard({ label, value, showPlus = false }) {
+function StatCard({ label, value, showPlus = false, className = "" }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl bg-white/10 p-3 text-center backdrop-blur ring-1 ring-white/20">
+        <div
+            className={
+                "relative overflow-hidden rounded-2xl bg-white/10 p-3 text-center backdrop-blur ring-1 ring-white/20 " +
+                className
+            }
+        >
             <div className="mb-1 flex items-baseline justify-center gap-1">
-                {showPlus && <span className="text-2xl font-extrabold text-emerald-300">+</span>}
-                <NumberTicker className="text-2xl font-extrabold text-white" value={value} />
+                {showPlus && (
+                    <span className="text-2xl font-extrabold text-emerald-300">+</span>
+                )}
+                <NumberTicker
+                    className="text-2xl font-extrabold text-white"
+                    value={value}
+                />
             </div>
             <p className="text-[11px] leading-4 text-white/90">{label}</p>
         </div>
@@ -16,7 +26,7 @@ function StatCard({ label, value, showPlus = false }) {
 
 function FeatureCard({ icon: Icon, title, desc }) {
     return (
-        <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15 backdrop-blur">
+        <div className="group rounded-2xl bg-white/10 p-4 ring-1 ring-white/15 backdrop-blur transition hover:-translate-y-1 hover:bg-white/15">
             <div className="flex items-start gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 ring-1 ring-white/20">
                     <Icon className="h-5 w-5 text-white" />
@@ -32,8 +42,12 @@ function FeatureCard({ icon: Icon, title, desc }) {
 
 export default function Hero({ THERAPIST }) {
     return (
-        <section id="nosotros" className="w-full bg-[#004aad] text-white">
-            <div className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-12 md:grid-cols-4 lg:py-16">
+        <section id="nosotros" className="relative w-full overflow-hidden bg-gradient-to-b from-[#004aad] via-[#003aa6] to-[#001aaf] text-white">
+            <div className="pointer-events-none absolute -left-32 top-10 h-64 w-64 rounded-full bg-sky-400/30 blur-3xl" />
+            <div className="pointer-events-none absolute right-[-6rem] bottom-[-6rem] h-80 w-80 rounded-full bg-emerald-400/25 blur-3xl" />
+
+
+            <div className="mx-auto flex max-w-7xl flex-col gap-10 px-4 py-12 lg:flex-row lg:items-center lg:py-20">
                 <div className="md:col-span-2">
                     <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs ring-1 ring-white/20">
                         <Sparkles className="h-3.5 w-3.5" /> Sobre mí
@@ -84,15 +98,16 @@ export default function Hero({ THERAPIST }) {
                 <div className="md:col-span-1 flex items-center justify-center">
                     <img src="/info.png" alt="Información" className="h-auto max-h-[520px] w-full object-contain drop-shadow-2xl" />
                 </div>
-
-                <div className="md:col-span-4">
-                    <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <FeatureCard icon={ShieldCheck} title="Atención certificada" desc="Profesionales con aval." />
-                        <FeatureCard icon={Activity} title="Planes a medida" desc="Protocolos personalizados." />
-                        <FeatureCard icon={HandHeart} title="Enfoque humano" desc="Acompañamiento y educación." />
-                    </div>
+            </div>
+            <div className="mx-auto max-w-7xl px-4 pb-10">
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <FeatureCard icon={ShieldCheck} title="Atención certificada" desc="Profesionales con aval y actualización constante." />
+                    <FeatureCard icon={Activity} title="Planes a medida" desc="Protocolos personalizados según tus objetivos." />
+                    <FeatureCard icon={HandHeart} title="Enfoque humano" desc="Acompañamiento cercano y educación al paciente." />
                 </div>
             </div>
         </section>
     );
 }
+
+
