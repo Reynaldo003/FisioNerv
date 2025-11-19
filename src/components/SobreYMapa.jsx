@@ -200,8 +200,8 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
                                 referrerPolicy="no-referrer-when-downgrade"
                                 src={base}
                             />
-                            <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-2">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-xs text-slate-800 shadow">
+                            <div className="pointer-events-none absolute right-3 top-3 flex flex-col gap-2">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-xs text-slate-800 shadow-2xl">
                                     <Star className="h-3.5 w-3.5" style={{ color: PRIMARY }} />
                                     {CLINIC.rating?.toFixed?.(1) || "5.0"} · {CLINIC.reviews || "100+"}
                                 </span>
@@ -209,9 +209,6 @@ export default function SobreYMapaPro({ CLINIC, PRIMARY = "#1E63C5" }) {
                                     <Clock3 className="h-3.5 w-3.5" style={{ color: PRIMARY }} />
                                     {CLINIC.hours?.[today.key] || "Lun–Sáb 9:00–18:00"}
                                 </span>
-                            </div>
-                            <div className="pointer-events-none absolute bottom-3 right-3 rounded-xl bg-white/90 px-3 py-1.5 text-xs text-slate-800 shadow">
-                                Vista {layer === "map" ? "Mapa" : "Satélite"}
                             </div>
                         </div>
                     </div>

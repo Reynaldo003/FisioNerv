@@ -6,7 +6,7 @@ export default function HeaderNav() {
             <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-3">
                     <div className="grid h-10 w-10 place-items-center rounded-xl bg-[--primary]/10 ring-1 ring-[--primary]/20">
-                        <Stethoscope className="h-6 w-6 text-[--primary]" />
+                        <img src="/onerv.png" className="h-9 w-9" />
                     </div>
                     <img className="w-40 sm:w-48" src="/logo.png" alt="FisioNerv" />
                 </div>

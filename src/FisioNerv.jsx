@@ -39,7 +39,7 @@ const SERVICES = [
     { name: "Rehabilitación deportiva", price: 380, tag: "Deportiva", description: "Retorno seguro a la actividad.", mediaSrc: "/rehabilitacion.png" },
 ];
 
-const images = ["/oxygen.png", "/DENTISTA.png", "/auFitness.png", "/logo.png", "/auFitness.png", "/auFitness.png", "/auFitness.png", "/DENTISTA.png", "/auFitness.png", "/DENTISTA.png", "/auFitness.png", "/auFitness.png"];
+const images = ["/oxygen.png", "/DENTISTA.png", "/auFitness.png", "/onerv.png", "/auFitness.png", "/auFitness.png", "/onerv.png", "/auFitness.png", "/DENTISTA.png", "/auFitness.png", "/DENTISTA.png", "/auFitness.png", "/auFitness.png"];
 
 export default function FisioNervLanding() {
     const PRIMARY = "#1E63C5";
