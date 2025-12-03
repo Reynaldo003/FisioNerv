@@ -1,4 +1,5 @@
 import HeaderNav from "@/components/HeaderNav";
+import Clinica from "@/components/Clinica";
 import Hero from "@/components/Hero";
 import SobreYMapa from "@/components/SobreYMapa";
 import Servicios from "@/components/Servicios";
@@ -46,6 +47,7 @@ export default function FisioNervLanding() {
     return (
         <div className="min-h-screen bg-neutral-100 dark:bg-[#0b0b0c] dark:text-neutral-200 text-slate-800 pb-28" style={{ "--primary": PRIMARY }}>
             <HeaderNav />
+            <Clinica CLINIC={CLINIC} />
             <Hero THERAPIST={THERAPIST} />
             <SobreYMapa CLINIC={CLINIC} />
             <Servicios SERVICES={SERVICES} />
