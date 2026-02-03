@@ -1,69 +1,61 @@
-import { useEffect, useRef, useState } from "react";
 import { Dumbbell } from "lucide-react";
-import { IconCloud } from "@/components/ui/icon-cloud";
-import { TextAnimate } from "@/components/ui/text-animate"
+import { TextAnimate } from "@/components/ui/text-animate";
 
-function useContainerSize() {
-    const ref = useRef(null);
-    const [size, setSize] = useState({ w: 0, h: 0 });
-    useEffect(() => {
-        if (!ref.current) return;
-        const obs = new ResizeObserver(([entry]) => {
-            const { width, height } = entry.contentRect;
-            setSize({ w: width, h: height });
-        });
-        obs.observe(ref.current);
-        return () => obs.disconnect();
-    }, []);
-    return { ref, ...size };
-}
+function Marquee({ images, speed = 26 }) {
+    const doubled = [...images, ...images];
 
-function LogoMarquee({ images }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-slate-300 bg-white dark:bg-neutral-800">
-            <div className="animate-[marquee_22s_linear_infinite] flex w-[200%] gap-8 p-6 [--tw-translate-x:0] ">
-                {[...images, ...images].map((src, i) => (
-                    <div key={i} className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border bg-white shadow-sm">
-                        <img src={src} alt="" className="h-12 w-12 rounded-full object-cover" />
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-2xl/30 dark:shadow-neutral-100">
+            <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-white to-transparent dark:bg-gradient-to-r dark:from-black dark:to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-white to-transparent dark:bg-gradient-to-l dark:from-black dark:to-transparent" />
+
+            <div
+                className="flex w-[200%] items-center gap-10 px-6 py-6"
+                style={{
+                    animation: `marquee ${speed}s linear infinite`,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.animationPlayState = "paused")}
+                onMouseLeave={(e) => (e.currentTarget.style.animationPlayState = "running")}
+            >
+                {doubled.map((src, i) => (
+                    <div
+                        key={i}
+                        className="flex h-20 w-36 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white dark:bg-[#F8FAFC]/80 shadow-2xl/30 dark:shadow-neutral-100 shadow-sm"
+                    >
+                        <img src={src} alt="" className="max-h-16 max-w-[120px] object-contain" />
                     </div>
                 ))}
             </div>
-            <style>{`@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
+
+            <style>{`
+        @keyframes marquee {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+      `}</style>
         </div>
     );
 }
 
-export default function Colaboraciones({ images }) {
-    const { ref, w, h } = useContainerSize();
-    const size = Math.max(260, Math.min(w, h)) || 320;
-
+export default function Colaboraciones({ images = [] }) {
     return (
         <section id="collabs" className="mx-auto mt-16 max-w-6xl px-4">
             <div className="mb-6 flex items-center gap-3">
                 <Dumbbell className="h-6 w-6 text-[#004aad]" />
-                <TextAnimate animation="blurInUp" className="mt-4 max-w-2xl  dark:text-white/90 text-2xl font-bold" by="word">
-                    Colaboraciones
+                <TextAnimate
+                    animation="blurInUp"
+                    className="mt-1 text-2xl font-bold  dark:text-white/90 text-slate-900"
+                    by="word"
+                >
+                    Convenios
                 </TextAnimate>
             </div>
 
-            <div className="hidden sm:block">
-                <div
-                    ref={ref}
-                    className="relative grid h-[480px] w-full place-items-center overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-xl dark:bg-neutral-800 dark:border-neutral-500 dark:shadow-neutral-700"
-                >
-                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(30,99,197,.08),transparent_50%)]" />
-                    <div
-                        className="pointer-events-none absolute inset-0 grid place-items-center "
-                        aria-hidden
-                    >
-                        <IconCloud images={images} iconSize={96} canvasSize={size} />
-                    </div>
-                </div>
-            </div>
+            <p className="mb-5 max-w-2xl text-sm dark:text-neutral-300 text-slate-600">
+                Centros y aliados que complementan tu proceso de recuperación.
+            </p>
 
-            <div className="sm:hidden">
-                <LogoMarquee images={images} />
-            </div>
+            <Marquee images={images} speed={24} />
         </section>
     );
 }
