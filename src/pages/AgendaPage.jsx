@@ -1,7 +1,7 @@
 // src/pages/AgendaPage.jsx
 import Agenda from "@/components/Agenda";
 import { CLINIC, PRIMARY } from "../shared/clinicData";
-import { useServicios } from "../shared/UseServicios";
+import { useServicios } from "../shared/useServicios";
 
 export default function AgendaPage() {
     const { SERVICES, loadingServices } = useServicios();

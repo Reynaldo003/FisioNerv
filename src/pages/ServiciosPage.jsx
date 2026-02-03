@@ -1,10 +1,10 @@
 // src/pages/ServiciosPage.jsx
 import Servicios from "@/components/Servicios";
-import { UseServicios } from "../shared/UseServicios";
+import { useServicios } from "../shared/useServicios";
 import { PRIMARY } from "../shared/clinicData";
 
 export default function ServiciosPage() {
-    const { SERVICES, loadingServices } = UseServicios();
+    const { SERVICES, loadingServices } = useServicios();
 
     return (
         <div className="space-y-6">

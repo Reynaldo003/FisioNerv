@@ -16,7 +16,7 @@ function durationToTag(durationStr) {
   return `${Math.round(total)} min`;
 }
 
-export function UseServicios() {
+export function useServicios() {
   const [servicesFromApi, setServicesFromApi] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
 
