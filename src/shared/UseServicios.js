@@ -12,6 +12,7 @@ function durationToTag(durationStr) {
   if (total <= 45) return "30–45 min";
   if (total <= 60) return "45–60 min";
   if (total <= 90) return "60–90 min";
+  if (total <= 100) return "+100 min";
   return `${Math.round(total)} min`;
 }
 
