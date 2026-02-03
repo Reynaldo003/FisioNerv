@@ -2,6 +2,7 @@
 import Servicios from "@/components/Servicios";
 import { PRIMARY } from "../shared/clinicData";
 import { useServicios } from "../shared/useServicios";
+// src/pages/ServiciosPage.jsx
 
 export default function ServiciosPage() {
     const { SERVICES, loadingServices } = useServicios();
