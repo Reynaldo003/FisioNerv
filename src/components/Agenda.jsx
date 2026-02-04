@@ -115,7 +115,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
     };
 
     return (
-        <section id="agenda" className="mx-auto mt-14 max-w-6xl px-4 sm:px-6  sm:flex-row sm:items-start sm:justify-between">
+        <section id="agenda" className="mx-auto mt-14 max-w-6xl px-4 sm:px-0 sm:flex-row sm:m-10">
             <div className="mb-6 flex items-center gap-3">
                 <CalendarDays className="h-6 w-6" style={{ color: PRIMARY }} />
                 <TextAnimate animation="blurInUp" className="text-2xl font-bold text-slate-900" by="word">
@@ -125,7 +125,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
 
             <div className="grid gap-6 lg:grid-cols-5">
                 <div className="lg:col-span-3">
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-xl sm:max-w-2xl">
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-xl sm:max-w-[600px]">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 1) Servicio
