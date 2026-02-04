@@ -91,7 +91,7 @@ export default function MorphicNavbar({ items = [], className = "" }) {
                 type="button"
                 onClick={() => onClickItem(it)}
                 className={[
-                  "relative z-10 rounded-xl px-3 py-2 text-sm font-medium",
+                  "relative z-10 rounded-xl px-3 py-2 text-sm font-bold",
                   "text-slate-700 hover:text-slate-900 dark:text-white/90",
                   "transition-colors",
                 ].join(" ")}

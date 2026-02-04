@@ -115,23 +115,17 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
     };
 
     return (
-        <section id="agenda" className="mx-auto mt-16 max-w-7xl px-4">
+        <section id="agenda" className="mx-auto mt-14 max-w-6xl px-4 sm:px-6  sm:flex-row sm:items-start sm:justify-between">
             <div className="mb-6 flex items-center gap-3">
                 <CalendarDays className="h-6 w-6" style={{ color: PRIMARY }} />
-                <TextAnimate
-                    animation="blurInUp"
-                    className="text-2xl font-bold text-slate-900"
-                    by="word"
-                >
+                <TextAnimate animation="blurInUp" className="text-2xl font-bold text-slate-900" by="word">
                     Agendar cita
                 </TextAnimate>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-5">
-                {/* Panel izquierdo (selección) */}
                 <div className="lg:col-span-3">
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-xl">
-                        {/* Servicio */}
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-xl sm:max-w-2xl">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 1) Servicio
@@ -164,9 +158,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                     <p className="text-xs text-slate-500">
                                         {selectedService ? `$${selectedService.price} MXN` : ""}
                                     </p>
-                                    <p className="mt-3 text-xs text-slate-500">
-                                        Selecciona fecha y hora para continuar.
-                                    </p>
+                                    <p className="mt-3 text-xs text-slate-500">Selecciona fecha y hora para continuar.</p>
                                 </div>
                             </div>
                         </div>
@@ -218,19 +210,24 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                     </p>
                                 </div>
 
-                                <div className="flex gap-1 rounded-full border border-slate-200 bg-white p-1">
-                                    {["Todo", "Mañana", "Tarde", "Noche"].map((p) => (
-                                        <button
-                                            key={p}
-                                            onClick={() => setPeriod(p)}
-                                            className={[
-                                                "rounded-full px-3 py-1 text-xs font-semibold",
-                                                period === p ? "bg-[#004aad] text-white" : "text-slate-700 hover:bg-slate-50",
-                                            ].join(" ")}
-                                        >
-                                            {p}
-                                        </button>
-                                    ))}
+                                {/* ✅ En móvil: scroll horizontal si no cabe */}
+                                <div className="flex max-w-full overflow-x-auto rounded-full border border-slate-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                    <div className="flex gap-1">
+                                        {["Todo", "Mañana", "Tarde", "Noche"].map((p) => (
+                                            <button
+                                                key={p}
+                                                onClick={() => setPeriod(p)}
+                                                className={[
+                                                    "shrink-0 rounded-full px-3 py-1 text-xs font-semibold",
+                                                    period === p
+                                                        ? "bg-[#004aad] text-white"
+                                                        : "text-slate-700 hover:bg-slate-50",
+                                                ].join(" ")}
+                                            >
+                                                {p}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
 
@@ -262,15 +259,21 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                     </div>
                 </div>
 
-                {/* Panel derecho (Doctoralia-ish: resumen + formulario sticky) */}
-                <div className="lg:col-span-2">
-                    <div className="sticky top-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-xl">
+                {/* Panel derecho (resumen + formulario) */}
+                <div className="lg:col-span-2 mt-6 lg:mt-0">
+                    {/* ✅ Sticky solo en pantallas grandes */}
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-xl lg:sticky lg:top-6">
                         <p className="text-sm font-bold text-slate-900">Confirmar</p>
                         <p className="mt-1 text-sm text-slate-600">
                             {selectedService ? (
                                 <>
                                     <b>{selectedService.name}</b> · {formatDateLong(selectedDate)}
-                                    {selectedSlot ? <> · <b>{selectedSlot}</b></> : null}
+                                    {selectedSlot ? (
+                                        <>
+                                            {" "}
+                                            · <b>{selectedSlot}</b>
+                                        </>
+                                    ) : null}
                                 </>
                             ) : (
                                 "Selecciona un servicio"
