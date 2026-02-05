@@ -84,7 +84,7 @@ export default function HeaderNav() {
             {/* Drawer móvil */}
             <div
                 className={[
-                    "lg:hidden fixed inset-0",
+                    "fixed inset-0 lg:hidden",
                     open ? "pointer-events-auto" : "pointer-events-none",
                 ].join(" ")}
                 aria-hidden={!open}
@@ -101,13 +101,15 @@ export default function HeaderNav() {
                 {/* Panel opaco */}
                 <div
                     className={[
-                        "absolute right-0 top-0 max-h-[600px] w-0 max-w-sm",
+                        "absolute right-0 top-0 h-dvh w-[min(100vw,380px)]", // 👈 100vw para 320px
                         "bg-white text-slate-900 shadow-2xl",
                         "dark:bg-neutral-950 dark:text-white",
-                        "transition-transform",
-                        open ? "translate-x-0 w-[400px]" : "translate-x-full hidden",
+                        "transform transition-transform duration-300 ease-out",
+                        open ? "translate-x-0" : "translate-x-full hidden",
+                        "flex flex-col", // 👈 clave
                     ].join(" ")}
                 >
+                    {/* Header fijo */}
                     <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-slate-800">
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">Menú</p>
 
@@ -121,7 +123,8 @@ export default function HeaderNav() {
                         </button>
                     </div>
 
-                    <nav className="px-4 py-4">
+                    {/* Contenido scrolleable */}
+                    <nav className="flex-1 overflow-y-auto px-4 py-4">
                         <ul className="space-y-1">
                             {items.map((it) => {
                                 const active = location.pathname === it.href;
@@ -143,16 +146,20 @@ export default function HeaderNav() {
                                 );
                             })}
                         </ul>
+                    </nav>
 
+                    {/* Footer fijo (para que nunca tape el menú) */}
+                    <div className="border-t border-slate-200 p-4 dark:border-slate-800">
                         <Link
                             to="/agenda"
-                            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#004aad] px-4 py-3 text-sm font-semibold text-white shadow hover:brightness-110"
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#004aad] px-4 py-3 text-sm font-semibold text-white shadow hover:brightness-110"
                         >
                             <PhoneCall className="h-4 w-4" />
                             Agendar cita
                         </Link>
-                    </nav>
+                    </div>
                 </div>
+
             </div >
         </header >
     );
