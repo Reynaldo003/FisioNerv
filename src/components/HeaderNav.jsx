@@ -62,7 +62,7 @@ export default function HeaderNav() {
                         className="
                             inline-flex items-center gap-2 rounded-xl bg-[#004aad]
                             px-3 py-2 text-sm font-semibold text-white shadow hover:brightness-110
-                            md:px-3 md:py-2 md:text-sm
+                            md:px-3 md:py-2 md:text-sm sm:hidden
                         "
                     >
                         <PhoneCall className="h-4 w-4" />
