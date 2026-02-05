@@ -36,7 +36,6 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
             .map((s) => ({ ...s, disabled: s.disabled || busySet.has(s.label) }));
     }, [slots, period, busySlots]);
 
-    // Cargar ocupados al cambiar día
     useEffect(() => {
         async function loadBusy() {
             try {
@@ -63,7 +62,6 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
         loadBusy();
     }, [selectedDate]);
 
-    // Reset slot al cambiar periodo
     useEffect(() => setSelectedSlot(null), [period]);
 
     const confirmBooking = async () => {
@@ -115,7 +113,14 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
     };
 
     return (
-        <section id="agenda" className="mx-auto mt-14 max-w-6xl px-4 sm:px-0 sm:flex-row sm:m-10">
+        <section
+            id="agenda"
+            className="
+      mx-auto mt-14 w-full max-w-6xl
+      px-4 sm:px-6
+      overflow-x-hidden
+    "
+        >
             <div className="mb-6 flex items-center gap-3">
                 <CalendarDays className="h-6 w-6" style={{ color: PRIMARY }} />
                 <TextAnimate animation="blurInUp" className="text-2xl font-bold text-slate-900" by="word">
@@ -124,18 +129,26 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
             </div>
 
             <div className="grid gap-6 lg:grid-cols-5">
-                <div className="lg:col-span-3">
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-xl sm:max-w-[600px]">
+                {/* Columna izquierda */}
+                <div className="lg:col-span-3 min-w-0">
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-xl w-full min-w-0">
+                        {/* Paso 1 */}
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 1) Servicio
                             </p>
 
-                            <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                                <div>
+                            <div className="mt-2 grid gap-3 sm:grid-cols-2 min-w-0">
+                                <div className="min-w-0">
                                     <label className="text-sm font-semibold text-slate-800">Selecciona</label>
+
                                     <select
-                                        className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm outline-none focus:ring-2 focus:ring-[#004aad]/25"
+                                        className="
+                    mt-2 w-full min-w-0
+                    rounded-2xl border border-slate-200 bg-white
+                    px-4 py-3 text-sm text-slate-800 shadow-sm outline-none
+                    focus:ring-2 focus:ring-[#004aad]/25
+                  "
                                         value={selectedServiceId || ""}
                                         onChange={(e) => setSelectedServiceId(Number(e.target.value))}
                                     >
@@ -145,35 +158,42 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                             </option>
                                         ))}
                                     </select>
+
                                     {!!selectedService?.description && (
-                                        <p className="mt-2 text-xs text-slate-600">{selectedService.description}</p>
+                                        <p className="mt-2 text-xs text-slate-600 break-words">
+                                            {selectedService.description}
+                                        </p>
                                     )}
                                 </div>
 
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 min-w-0">
                                     <p className="text-sm font-semibold text-slate-800">Resumen</p>
-                                    <p className="mt-1 text-sm text-slate-600">
+                                    <p className="mt-1 text-sm text-slate-600 break-words">
                                         <b>{selectedService?.name || "—"}</b>
                                     </p>
                                     <p className="text-xs text-slate-500">
                                         {selectedService ? `$${selectedService.price} MXN` : ""}
                                     </p>
-                                    <p className="mt-3 text-xs text-slate-500">Selecciona fecha y hora para continuar.</p>
+                                    <p className="mt-3 text-xs text-slate-500">
+                                        Selecciona fecha y hora para continuar.
+                                    </p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Día */}
+                        {/* Paso 2: Fecha */}
                         <div className="mt-8">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 2) Fecha
                             </p>
 
-                            <div className="mt-3 -mx-2 overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                <div className="flex gap-2">
+                            {/* 👇 sin -mx-2 para evitar overflow en móviles */}
+                            <div className="mt-3 w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                <div className="flex gap-2 pr-2">
                                     {days.map((d) => {
                                         const chip = formatDayChip(d);
                                         const active = d.toDateString() === selectedDate.toDateString();
+
                                         return (
                                             <button
                                                 key={d.toDateString()}
@@ -195,14 +215,14 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                 </div>
                             </div>
 
-                            <p className="mt-2 text-sm text-slate-600">
+                            <p className="mt-2 text-sm text-slate-600 break-words">
                                 Seleccionado: <b className="text-slate-900">{formatDateLong(selectedDate)}</b>
                             </p>
                         </div>
 
-                        {/* Hora */}
+                        {/* Paso 3: Hora */}
                         <div className="mt-8">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
                                 <div className="flex items-center gap-2">
                                     <Clock3 className="h-5 w-5" style={{ color: PRIMARY }} />
                                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -210,7 +230,6 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                     </p>
                                 </div>
 
-                                {/* ✅ En móvil: scroll horizontal si no cabe */}
                                 <div className="flex max-w-full overflow-x-auto rounded-full border border-slate-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                     <div className="flex gap-1">
                                         {["Todo", "Mañana", "Tarde", "Noche"].map((p) => (
@@ -219,9 +238,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                                 onClick={() => setPeriod(p)}
                                                 className={[
                                                     "shrink-0 rounded-full px-3 py-1 text-xs font-semibold",
-                                                    period === p
-                                                        ? "bg-[#004aad] text-white"
-                                                        : "text-slate-700 hover:bg-slate-50",
+                                                    period === p ? "bg-[#004aad] text-white" : "text-slate-700 hover:bg-slate-50",
                                                 ].join(" ")}
                                             >
                                                 {p}
@@ -231,14 +248,14 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                 </div>
                             </div>
 
-                            <div className="mt-4 grid gap-2 sm:[grid-template-columns:repeat(auto-fill,minmax(140px,1fr))]">
+                            <div className="mt-4 grid gap-2 sm:[grid-template-columns:repeat(auto-fill,minmax(140px,1fr))] min-w-0">
                                 {filtered.map((s) => (
                                     <button
                                         key={s.label}
                                         disabled={s.disabled}
                                         onClick={() => setSelectedSlot(s.label)}
                                         className={[
-                                            "rounded-2xl border p-3 text-left transition",
+                                            "rounded-2xl border p-3 text-left transition w-full min-w-0",
                                             s.disabled
                                                 ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400 line-through"
                                                 : selectedSlot === s.label
@@ -259,19 +276,18 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                     </div>
                 </div>
 
-                {/* Panel derecho (resumen + formulario) */}
-                <div className="lg:col-span-2 mt-6 lg:mt-0">
-                    {/* ✅ Sticky solo en pantallas grandes */}
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-xl lg:sticky lg:top-6">
+                {/* Columna derecha */}
+                <div className="lg:col-span-2 mt-6 lg:mt-0 min-w-0">
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-xl w-full min-w-0 lg:sticky lg:top-6">
                         <p className="text-sm font-bold text-slate-900">Confirmar</p>
-                        <p className="mt-1 text-sm text-slate-600">
+
+                        <p className="mt-1 text-sm text-slate-600 break-words">
                             {selectedService ? (
                                 <>
                                     <b>{selectedService.name}</b> · {formatDateLong(selectedDate)}
                                     {selectedSlot ? (
                                         <>
-                                            {" "}
-                                            · <b>{selectedSlot}</b>
+                                            {" "}· <b>{selectedSlot}</b>
                                         </>
                                     ) : null}
                                 </>
@@ -280,18 +296,18 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                             )}
                         </p>
 
-                        <div className="mt-5 grid gap-3">
+                        <div className="mt-5 grid gap-3 min-w-0">
                             <input
                                 type="text"
                                 placeholder="Tu nombre"
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#004aad]/25"
+                                className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#004aad]/25"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                             />
                             <input
                                 type="tel"
                                 placeholder="WhatsApp"
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#004aad]/25"
+                                className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#004aad]/25"
                                 value={phone}
                                 onChange={(e) => setPhone(e.target.value)}
                             />
@@ -300,7 +316,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                 onClick={confirmBooking}
                                 disabled={!selectedService || !selectedSlot || !name || !phone || booking}
                                 className={[
-                                    "inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-lg transition",
+                                    "inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-lg transition",
                                     !selectedService || !selectedSlot || !name || !phone || booking
                                         ? "bg-slate-300 text-slate-600 shadow-none"
                                         : "bg-[#004aad] shadow-[#004aad]/25 hover:brightness-110",
@@ -310,10 +326,10 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                 {booking ? "Registrando..." : "Confirmar cita"}
                             </button>
 
-                            {message && <p className="text-xs font-semibold text-emerald-700">{message}</p>}
-                            {error && <p className="text-xs font-semibold text-rose-700">{error}</p>}
+                            {message && <p className="text-xs font-semibold text-emerald-700 break-words">{message}</p>}
+                            {error && <p className="text-xs font-semibold text-rose-700 break-words">{error}</p>}
 
-                            <p className="pt-2 text-[11px] text-slate-500">
+                            <p className="pt-2 text-[11px] text-slate-500 break-words">
                                 Al confirmar, registramos la cita y abrimos WhatsApp para confirmar detalles.
                             </p>
                         </div>

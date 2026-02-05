@@ -81,7 +81,14 @@ export default function MorphicNavbar({ items = [], className = "" }) {
       ].join(" ")}
       aria-label="Navegación"
     >
-      <ul className="relative flex items-center gap-1">
+      <ul
+        className="
+          relative flex items-center gap-1
+          whitespace-nowrap
+          overflow-x-auto
+          [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+        "
+      >
         {items.map((it) => {
           const isActive = activeId === it.id;
 

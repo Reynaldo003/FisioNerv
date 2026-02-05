@@ -21,10 +21,8 @@ export default function HeaderNav() {
         []
     );
 
-    // Cierra el menú al cambiar de ruta
     useEffect(() => setOpen(false), [location.pathname]);
 
-    // Bloquea scroll del body cuando el drawer está abierto
     useEffect(() => {
         if (!open) return;
         const prev = document.body.style.overflow;
@@ -50,25 +48,32 @@ export default function HeaderNav() {
                 </Link>
 
                 {/* Desktop */}
-                <div className="hidden md:block">
-                    <MorphicNavbar items={items} />
+                <div className="hidden lg:block flex-1 min-w-0">
+                    <div className="flex justify-center min-w-0">
+                        <MorphicNavbar items={items} className="max-w-full" />
+                    </div>
                 </div>
+
 
                 <div className="flex items-center gap-2">
                     {/* CTA visible siempre */}
                     <Link
                         to="/agenda"
-                        className="inline-flex items-center gap-2 rounded-xl bg-[#004aad] px-3 py-2 text-sm font-semibold text-white shadow hover:brightness-110 sm:px-4"
+                        className="
+                            inline-flex items-center gap-2 rounded-xl bg-[#004aad]
+                            px-3 py-2 text-sm font-semibold text-white shadow hover:brightness-110
+                            md:px-3 md:py-2 md:text-sm
+                        "
                     >
                         <PhoneCall className="h-4 w-4" />
-                        <span className="hidden sm:inline">Agendar</span>
+                        <span className="hidden lg:inline">Agendar</span>
                     </Link>
 
                     {/* Botón menú móvil */}
                     <button
                         type="button"
                         onClick={() => setOpen(true)}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/70 text-slate-900 shadow-sm hover:bg-white md:hidden dark:border-slate-800 dark:bg-black/40 dark:text-white"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/70 text-slate-900 shadow-sm hover:bg-white lg:hidden dark:border-slate-800 dark:bg-black/40 dark:text-white"
                         aria-label="Abrir menú"
                     >
                         <Menu className="h-5 w-5" />
@@ -79,7 +84,7 @@ export default function HeaderNav() {
             {/* Drawer móvil */}
             <div
                 className={[
-                    "md:hidden fixed inset-0",
+                    "lg:hidden fixed inset-0",
                     open ? "pointer-events-auto" : "pointer-events-none",
                 ].join(" ")}
                 aria-hidden={!open}
@@ -103,8 +108,6 @@ export default function HeaderNav() {
                         open ? "translate-x-0 w-[400px]" : "translate-x-full hidden",
                     ].join(" ")}
                 >
-
-
                     <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 dark:border-slate-800">
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">Menú</p>
 
