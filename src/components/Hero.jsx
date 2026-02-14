@@ -1,5 +1,6 @@
 // src/components/Hero.jsx
 import { Link } from "react-router-dom";
+import { ShieldCheck } from "lucide-react";
 
 export default function Hero() {
     return (
@@ -18,17 +19,24 @@ export default function Hero() {
                 <div className="mx-auto w-full max-w-6xl px-4">
                     <div className="max-w-xl">
                         <h2 className="text-4xl font-semibold text-white leading-tight">
-                            Lic. Edgar Mauricio <br /> Medina Cruz
+                            LFT. Edgar Mauricio<br /> Medina Cruz
                         </h2>
 
-                        <p className="mt-3 text-white/90 text-lg font-medium">
-                            Tecnología avanzada, trato humano y planes a tu medida.
+                        <p className="mt-2 text-white/80 text-base font-semibold">
+                            Especialidad en rehabilitación neurológica
                         </p>
 
-                        <p className="mt-2 text-white/80 text-sm">
-                            Recupera movilidad y reduce dolor con un plan claro, progresivo y medible.
+                        <p className="mt-2 text-white/80 text-base font-semibold">
+                            Maestría en rehabilitación de traumatología y ortopedia
                         </p>
 
+                        <p className="mt-2 text-white/80 text-base font-semibold">
+                            Maestría en rehabilitación oncológica
+                        </p>
+
+                        <p className="mt-2 text-white/80 text-base font-semibold">
+                            Ced. Prof. <span className="font-bold">14168874</span>
+                        </p>
                         <div className="mt-7 flex flex-wrap gap-3">
                             <Link
                                 to="/agenda"

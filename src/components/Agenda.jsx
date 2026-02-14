@@ -6,6 +6,9 @@ import { TextAnimate } from "@/components/ui/text-animate";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+// Solo como “hint” (el backend ya lo fuerza)
+const DEFAULT_PUBLIC_PROFESSIONAL = "Edgar Mauricio Medina Cruz";
+
 export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" }) {
     const days = useMemo(() => nextDays(14), []);
     const [selectedServiceId, setSelectedServiceId] = useState(SERVICES?.[0]?.id || null);
@@ -25,10 +28,8 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
 
-    // Slots base
     const slots = useMemo(() => buildSlots(selectedDate), [selectedDate]);
 
-    // Slots filtrados
     const filtered = useMemo(() => {
         const busySet = new Set(busySlots);
         return slots
@@ -83,6 +84,9 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                 servicio_id: selectedService.id,
                 fecha,
                 hora_inicio: selectedSlot,
+
+                // hint (opcional)
+                profesional_hint: DEFAULT_PUBLIC_PROFESSIONAL,
             };
 
             const resp = await fetch(`${API_BASE}/api/public/citas/`, {
@@ -100,9 +104,8 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
             setBusySlots((prev) => (prev.includes(selectedSlot) ? prev : [...prev, selectedSlot]));
 
             const text = encodeURIComponent(
-                `Hola, soy ${name}. Quiero confirmar mi cita de ${selectedService.name} en ${CLINIC.name} el ${formatDateLong(
-                    selectedDate
-                )} a las ${selectedSlot}. Mi WhatsApp es ${phone}.`
+                `Hola, soy ${name}. Quiero confirmar mi cita de ${selectedService.name || selectedService.nombre} en ${CLINIC.name
+                } el ${formatDateLong(selectedDate)} a las ${selectedSlot}. Mi WhatsApp es ${phone}.`
             );
             window.open(`https://wa.me/522711224494?text=${text}`, "_blank");
         } catch {
@@ -116,10 +119,10 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
         <section
             id="agenda"
             className="
-      mx-auto mt-14 w-full max-w-6xl
-      px-4 sm:px-6
-      overflow-x-hidden
-    "
+        mx-auto mt-14 w-full max-w-6xl
+        px-4 sm:px-6
+        overflow-x-hidden
+      "
         >
             <div className="mb-6 flex items-center gap-3">
                 <CalendarDays className="h-6 w-6" style={{ color: PRIMARY }} />
@@ -134,9 +137,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                     <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-xl w-full min-w-0">
                         {/* Paso 1 */}
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                1) Servicio
-                            </p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">1) Servicio</p>
 
                             <div className="mt-2 grid gap-3 sm:grid-cols-2 min-w-0">
                                 <div className="min-w-0">
@@ -144,50 +145,52 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
 
                                     <select
                                         className="
-                    mt-2 w-full min-w-0
-                    rounded-2xl border border-slate-200 bg-white
-                    px-4 py-3 text-sm text-slate-800 shadow-sm outline-none
-                    focus:ring-2 focus:ring-[#004aad]/25
-                  "
+                      mt-2 w-full min-w-0
+                      rounded-2xl border border-slate-200 bg-white
+                      px-4 py-3 text-sm text-slate-800 shadow-sm outline-none
+                      focus:ring-2 focus:ring-[#004aad]/25
+                    "
                                         value={selectedServiceId || ""}
                                         onChange={(e) => setSelectedServiceId(Number(e.target.value))}
                                     >
                                         {SERVICES.map((s) => (
                                             <option key={s.id} value={s.id}>
-                                                {s.name} · ${s.price}
+                                                {(s.name || s.nombre)} · ${(s.price ?? s.precio)}
                                             </option>
                                         ))}
                                     </select>
 
-                                    {!!selectedService?.description && (
+                                    {!!(selectedService?.description || selectedService?.descripcion) && (
                                         <p className="mt-2 text-xs text-slate-600 break-words">
-                                            {selectedService.description}
+                                            {selectedService.description || selectedService.descripcion}
                                         </p>
                                     )}
+
+                                    <p className="mt-1 text-sm text-slate-600 break-words">
+                                        <b>{(selectedService?.name || selectedService?.nombre) || "—"}</b>
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {selectedService ? `$${selectedService.price ?? selectedService.precio} MXN` : ""}
+                                    </p>
                                 </div>
 
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 min-w-0">
                                     <p className="text-sm font-semibold text-slate-800">Resumen</p>
                                     <p className="mt-1 text-sm text-slate-600 break-words">
-                                        <b>{selectedService?.name || "—"}</b>
+                                        <b>{selectedService?.name || selectedService?.nombre || "—"}</b>
                                     </p>
                                     <p className="text-xs text-slate-500">
-                                        {selectedService ? `$${selectedService.price} MXN` : ""}
+                                        {selectedService ? `$${selectedService.price ?? selectedService.precio} MXN` : ""}
                                     </p>
-                                    <p className="mt-3 text-xs text-slate-500">
-                                        Selecciona fecha y hora para continuar.
-                                    </p>
+                                    <p className="mt-3 text-xs text-slate-500">Selecciona fecha y hora para continuar.</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Paso 2: Fecha */}
                         <div className="mt-8">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                2) Fecha
-                            </p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">2) Fecha</p>
 
-                            {/* 👇 sin -mx-2 para evitar overflow en móviles */}
                             <div className="mt-3 w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                 <div className="flex gap-2 pr-2">
                                     {days.map((d) => {
@@ -200,9 +203,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                                 onClick={() => setSelectedDate(d)}
                                                 className={[
                                                     "shrink-0 rounded-2xl border px-4 py-3 text-left",
-                                                    active
-                                                        ? "border-[#004aad] bg-[#004aad]/5"
-                                                        : "border-slate-200 bg-white hover:bg-slate-50",
+                                                    active ? "border-[#004aad] bg-[#004aad]/5" : "border-slate-200 bg-white hover:bg-slate-50",
                                                 ].join(" ")}
                                                 style={{ minWidth: 86 }}
                                             >
@@ -225,9 +226,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
                                 <div className="flex items-center gap-2">
                                     <Clock3 className="h-5 w-5" style={{ color: PRIMARY }} />
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                        3) Hora
-                                    </p>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">3) Hora</p>
                                 </div>
 
                                 <div className="flex max-w-full overflow-x-auto rounded-full border border-slate-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -268,9 +267,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                                     </button>
                                 ))}
 
-                                {!filtered.length && (
-                                    <p className="text-sm text-slate-500">No hay horarios disponibles para este día.</p>
-                                )}
+                                {!filtered.length && <p className="text-sm text-slate-500">No hay horarios disponibles para este día.</p>}
                             </div>
                         </div>
                     </div>
@@ -284,10 +281,11 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                         <p className="mt-1 text-sm text-slate-600 break-words">
                             {selectedService ? (
                                 <>
-                                    <b>{selectedService.name}</b> · {formatDateLong(selectedDate)}
+                                    <b>{selectedService.name || selectedService.nombre}</b> · {formatDateLong(selectedDate)}
                                     {selectedSlot ? (
                                         <>
-                                            {" "}· <b>{selectedSlot}</b>
+                                            {" "}
+                                            · <b>{selectedSlot}</b>
                                         </>
                                     ) : null}
                                 </>

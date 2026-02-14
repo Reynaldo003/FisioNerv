@@ -9,10 +9,9 @@ export default function Clinica() {
                 <div>
                     <p className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-sm text-slate-700 border border-slate-200">
                         <ShieldCheck className="h-4 w-4 text-[#004aad]" />
-                        Clínica de fisioterapia y rehabilitación
+                        Permiso sanitario COFEPRIS: 2530062002AA00019
                     </p>
-
-                    <h1 className="mt-5 text-4xl font-semibold text-[#004aad]">FisioNerv</h1>
+                    <h1 className="mt-5 text-4xl font-semibold text-[#004aad]">Fisionerv</h1>
 
                     <p className="mt-4 text-lg font-semibold text-slate-900">
                         Fisioterapia avanzada con enfoque humano

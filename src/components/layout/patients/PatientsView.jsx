@@ -6,13 +6,30 @@ import { FilterBlock } from "./FilterBlock";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 function getFullName(p) {
-  return `${p.nombres || ""} ${p.apellido_pat || ""} ${p.apellido_mat || ""
-    }`.trim();
+  return `${p.nombres || ""} ${p.apellido_pat || ""} ${p.apellido_mat || ""}`.trim();
 }
 
 function getProfessionalLabel(p) {
   const full = `${p.first_name || ""} ${p.last_name || ""}`.trim();
   return full || p.username || `Profesional #${p.id}`;
+}
+
+function formatDateMX(iso) {
+  if (!iso) return "—";
+  // iso: YYYY-MM-DD
+  const [y, m, d] = String(iso).split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+}
+
+function formatTimeHM(hhmmss) {
+  if (!hhmmss) return "—";
+  return String(hhmmss).slice(0, 5);
+}
+
+function estadoTratamientoLabel(v) {
+  if (v === "alta") return "Dado de alta";
+  return "En tratamiento";
 }
 
 export function PatientsView() {
@@ -26,9 +43,9 @@ export function PatientsView() {
   // búsqueda + filtros
   const [search, setSearch] = useState("");
   const [filterBranch, setFilterBranch] = useState("Todos");
-  const [filterProfessional, setFilterProfessional] = useState("Todos"); // id o "Todos"
-  const [filterService, setFilterService] = useState("Todos"); // nombre servicio o "Todos"
-  const [filterStatus, setFilterStatus] = useState("Todos"); // Todos | Con reservas | Sin reservas
+  const [filterProfessional, setFilterProfessional] = useState("Todos");
+  const [filterService, setFilterService] = useState("Todos");
+  const [filterStatus, setFilterStatus] = useState("Todos");
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
 
@@ -36,7 +53,11 @@ export function PatientsView() {
   const [profileOpen, setProfileOpen] = useState(false);
 
   const [formOpen, setFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState("create"); // "create" | "edit"
+  const [formMode, setFormMode] = useState("create");
+
+  // ✅ NUEVO: modal confirmación eliminar con palabra
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const logoutAndRedirect = () => {
     localStorage.removeItem("auth.access");
@@ -44,10 +65,6 @@ export function PatientsView() {
     localStorage.removeItem("auth.user");
     window.location.href = "/login";
   };
-
-  // =========================
-  // Cargar datos del backend
-  // =========================
 
   useEffect(() => {
     const token = localStorage.getItem("auth.access");
@@ -62,30 +79,17 @@ export function PatientsView() {
 
         const [patientsResp, citasResp, profsResp] = await Promise.all([
           fetch(`${API_BASE}/api/pacientes/`, {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           }),
           fetch(`${API_BASE}/api/citas/`, {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           }),
           fetch(`${API_BASE}/api/profesionales/`, {
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           }),
         ]);
 
-        if (
-          patientsResp.status === 401 ||
-          citasResp.status === 401 ||
-          profsResp.status === 401
-        ) {
+        if (patientsResp.status === 401 || citasResp.status === 401 || profsResp.status === 401) {
           logoutAndRedirect();
           return;
         }
@@ -114,34 +118,21 @@ export function PatientsView() {
     loadAll();
   }, []);
 
-  // Para botón "Cargar pacientes" (reload)
   const reloadPatients = async () => {
     const token = localStorage.getItem("auth.access");
-    if (!token) {
-      logoutAndRedirect();
-      return;
-    }
+    if (!token) return logoutAndRedirect();
 
     try {
       setLoading(true);
       const resp = await fetch(`${API_BASE}/api/pacientes/`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       });
 
-      if (resp.status === 401) {
-        logoutAndRedirect();
-        return;
-      }
+      if (resp.status === 401) return logoutAndRedirect();
 
       const data = await resp.json();
       setPatients(data || []);
-
-      if (data?.length && data[0].clinica) {
-        setDefaultClinicId(data[0].clinica);
-      }
+      if (data?.length && data[0].clinica) setDefaultClinicId(data[0].clinica);
     } catch (e) {
       console.error("Error recargando pacientes:", e);
     } finally {
@@ -149,18 +140,13 @@ export function PatientsView() {
     }
   };
 
-  // =========================
-  // Enriquecer pacientes con info de citas
-  // =========================
-
+  // ========= Enriquecer pacientes con info de citas =========
   const enhancedPatients = useMemo(() => {
     const citasPorPaciente = new Map();
 
     citas.forEach((c) => {
       if (!c.paciente) return;
-      if (!citasPorPaciente.has(c.paciente)) {
-        citasPorPaciente.set(c.paciente, []);
-      }
+      if (!citasPorPaciente.has(c.paciente)) citasPorPaciente.set(c.paciente, []);
       citasPorPaciente.get(c.paciente).push(c);
     });
 
@@ -176,11 +162,8 @@ export function PatientsView() {
         if (c.profesional) professionalsSet.add(c.profesional);
 
         const key = `${c.fecha || ""}T${c.hora_inicio || ""}`;
-        if (!lastCita) {
-          lastCita = { ...c, _key: key };
-        } else if (key > lastCita._key) {
-          lastCita = { ...c, _key: key };
-        }
+        if (!lastCita) lastCita = { ...c, _key: key };
+        else if (key > lastCita._key) lastCita = { ...c, _key: key };
       });
 
       const hasReservations = cp.length > 0;
@@ -193,25 +176,19 @@ export function PatientsView() {
         servicesSet,
         professionalsSet,
         hasReservations,
-        // por ahora solo una sede
         branchLabel: "Fisionerv Centro",
+        _citas: cp, // ✅ útil para el expediente clínico
       };
     });
   }, [patients, citas]);
 
-  // Lista de servicios disponibles para filtro
   const servicesForFilter = useMemo(() => {
     const set = new Set();
-    enhancedPatients.forEach((p) => {
-      p.servicesSet?.forEach((s) => s && set.add(s));
-    });
+    enhancedPatients.forEach((p) => p.servicesSet?.forEach((s) => s && set.add(s)));
     return Array.from(set).sort();
   }, [enhancedPatients]);
 
-  // =========================
-  // Handlers
-  // =========================
-
+  // ========= Handlers =========
   const handleOpenCreate = () => {
     setFormMode("create");
     setSelectedPatient(null);
@@ -229,30 +206,22 @@ export function PatientsView() {
     setProfileOpen(true);
   };
 
-  const handleDeletePatient = async (patient) => {
-    const ok = window.confirm(
-      `¿Seguro que deseas eliminar al paciente ${getFullName(patient)}?`,
-    );
-    if (!ok) return;
+  const handleDeletePatient = (patient) => {
+    setDeleteTarget(patient);
+    setDeleteOpen(true);
+  };
 
+  const confirmDeletePatient = async (patient) => {
     const token = localStorage.getItem("auth.access");
-    if (!token) {
-      logoutAndRedirect();
-      return;
-    }
+    if (!token) return logoutAndRedirect();
 
     try {
       const resp = await fetch(`${API_BASE}/api/pacientes/${patient.id}/`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (resp.status === 401) {
-        logoutAndRedirect();
-        return;
-      }
+      if (resp.status === 401) return logoutAndRedirect();
 
       if (!resp.ok && resp.status !== 204) {
         const data = await resp.json().catch(() => null);
@@ -264,6 +233,8 @@ export function PatientsView() {
       setPatients((prev) => prev.filter((p) => p.id !== patient.id));
       setProfileOpen(false);
       setSelectedPatient(null);
+      setDeleteOpen(false);
+      setDeleteTarget(null);
     } catch (e) {
       console.error("Error al eliminar paciente:", e);
       alert("Ocurrió un error al eliminar al paciente.");
@@ -272,53 +243,39 @@ export function PatientsView() {
 
   const handleSavePatient = async (formData) => {
     const token = localStorage.getItem("auth.access");
-    if (!token) {
-      logoutAndRedirect();
-      return;
-    }
+    if (!token) return logoutAndRedirect();
 
     const isEdit = formMode === "edit" && selectedPatient;
-
-    const url = isEdit
-      ? `${API_BASE}/api/pacientes/${selectedPatient.id}/`
-      : `${API_BASE}/api/pacientes/`;
+    const url = isEdit ? `${API_BASE}/api/pacientes/${selectedPatient.id}/` : `${API_BASE}/api/pacientes/`;
     const method = isEdit ? "PATCH" : "POST";
 
     const payload = {
-      // si es nuevo, usamos la clínica por defecto
-      clinica: isEdit
-        ? selectedPatient.clinica || defaultClinicId
-        : defaultClinicId,
+      clinica: isEdit ? selectedPatient.clinica || defaultClinicId : defaultClinicId,
       nombres: formData.nombres,
       apellido_pat: formData.apellido_pat,
       apellido_mat: formData.apellido_mat || "",
-      fecha_nac: formData.fecha_nac,
+      fecha_nac: formData.fecha_nac || null,
       genero: formData.genero || "",
       telefono: formData.telefono,
       correo: formData.correo || "",
       molestia: formData.molestia || "",
       notas: formData.notas || "",
+
+      // ✅ NUEVO
+      estado_tratamiento: formData.estado_tratamiento || "en_tratamiento",
+      fecha_alta: formData.estado_tratamiento === "alta" ? (formData.fecha_alta || null) : null,
     };
 
-    // para PATCH no es necesario mandar clinica si no cambió
-    if (isEdit) {
-      delete payload.clinica;
-    }
+    if (isEdit) delete payload.clinica;
 
     try {
       const resp = await fetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
       });
 
-      if (resp.status === 401) {
-        logoutAndRedirect();
-        return;
-      }
+      if (resp.status === 401) return logoutAndRedirect();
 
       if (!resp.ok) {
         const data = await resp.json().catch(() => null);
@@ -329,13 +286,8 @@ export function PatientsView() {
 
       const saved = await resp.json();
 
-      if (isEdit) {
-        setPatients((prev) =>
-          prev.map((p) => (p.id === saved.id ? saved : p)),
-        );
-      } else {
-        setPatients((prev) => [...prev, saved]);
-      }
+      if (isEdit) setPatients((prev) => prev.map((p) => (p.id === saved.id ? saved : p)));
+      else setPatients((prev) => [...prev, saved]);
 
       setFormOpen(false);
       setSelectedPatient(null);
@@ -345,20 +297,15 @@ export function PatientsView() {
     }
   };
 
-  // =========================
-  // Aplicar búsqueda + filtros
-  // =========================
-
+  // ========= Aplicar búsqueda + filtros =========
   const filteredPatients = useMemo(() => {
     const term = search.toLowerCase();
-    const profId =
-      filterProfessional === "Todos" ? null : Number(filterProfessional);
+    const profId = filterProfessional === "Todos" ? null : Number(filterProfessional);
     const serviceName = filterService === "Todos" ? null : filterService;
     const status = filterStatus;
 
     return enhancedPatients
       .filter((p) => {
-        // búsqueda
         if (term) {
           const hayCoincidencia =
             p.fullName.toLowerCase().includes(term) ||
@@ -367,32 +314,15 @@ export function PatientsView() {
           if (!hayCoincidencia) return false;
         }
 
-        // sede (por ahora solo Fisionerv Centro)
-        if (filterBranch !== "Todos" && p.branchLabel !== filterBranch) {
-          return false;
-        }
+        if (filterBranch !== "Todos" && p.branchLabel !== filterBranch) return false;
+        if (profId && !p.professionalsSet.has(profId)) return false;
+        if (serviceName && !p.servicesSet.has(serviceName)) return false;
 
-        // profesional
-        if (profId && !p.professionalsSet.has(profId)) {
-          return false;
-        }
-
-        // servicio
-        if (serviceName && !p.servicesSet.has(serviceName)) {
-          return false;
-        }
-
-        // estado de reserva
         if (status === "Con reservas" && !p.hasReservations) return false;
         if (status === "Sin reservas" && p.hasReservations) return false;
 
-        // rango de fechas por campo registro
-        if (filterStartDate && (!p.registro || p.registro < filterStartDate)) {
-          return false;
-        }
-        if (filterEndDate && (!p.registro || p.registro > filterEndDate)) {
-          return false;
-        }
+        if (filterStartDate && (!p.registro || p.registro < filterStartDate)) return false;
+        if (filterEndDate && (!p.registro || p.registro > filterEndDate)) return false;
 
         return true;
       })
@@ -408,22 +338,15 @@ export function PatientsView() {
     filterEndDate,
   ]);
 
-  // =========================
-  // Render
-  // =========================
-
+  // ========= Render =========
   if (loading) {
     return (
       <>
         <aside className="w-72 bg-white border-r border-slate-200 p-4 space-y-4">
-          <h2 className="text-sm font-semibold text-slate-700">
-            Filtros avanzados
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-700">Filtros avanzados</h2>
         </aside>
         <main className="flex-1 flex items-center justify-center bg-slate-50">
-          <p className="text-sm text-slate-500">
-            Cargando pacientes desde el servidor…
-          </p>
+          <p className="text-sm text-slate-500">Cargando pacientes desde el servidor…</p>
         </main>
       </>
     );
@@ -433,9 +356,7 @@ export function PatientsView() {
     <>
       {/* Sidebar filtros */}
       <aside className="w-72 bg-white border-r border-slate-200 p-4 space-y-4">
-        <h2 className="text-sm font-semibold text-slate-700">
-          Filtros avanzados
-        </h2>
+        <h2 className="text-sm font-semibold text-slate-700">Filtros avanzados</h2>
 
         <FilterBlock title="Local/sede">
           <select
@@ -510,12 +431,8 @@ export function PatientsView() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="h-16 border-b border-slate-200 bg-slate-50 flex items-center justify-between px-6">
           <div>
-            <h2 className="text-sm font-semibold text-slate-800">
-              Base de pacientes
-            </h2>
-            <p className="text-xs text-slate-500">
-              {patients.length} pacientes registrados.
-            </p>
+            <h2 className="text-sm font-semibold text-slate-800">Base de pacientes</h2>
+            <p className="text-xs text-slate-500">{patients.length} pacientes registrados.</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -559,22 +476,28 @@ export function PatientsView() {
                   <Th>Correo</Th>
                   <Th>Teléfono</Th>
                   <Th>Servicio</Th>
+                  <Th>Estado</Th>
                   <Th className="text-center">Opciones</Th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPatients.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="border-b border-slate-50 hover:bg-slate-50"
-                  >
+                  <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50">
                     <Td>{p.nombres}</Td>
-                    <Td>
-                      {(p.apellido_pat || "") + " " + (p.apellido_mat || "")}
-                    </Td>
+                    <Td>{(p.apellido_pat || "") + " " + (p.apellido_mat || "")}</Td>
                     <Td>{p.correo || "—"}</Td>
                     <Td>{p.telefono || "—"}</Td>
                     <Td>{p.lastServiceName || "—"}</Td>
+                    <Td>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] ring-1 ${p.estado_tratamiento === "alta"
+                            ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                            : "bg-amber-50 text-amber-700 ring-amber-200"
+                          }`}
+                      >
+                        {estadoTratamientoLabel(p.estado_tratamiento)}
+                      </span>
+                    </Td>
                     <Td className="text-center">
                       <div className="inline-flex gap-1">
                         <button
@@ -599,12 +522,10 @@ export function PatientsView() {
                     </Td>
                   </tr>
                 ))}
+
                 {filteredPatients.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="text-center text-slate-400 py-8 text-xs"
-                    >
+                    <td colSpan={7} className="text-center text-slate-400 py-8 text-xs">
                       No se encontraron pacientes con ese criterio.
                     </td>
                   </tr>
@@ -631,73 +552,143 @@ export function PatientsView() {
           onSave={handleSavePatient}
         />
       )}
+
+      {deleteOpen && deleteTarget && (
+        <DeleteConfirmModal
+          patient={deleteTarget}
+          onClose={() => {
+            setDeleteOpen(false);
+            setDeleteTarget(null);
+          }}
+          onConfirm={() => confirmDeletePatient(deleteTarget)}
+        />
+      )}
     </>
   );
 }
 
 /* =========================
-   Modal: Ver perfil paciente
+   Modal: Ver perfil paciente (2 columnas)
    ========================= */
-
 function PatientProfileModal({ patient, onClose }) {
+  const citasPaciente = useMemo(() => {
+    const list = Array.isArray(patient?._citas) ? patient._citas : [];
+    // orden por fecha/hora asc para expediente
+    return [...list].sort((a, b) => {
+      const ka = `${a.fecha || ""}T${a.hora_inicio || ""}`;
+      const kb = `${b.fecha || ""}T${b.hora_inicio || ""}`;
+      return ka.localeCompare(kb);
+    });
+  }, [patient]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-3">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
+
+      <div className="relative z-10 w-full max-w-6xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200 bg-slate-50">
           <div>
-            <h2 className="text-sm font-semibold text-slate-800">
-              Perfil de paciente
-            </h2>
+            <h2 className="text-base font-semibold text-slate-900">Expediente del paciente</h2>
             <p className="text-xs text-slate-500">
-              Detalle general del paciente.
+              {getFullName(patient)} • {estadoTratamientoLabel(patient.estado_tratamiento)}
+              {patient.estado_tratamiento === "alta" && patient.fecha_alta ? ` • Alta: ${formatDateMX(patient.fecha_alta)}` : ""}
             </p>
           </div>
+
           <button
             onClick={onClose}
-            className="h-8 w-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-500 hover:bg-slate-100 text-xs"
+            className="h-9 w-9 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-white text-sm"
+            title="Cerrar"
           >
             ✕
           </button>
         </div>
 
-        <div className="space-y-3 text-xs text-slate-700">
-          <InfoRow label="Nombre completo">
-            {getFullName(patient)}
-          </InfoRow>
-          <InfoRow label="Correo">
-            {patient.correo || "—"}
-          </InfoRow>
-          <InfoRow label="Teléfono">
-            {patient.telefono || "—"}
-          </InfoRow>
-          <InfoRow label="Fecha de nacimiento">
-            {patient.fecha_nac || "—"}
-          </InfoRow>
-          <InfoRow label="Género">
-            {patient.genero || "—"}
-          </InfoRow>
-          <InfoRow label="Registrado el">
-            {patient.registro || "—"}
-          </InfoRow>
-          <InfoRow label="Último servicio">
-            {patient.lastServiceName || "Sin registros de citas"}
-          </InfoRow>
-          <InfoRow label="Molestia / motivo">
-            {patient.molestia || "—"}
-          </InfoRow>
-          <InfoRow label="Notas">
-            {patient.notas || "—"}
-          </InfoRow>
-        </div>
+        {/* Body */}
+        <div className="grid grid-cols-1 lg:grid-cols-2">
+          {/* Izquierda */}
+          <div className="p-5 border-b lg:border-b-0 lg:border-r border-slate-200">
+            <h3 className="text-sm font-semibold text-slate-800">Información general</h3>
+            <p className="mt-1 text-xs text-slate-500">Datos básicos y estado del paciente.</p>
 
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-md text-xs border border-slate-300 bg-white hover:bg-slate-50"
-          >
-            Cerrar
-          </button>
+            <div className="mt-4 space-y-3 text-xs text-slate-700">
+              <InfoRow label="Nombre completo">{getFullName(patient)}</InfoRow>
+              <InfoRow label="Correo">{patient.correo || "—"}</InfoRow>
+              <InfoRow label="Teléfono">{patient.telefono || "—"}</InfoRow>
+              <InfoRow label="Fecha de nacimiento">{patient.fecha_nac ? formatDateMX(patient.fecha_nac) : "—"}</InfoRow>
+              <InfoRow label="Género">{patient.genero || "—"}</InfoRow>
+              <InfoRow label="Registrado">{patient.registro ? formatDateMX(patient.registro) : "—"}</InfoRow>
+              <InfoRow label="Estado">{estadoTratamientoLabel(patient.estado_tratamiento)}</InfoRow>
+              <InfoRow label="Fecha de alta">
+                {patient.estado_tratamiento === "alta" ? (patient.fecha_alta ? formatDateMX(patient.fecha_alta) : "—") : "—"}
+              </InfoRow>
+              <InfoRow label="Último servicio">{patient.lastServiceName || "Sin registros de citas"}</InfoRow>
+              <InfoRow label="Molestia / motivo">{patient.molestia || "—"}</InfoRow>
+              <InfoRow label="Notas">{patient.notas || "—"}</InfoRow>
+            </div>
+          </div>
+
+          {/* Derecha */}
+          <div className="p-5">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Expediente clínico</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Historial de citas registradas a nombre del paciente.
+                </p>
+              </div>
+              <span className="text-[11px] rounded-full bg-slate-100 px-2.5 py-1 ring-1 ring-slate-200 text-slate-700">
+                Total citas: <b>{citasPaciente.length}</b>
+              </span>
+            </div>
+
+            <div className="mt-4 max-h-[60vh] overflow-auto rounded-xl border border-slate-200">
+              {citasPaciente.length === 0 ? (
+                <div className="p-6 text-center text-sm text-slate-600">
+                  Aún no hay citas registradas para este paciente.
+                </div>
+              ) : (
+                <table className="min-w-full text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
+                    <tr>
+                      <Th>Fecha</Th>
+                      <Th>Hora</Th>
+                      <Th>Servicio</Th>
+                      <Th>Profesional</Th>
+                      <Th>Estado</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {citasPaciente.map((c) => (
+                      <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
+                        <Td>{c.fecha ? formatDateMX(c.fecha) : "—"}</Td>
+                        <Td>
+                          {formatTimeHM(c.hora_inicio)} - {formatTimeHM(c.hora_termina)}
+                        </Td>
+                        <Td>{c.servicio_nombre || "—"}</Td>
+                        <Td>{c.profesional_nombre || "—"}</Td>
+                        <Td>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 ring-1 ring-slate-200">
+                            {c.estado || "—"}
+                          </span>
+                        </Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 rounded-md text-xs border border-slate-300 bg-white hover:bg-slate-50"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -705,9 +696,8 @@ function PatientProfileModal({ patient, onClose }) {
 }
 
 /* =========================
-   Modal: Crear / editar paciente
+   Modal: Crear / editar paciente (responsive + scroll)
    ========================= */
-
 function PatientFormModal({ mode, patient, onClose, onSave }) {
   const isEdit = mode === "edit";
 
@@ -721,46 +711,49 @@ function PatientFormModal({ mode, patient, onClose, onSave }) {
     genero: patient?.genero ?? "",
     molestia: patient?.molestia ?? "",
     notas: patient?.notas ?? "",
+
+    // ✅ NUEVO
+    estado_tratamiento: patient?.estado_tratamiento ?? "en_tratamiento",
+    fecha_alta: patient?.fecha_alta ?? "",
   });
 
-  const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
+  const handleChange = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     await onSave(form);
   };
 
+  const showAltaDate = form.estado_tratamiento === "alta";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-3">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
+
+      {/* ✅ más grande + alto limitado + scroll */}
+      <div className="relative z-10 w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white rounded-2xl shadow-2xl border border-slate-200">
+        <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200 bg-slate-50">
           <div>
-            <h2 className="text-sm font-semibold text-slate-800">
+            <h2 className="text-base font-semibold text-slate-900">
               {isEdit ? "Editar paciente" : "Nuevo paciente"}
             </h2>
             <p className="text-xs text-slate-500">
-              {isEdit
-                ? "Actualiza los datos del paciente."
-                : "Completa la información básica del paciente."}
+              {isEdit ? "Actualiza los datos del paciente." : "Completa la información básica del paciente."}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-500 hover:bg-slate-100 text-xs"
+            className="h-9 w-9 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 hover:bg-white text-sm"
+            title="Cerrar"
           >
             ✕
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div className="grid grid-cols-1 gap-3">
-            <div>
-              <label className="block mb-1 font-semibold text-slate-600">
-                Nombre(s)
-              </label>
+        <form onSubmit={handleSubmit} className="p-5 overflow-auto max-h-[calc(90vh-76px)]">
+          {/* ✅ 2 columnas en pantallas grandes */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+            <Field label="Nombre(s)">
               <input
                 type="text"
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -768,49 +761,9 @@ function PatientFormModal({ mode, patient, onClose, onSave }) {
                 onChange={(e) => handleChange("nombres", e.target.value)}
                 required
               />
-            </div>
+            </Field>
 
-            <div>
-              <label className="block mb-1 font-semibold text-slate-600">
-                Apellido paterno
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                value={form.apellido_pat}
-                onChange={(e) => handleChange("apellido_pat", e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-semibold text-slate-600">
-                Apellido materno
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                value={form.apellido_mat}
-                onChange={(e) => handleChange("apellido_mat", e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-semibold text-slate-600">
-                Correo
-              </label>
-              <input
-                type="email"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                value={form.correo}
-                onChange={(e) => handleChange("correo", e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-semibold text-slate-600">
-                Teléfono
-              </label>
+            <Field label="Teléfono">
               <input
                 type="text"
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -818,25 +771,46 @@ function PatientFormModal({ mode, patient, onClose, onSave }) {
                 onChange={(e) => handleChange("telefono", e.target.value)}
                 required
               />
-            </div>
+            </Field>
 
-            <div>
-              <label className="block mb-1 font-semibold text-slate-600">
-                Fecha de nacimiento
-              </label>
+            <Field label="Apellido paterno">
+              <input
+                type="text"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={form.apellido_pat}
+                onChange={(e) => handleChange("apellido_pat", e.target.value)}
+                required
+              />
+            </Field>
+
+            <Field label="Apellido materno">
+              <input
+                type="text"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={form.apellido_mat}
+                onChange={(e) => handleChange("apellido_mat", e.target.value)}
+              />
+            </Field>
+
+            <Field label="Correo">
+              <input
+                type="email"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={form.correo}
+                onChange={(e) => handleChange("correo", e.target.value)}
+              />
+            </Field>
+
+            <Field label="Fecha de nacimiento">
               <input
                 type="date"
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 value={form.fecha_nac}
                 onChange={(e) => handleChange("fecha_nac", e.target.value)}
-                required
               />
-            </div>
+            </Field>
 
-            <div>
-              <label className="block mb-1 font-semibold text-slate-600">
-                Género
-              </label>
+            <Field label="Género">
               <select
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white"
                 value={form.genero}
@@ -847,44 +821,70 @@ function PatientFormModal({ mode, patient, onClose, onSave }) {
                 <option value="masculino">Masculino</option>
                 <option value="otro">Otro</option>
               </select>
+            </Field>
+
+            <Field label="Estado del tratamiento">
+              <select
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white"
+                value={form.estado_tratamiento}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  handleChange("estado_tratamiento", v);
+                  if (v !== "alta") handleChange("fecha_alta", "");
+                }}
+              >
+                <option value="en_tratamiento">En tratamiento</option>
+                <option value="alta">Dado de alta</option>
+              </select>
+            </Field>
+
+            <Field label="Fecha de alta">
+              <input
+                type="date"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+                value={form.fecha_alta}
+                onChange={(e) => handleChange("fecha_alta", e.target.value)}
+                disabled={!showAltaDate}
+              />
+              <p className="mt-1 text-[11px] text-slate-500">
+                Solo aplica si el paciente está dado de alta (para tus gráficas).
+              </p>
+            </Field>
+
+            <div className="lg:col-span-2">
+              <Field label="Molestia / motivo de consulta">
+                <textarea
+                  rows={3}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm resize-none"
+                  value={form.molestia}
+                  onChange={(e) => handleChange("molestia", e.target.value)}
+                />
+              </Field>
             </div>
 
-            <div>
-              <label className="block mb-1 font-semibold text-slate-600">
-                Molestia / motivo de consulta
-              </label>
-              <textarea
-                rows={2}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm resize-none"
-                value={form.molestia}
-                onChange={(e) => handleChange("molestia", e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block mb-1 font-semibold text-slate-600">
-                Notas adicionales
-              </label>
-              <textarea
-                rows={2}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm resize-none"
-                value={form.notas}
-                onChange={(e) => handleChange("notas", e.target.value)}
-              />
+            <div className="lg:col-span-2">
+              <Field label="Notas adicionales">
+                <textarea
+                  rows={3}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm resize-none"
+                  value={form.notas}
+                  onChange={(e) => handleChange("notas", e.target.value)}
+                />
+              </Field>
             </div>
           </div>
 
-          <div className="pt-3 flex justify-end gap-2">
+          <div className="pt-5 flex justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-1.5 rounded-md text-xs border border-slate-300 bg-white hover:bg-slate-50"
+              className="px-4 py-2 rounded-md text-xs border border-slate-300 bg-white hover:bg-slate-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 rounded-md text-xs bg-violet-600 text-white hover:bg-violet-700"
+              className="px-4 py-2 rounded-md text-xs bg-violet-600 text-white hover:bg-violet-700"
             >
               {isEdit ? "Guardar cambios" : "Crear paciente"}
             </button>
@@ -895,13 +895,74 @@ function PatientFormModal({ mode, patient, onClose, onSave }) {
   );
 }
 
-/* Row simple para el modal de perfil */
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="block mb-1 font-semibold text-slate-600">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+/* =========================
+   Modal: Confirmar eliminación escribiendo "eliminar"
+   ========================= */
+function DeleteConfirmModal({ patient, onClose, onConfirm }) {
+  const [text, setText] = useState("");
+
+  const ok = text.trim().toLowerCase() === "eliminar";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3">
+      <div className="absolute inset-0" onClick={onClose} />
+
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="p-5 border-b border-slate-200 bg-slate-50">
+          <h3 className="text-base font-semibold text-slate-900">Eliminar paciente</h3>
+          <p className="mt-1 text-xs text-slate-600">
+            Esta acción no se puede deshacer. Para confirmar, escribe <b>eliminar</b>.
+          </p>
+        </div>
+
+        <div className="p-5">
+          <p className="text-sm text-slate-700">
+            Paciente: <b>{getFullName(patient)}</b>
+          </p>
+
+          <input
+            type="text"
+            className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
+            placeholder='Escribe: eliminar'
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-md text-xs border border-slate-300 bg-white hover:bg-slate-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => ok && onConfirm()}
+              disabled={!ok}
+              className="px-4 py-2 rounded-md text-xs bg-rose-600 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-rose-700"
+            >
+              Eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Row simple */
 function InfoRow({ label, children }) {
   return (
-    <div className="flex items-start gap-2">
-      <span className="w-32 text-[11px] font-semibold text-slate-500">
-        {label}
-      </span>
+    <div className="flex items-start gap-3">
+      <span className="w-32 text-[11px] font-semibold text-slate-500">{label}</span>
       <span className="flex-1 text-[11px] text-slate-700">{children}</span>
     </div>
   );

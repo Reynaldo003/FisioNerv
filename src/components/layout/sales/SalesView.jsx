@@ -1,16 +1,89 @@
 // src/components/layout/sales/SalesView.jsx
-import { useEffect, useState } from "react";
-import {
-  FilterField,
-  KpiCard,
-  SummaryCard,
-  DonutValue,
-  BarList,
-} from "./SummaryParts";
+import { useEffect, useMemo, useState } from "react";
+import { FilterField, KpiCard, SummaryCard, DonutValue, BarList } from "./SummaryParts";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-// Modal para ver y editar el detalle de un pago
+// =======================
+// Helpers fechas
+// =======================
+function toDateKey(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function startOfWeekMonday(date) {
+  const d = new Date(date);
+  const jsDay = d.getDay(); // 0 domingo, 1 lunes...
+  const deltaToMonday = (jsDay + 6) % 7;
+  d.setDate(d.getDate() - deltaToMonday);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfWeekSunday(date) {
+  const monday = startOfWeekMonday(date);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return sunday;
+}
+
+function startOfMonth(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function endOfMonth(date) {
+  const d = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function startOfYear(date) {
+  const d = new Date(date.getFullYear(), 0, 1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function endOfYear(date) {
+  const d = new Date(date.getFullYear(), 11, 31);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function clampRange(fromKey, toKey) {
+  if (!fromKey || !toKey) return { fromKey, toKey };
+  if (fromKey <= toKey) return { fromKey, toKey };
+  return { fromKey: toKey, toKey: fromKey };
+}
+
+function inRange(dateKey, fromKey, toKey) {
+  if (!dateKey) return false;
+  if (!fromKey || !toKey) return true;
+  return dateKey >= fromKey && dateKey <= toKey;
+}
+
+function fmtPeriodLabel(periodStr, group) {
+  // periodStr viene como ISO (por trunc)
+  const d = new Date(periodStr);
+  if (group === "day") {
+    return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+  }
+  if (group === "week") {
+    return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+  }
+  if (group === "year") {
+    return String(d.getFullYear());
+  }
+  // month
+  return d.toLocaleDateString("es-MX", { month: "short", year: "2-digit" });
+}
+
+// =======================
+// Modal para editar pago
+// =======================
 function PaymentDetailModal({ payment, onClose, onUpdated }) {
   const [form, setForm] = useState(() => ({
     fecha_pago: payment.fecha_pago || "",
@@ -80,9 +153,7 @@ function PaymentDetailModal({ payment, onClose, onUpdated }) {
         className="relative z-10 w-full max-w-md bg-white rounded-xl shadow-2xl p-5 space-y-3 text-sm"
       >
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-sm font-semibold text-slate-800">
-            Editar pago #{payment.id}
-          </h3>
+          <h3 className="text-sm font-semibold text-slate-800">Editar pago #{payment.id}</h3>
           <button
             type="button"
             onClick={onClose}
@@ -94,24 +165,22 @@ function PaymentDetailModal({ payment, onClose, onUpdated }) {
 
         <div className="space-y-1 text-[11px] border border-slate-100 rounded-md px-3 py-2 bg-slate-50">
           <p>
-            <span className="font-semibold text-slate-600">Paciente:</span>{" "}
-            {payment.paciente_nombre}
+            <span className="font-semibold text-slate-600">Paciente:</span> {payment.paciente_nombre}
           </p>
           <p>
-            <span className="font-semibold text-slate-600">Servicio:</span>{" "}
-            {payment.servicio_nombre}
+            <span className="font-semibold text-slate-600">Servicio:</span> {payment.servicio_nombre}
           </p>
           <p>
-            <span className="font-semibold text-slate-600">Fecha cita:</span>{" "}
-            {payment.fecha_cita}
+            <span className="font-semibold text-slate-600">Profesional:</span> {payment.profesional_nombre}
+          </p>
+          <p>
+            <span className="font-semibold text-slate-600">Fecha cita:</span> {payment.fecha_cita}
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-3 text-[11px]">
           <div>
-            <label className="block font-semibold text-slate-600 mb-1">
-              Fecha de pago
-            </label>
+            <label className="block font-semibold text-slate-600 mb-1">Fecha de pago</label>
             <input
               type="date"
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
@@ -121,9 +190,7 @@ function PaymentDetailModal({ payment, onClose, onUpdated }) {
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-600 mb-1">
-              Método de pago
-            </label>
+            <label className="block font-semibold text-slate-600 mb-1">Método de pago</label>
             <select
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs bg-white"
               value={form.metodo_pago}
@@ -137,9 +204,7 @@ function PaymentDetailModal({ payment, onClose, onUpdated }) {
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-600 mb-1">
-              Nº comprobante de pago
-            </label>
+            <label className="block font-semibold text-slate-600 mb-1">Nº comprobante de pago</label>
             <input
               type="text"
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
@@ -149,9 +214,7 @@ function PaymentDetailModal({ payment, onClose, onUpdated }) {
           </div>
 
           <div>
-            <label className="block font-semibold text-slate-600 mb-1">
-              Monto facturado (total de la cita)
-            </label>
+            <label className="block font-semibold text-slate-600 mb-1">Monto facturado (total de la cita)</label>
             <input
               type="number"
               min="0"
@@ -163,25 +226,19 @@ function PaymentDetailModal({ payment, onClose, onUpdated }) {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block font-semibold text-slate-600 mb-1">
-                Descuento (%)
-              </label>
+              <label className="block font-semibold text-slate-600 mb-1">Descuento (%)</label>
               <input
                 type="number"
                 min="0"
                 max="100"
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs"
                 value={form.descuento_porcentaje}
-                onChange={(e) =>
-                  handleChange("descuento_porcentaje", e.target.value)
-                }
+                onChange={(e) => handleChange("descuento_porcentaje", e.target.value)}
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-600 mb-1">
-                Monto de este pago
-              </label>
+              <label className="block font-semibold text-slate-600 mb-1">Monto de este pago</label>
               <input
                 type="number"
                 min="0"
@@ -194,9 +251,7 @@ function PaymentDetailModal({ payment, onClose, onUpdated }) {
             <div className="flex flex-col justify-center text-[11px] text-slate-700 bg-slate-50 rounded-md border border-slate-200 px-3 py-2">
               <span className="font-semibold">Restante actual:</span>
               <span>${Number(payment.restante || 0).toFixed(2)}</span>
-              <span className="text-[10px] text-slate-500 mt-1">
-                Se recalculará al guardar cambios.
-              </span>
+              <span className="text-[10px] text-slate-500 mt-1">Se recalculará al guardar.</span>
             </div>
           </div>
         </div>
@@ -222,117 +277,255 @@ function PaymentDetailModal({ payment, onClose, onUpdated }) {
   );
 }
 
+// =======================
+// Selector de rango
+// =======================
+function DateRangeFilter({
+  fromKey,
+  toKey,
+  onChange,
+  onPreset,
+  preset,
+  group,
+  onGroupChange,
+  onApply,
+  applying,
+}) {
+  const buttons = [
+    { id: "day", label: "Día" },
+    { id: "week", label: "Semana" },
+    { id: "month", label: "Mes" },
+    { id: "year", label: "Año" },
+  ];
+
+  const groups = [
+    { id: "day", label: "Agrupar por día" },
+    { id: "week", label: "Agrupar por semana" },
+    { id: "month", label: "Agrupar por mes" },
+    { id: "year", label: "Agrupar por año" },
+  ];
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {buttons.map((b) => {
+          const active = preset === b.id;
+          return (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => onPreset(b.id)}
+              className={
+                "text-[11px] px-3 py-1.5 rounded-md border transition " +
+                (active
+                  ? "bg-violet-50 text-violet-700 border-violet-200"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50")
+              }
+            >
+              {b.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-600 mb-1">Fecha inicio</label>
+          <input
+            type="date"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs bg-white"
+            value={fromKey}
+            onChange={(e) => onChange({ fromKey: e.target.value, toKey })}
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-600 mb-1">Fecha fin</label>
+          <input
+            type="date"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs bg-white"
+            value={toKey}
+            onChange={(e) => onChange({ fromKey, toKey: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <select
+          className="w-full sm:w-auto rounded-md border border-slate-300 px-3 py-2 text-xs bg-white"
+          value={group}
+          onChange={(e) => onGroupChange(e.target.value)}
+        >
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.label}
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          onClick={onApply}
+          disabled={applying}
+          className="w-full sm:w-auto text-[11px] px-4 py-2 rounded-md bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:opacity-60"
+        >
+          {applying ? "Aplicando..." : "Aplicar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SalesView() {
   const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
   const [stats, setStats] = useState(null);
 
   const [payments, setPayments] = useState([]);
   const [selectedPayment, setSelectedPayment] = useState(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem("auth.access");
-    async function loadData() {
-      try {
-        setLoading(true);
+  const [professionals, setProfessionals] = useState([]);
+  const [professionalId, setProfessionalId] = useState(""); // "" = todos
 
-        const [statsResp, paymentsResp] = await Promise.all([
-          fetch(`${API_BASE}/api/dashboard-stats/`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-          fetch(`${API_BASE}/api/pagos/`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-        ]);
+  // Rango flexible (default: mes actual)
+  const now = new Date();
+  const defaultFrom = toDateKey(startOfMonth(now));
+  const defaultTo = toDateKey(endOfMonth(now));
 
-        const statsData = await statsResp.json();
-        setStats(statsData);
+  const [preset, setPreset] = useState("month");
+  const [group, setGroup] = useState("month");
 
-        if (paymentsResp.ok) {
-          const paymentsData = await paymentsResp.json();
-          setPayments(paymentsData);
-        } else {
-          console.error("No se pudo cargar /api/pagos/ (quizá aún no existe)");
-          setPayments([]);
-        }
-      } catch (err) {
-        console.error("Error cargando estadísticas o pagos:", err);
-        setPayments([]);
-      } finally {
-        setLoading(false);
-      }
+  const [fromKey, setFromKey] = useState(defaultFrom);
+  const [toKey, setToKey] = useState(defaultTo);
+
+  const [appliedRange, setAppliedRange] = useState(() => clampRange(defaultFrom, defaultTo));
+
+  const applyRange = (range) => {
+    const clamped = clampRange(range.fromKey, range.toKey);
+    setAppliedRange(clamped);
+  };
+
+  const setPresetRange = (id) => {
+    const today = new Date();
+    let from = today;
+    let to = today;
+
+    if (id === "day") {
+      from = new Date(today);
+      to = new Date(today);
+    } else if (id === "week") {
+      from = startOfWeekMonday(today);
+      to = endOfWeekSunday(today);
+    } else if (id === "month") {
+      from = startOfMonth(today);
+      to = endOfMonth(today);
+    } else if (id === "year") {
+      from = startOfYear(today);
+      to = endOfYear(today);
     }
-    loadData();
+
+    const f = toDateKey(from);
+    const t = toDateKey(to);
+
+    setPreset(id);
+    setFromKey(f);
+    setToKey(t);
+    applyRange({ fromKey: f, toKey: t });
+  };
+
+  const fetchStats = async (token, from, to, groupBy, profesional) => {
+    const qp = new URLSearchParams();
+    qp.set("from", from);
+    qp.set("to", to);
+    qp.set("group", groupBy);
+    if (profesional) qp.set("profesional", profesional);
+
+    const resp = await fetch(`${API_BASE}/api/dashboard-stats/?${qp.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(`dashboard-stats error: ${resp.status} ${text}`);
+    }
+
+    return resp.json();
+  };
+
+  const loadAll = async (mode = "initial") => {
+    const token = localStorage.getItem("auth.access");
+    if (!token) return;
+
+    try {
+      if (mode === "initial") setLoading(true);
+      else setApplying(true);
+
+      const { fromKey: from, toKey: to } = appliedRange;
+
+      const [statsData, paymentsResp, prosResp] = await Promise.all([
+        fetchStats(token, from, to, group, professionalId),
+        fetch(`${API_BASE}/api/pagos/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE}/api/profesionales/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      setStats(statsData);
+
+      if (paymentsResp.ok) {
+        const paymentsData = await paymentsResp.json();
+        setPayments(paymentsData);
+      } else {
+        console.error("No se pudo cargar /api/pagos/");
+        setPayments([]);
+      }
+
+      if (prosResp.ok) {
+        const pros = await prosResp.json();
+        setProfessionals(pros || []);
+      } else {
+        setProfessionals([]);
+      }
+    } catch (err) {
+      console.error("Error cargando estadísticas o pagos:", err);
+      setPayments([]);
+      setProfessionals([]);
+    } finally {
+      setLoading(false);
+      setApplying(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAll("initial");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading || !stats) {
-    return (
-      <main className="flex-1 flex items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">
-          Cargando estadísticas de ventas...
-        </p>
-      </main>
-    );
-  }
+  // recarga cuando cambian filtros aplicados
+  useEffect(() => {
+    if (!stats) return;
+    loadAll("apply");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appliedRange.fromKey, appliedRange.toKey, group, professionalId]);
 
-  // ====== Transformaciones de datos ======
+  // Pagos filtrados por rango y profesional (frontend)
+  const filteredPayments = useMemo(() => {
+    const { fromKey: f, toKey: t } = appliedRange;
+    return (payments || [])
+      .filter((p) => inRange(p.fecha_pago, f, t))
+      .filter((p) => (professionalId ? String(p.profesional_id) === String(professionalId) : true));
+  }, [payments, appliedRange, professionalId]);
 
-  const totalAsistencias =
-    stats.status_breakdown.find((s) => s.estado === "completado")?.count || 0;
-
-  const totalIngresos = stats.revenue_by_service.reduce(
-    (acc, s) => acc + Number(s.total || 0),
-    0,
-  );
-
-  const revenueItems = stats.revenue_by_service.map((s) => ({
-    label: s.servicio__nombre,
-    value: Number(s.total || 0),
-  }));
-
-  const paymentItems = stats.payments_by_method.map((m) => ({
-    label: m.metodo_pago || "Sin método",
-    value: Number(m.total || 0),
-  }));
-  const totalPagado = paymentItems.reduce((acc, i) => acc + i.value, 0);
-
-  const patientsItems = stats.patients_by_month.map((p) => ({
-    label: new Date(p.period).toLocaleDateString("es-MX", {
-      month: "short",
-      year: "2-digit",
-    }),
-    value: p.total,
-  }));
-  const totalPacientesNuevos = patientsItems.reduce(
-    (acc, p) => acc + p.value,
-    0,
-  );
-
-  const attendanceMonthlyItems = stats.monthly_attendance.map((m) => ({
-    label: new Date(m.period).toLocaleDateString("es-MX", {
-      month: "short",
-      year: "2-digit",
-    }),
-    value: m.total,
-  }));
-
-  const statusItems = stats.status_breakdown.map((s) => ({
-    label: s.estado,
-    value: s.count,
-  }));
-
-  // ====== Exportar pagos a CSV (para abrir en Excel) ======
   const handleExportPayments = () => {
-    if (!payments.length) return;
+    if (!filteredPayments.length) return;
 
     const headers = [
       "ID",
       "Fecha pago",
       "Fecha cita",
       "Paciente",
+      "Profesional",
       "Servicio",
       "Método de pago",
       "Comprobante",
@@ -342,11 +535,12 @@ export function SalesView() {
       "Restante",
     ];
 
-    const rows = payments.map((p) => [
+    const rows = filteredPayments.map((p) => [
       p.id,
       p.fecha_pago,
       p.fecha_cita,
       p.paciente_nombre,
+      p.profesional_nombre,
       p.servicio_nombre,
       p.metodo_pago,
       p.comprobante || "",
@@ -360,11 +554,7 @@ export function SalesView() {
       [headers, ...rows]
         .map((row) =>
           row
-            .map((cell) =>
-              typeof cell === "string" && cell.includes(",")
-                ? `"${cell}"`
-                : cell,
-            )
+            .map((cell) => (typeof cell === "string" && cell.includes(",") ? `"${cell}"` : cell))
             .join(","),
         )
         .join("\n") + "\n";
@@ -373,124 +563,224 @@ export function SalesView() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "fisionerv-pagos.csv";
+    a.download = "fisionerv-ventas.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
+  const handleTicketPdf = async (paymentId) => {
+    const token = localStorage.getItem("auth.access");
+    if (!token) return;
+
+    try {
+      const resp = await fetch(`${API_BASE}/api/pagos/${paymentId}/ticket/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!resp.ok) {
+        alert("No se pudo generar el PDF del ticket.");
+        return;
+      }
+
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ticket_pago_${paymentId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert("Error de red generando el ticket.");
+    }
+  };
+
+  if (loading || !stats) {
+    return (
+      <main className="flex-1 flex items-center justify-center bg-slate-50">
+        <p className="text-sm text-slate-500">Cargando estadísticas de ventas...</p>
+      </main>
+    );
+  }
+
+  // ====== KPIs ======
+  const kpis = stats.kpis || {};
+  const totalAsistencias = Number(kpis.total_asistencias || 0);
+  const totalCobrado = Number(kpis.total_cobrado || 0);
+  const totalPagos = Number(kpis.total_pagos || 0);
+  const pacientesNuevos = Number(kpis.pacientes_nuevos || 0);
+
+  // ====== Datos para gráficas ======
+  const paymentItems = (stats.payments_by_method || []).map((m) => ({
+    label: m.metodo_pago || "Sin método",
+    value: Number(m.total || 0),
+  }));
+
+  const serviceItems = (stats.revenue_by_service || []).map((s) => ({
+    label: s.cita__servicio__nombre || "Servicio",
+    value: Number(s.total || 0),
+  }));
+
+  const statusItems = (stats.status_breakdown || []).map((s) => ({
+    label: s.estado,
+    value: s.count,
+  }));
+
+  const attendanceItems = (stats.attendance_series || []).map((x) => ({
+    label: fmtPeriodLabel(x.period, stats.group),
+    value: x.total,
+  }));
+
+  const salesItems = (stats.sales_series || []).map((x) => ({
+    label: fmtPeriodLabel(x.period, stats.group),
+    value: Number(x.total_cobrado || 0),
+  }));
+
+  const monthlyIncomeItems = (stats.monthly_income || []).map((x) => ({
+    label: fmtPeriodLabel(x.period, "month"),
+    value: Number(x.total || 0),
+  }));
+
+  const patientStatusMap = (stats.patient_status_totals || []).reduce((acc, x) => {
+    acc[x.estado_tratamiento] = Number(x.count || 0);
+    return acc;
+  }, {});
+  const patientStatusItems = [
+    { label: "En tratamiento", value: patientStatusMap.en_tratamiento || 0 },
+    { label: "Dado de alta", value: patientStatusMap.alta || 0 },
+  ];
+
   return (
     <main className="flex-1 flex flex-col overflow-hidden bg-slate-50">
       {/* Header */}
       <div className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-6">
         <div>
-          <h2 className="text-sm font-semibold text-slate-800">
-            Estadísticas de pacientes y ventas
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-800">Ventas y estadísticas</h2>
           <p className="text-xs text-slate-500">
-            Asistencia, ingresos por servicio, altas de pacientes y métodos de
-            pago.
+            Filtra por fechas y profesional. Puedes analizar fechas anteriores para comparar.
           </p>
         </div>
       </div>
 
       <div className="p-4 space-y-4 overflow-auto">
         {/* Filtros superiores */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <FilterField label="Rango de análisis">
-            <p className="text-[11px] text-slate-500">
-              Últimos 12 meses (definido en el backend).
-            </p>
+            <DateRangeFilter
+              fromKey={fromKey}
+              toKey={toKey}
+              preset={preset}
+              group={group}
+              applying={applying}
+              onChange={(r) => {
+                setPreset("custom");
+                const clamped = clampRange(r.fromKey, r.toKey);
+                setFromKey(clamped.fromKey);
+                setToKey(clamped.toKey);
+              }}
+              onPreset={(id) => setPresetRange(id)}
+              onGroupChange={(g) => setGroup(g)}
+              onApply={() => applyRange({ fromKey, toKey })}
+            />
           </FilterField>
-          <FilterField label="Sucursal">
-            <p className="text-[11px] text-slate-500">
-              Por ahora se muestra la clínica configurada en el backend.
-            </p>
-          </FilterField>
+
           <FilterField label="Profesional">
-            <p className="text-[11px] text-slate-500">
-              Próximamente podrás filtrar por terapeuta.
+            <select
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs bg-white"
+              value={professionalId}
+              onChange={(e) => setProfessionalId(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {professionals.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {(p.first_name || p.last_name)
+                    ? `${p.first_name || ""} ${p.last_name || ""}`.trim()
+                    : p.username}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-500 mt-2">
+              Tip: usa &quot;Todos&quot; para ver global o selecciona un profesional para su desempeño.
             </p>
           </FilterField>
         </div>
 
         {/* KPIs principales */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <KpiCard
-            label="Pacientes que asistieron (último año)"
+            label="Ingresos cobrados"
+            value={`$ ${totalCobrado.toFixed(2)}`}
+            helper={`Rango: ${appliedRange.fromKey} → ${appliedRange.toKey}`}
+          />
+          <KpiCard
+            label="Pagos registrados"
+            value={totalPagos}
+            helper="Número de pagos (ventas) en el rango."
+          />
+          <KpiCard
+            label="Asistencias"
             value={totalAsistencias}
-            helper="Número de citas marcadas como completadas."
+            helper="Citas completadas en el rango."
           />
           <KpiCard
-            label="Ingresos totales (último año)"
-            value={`$ ${totalIngresos.toFixed(2)}`}
-            helper="Total facturado por citas (considerando descuentos)."
-          />
-          <KpiCard
-            label="Pacientes nuevos (último año)"
-            value={totalPacientesNuevos}
-            helper="Altas de pacientes por fecha de registro."
+            label="Pacientes nuevos"
+            value={pacientesNuevos}
+            helper="Altas por fecha de registro."
           />
         </div>
 
-        {/* Fila 2: métodos de pago + ingresos por servicio + altas por mes */}
+        {/* Gráficas fila 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <SummaryCard
-            title="Métodos de pago"
-            subtitle="Distribución de los pagos registrados."
-          >
+          <SummaryCard title="Métodos de pago" subtitle="Distribución del dinero cobrado.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-              <DonutValue
-                value={`$ ${totalPagado.toFixed(2)}`}
-                label="Total pagado (último año)"
-              />
+              <DonutValue value={`$ ${totalCobrado.toFixed(2)}`} label="Total cobrado (rango)" />
               <BarList items={paymentItems} tone="emerald" />
             </div>
           </SummaryCard>
 
-          <SummaryCard
-            title="Ingresos por servicio"
-            subtitle="Total facturado por cada tipo de servicio."
-          >
-            <BarList items={revenueItems} />
+          <SummaryCard title="Ingresos por servicio" subtitle="Cobrado por tipo de servicio.">
+            <BarList items={serviceItems} />
           </SummaryCard>
 
-          <SummaryCard
-            title="Pacientes dados de alta por mes"
-            subtitle="Altas de pacientes en los últimos 12 meses."
-          >
-            <BarList items={patientsItems} tone="emerald" />
+          <SummaryCard title="Pacientes" subtitle="En tratamiento vs dados de alta (global).">
+            <BarList items={patientStatusItems} tone="emerald" />
           </SummaryCard>
         </div>
 
-        {/* Fila 3: asistencias mensuales + estados */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <SummaryCard
-            title="Asistencias por mes"
-            subtitle="Citas completadas en los últimos 12 meses."
-          >
-            <BarList items={attendanceMonthlyItems} />
+        {/* Gráficas fila 2 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <SummaryCard title="Ventas realizadas" subtitle="Cobrado por periodo (según agrupación).">
+            <BarList items={salesItems} tone="emerald" />
           </SummaryCard>
 
-          <SummaryCard
-            title="Resumen por estado de cita"
-            subtitle="Reservado, confirmado, completado y cancelado."
-          >
-            <BarList items={statusItems} tone="emerald" />
+          <SummaryCard title="Asistencias" subtitle="Citas completadas por periodo (según agrupación).">
+            <BarList items={attendanceItems} />
+          </SummaryCard>
+
+          <SummaryCard title="Estado de cita" subtitle="Reservado, confirmado, completado y cancelado.">
+            <BarList items={statusItems} />
           </SummaryCard>
         </div>
 
-        {/* Tabla de pagos detallados */}
+        {/* Gráfica ingresos mensuales */}
+        <div className="grid grid-cols-1 gap-4">
+          <SummaryCard title="Ingresos mensuales" subtitle="Total cobrado por mes (pagos).">
+            <BarList items={monthlyIncomeItems} tone="emerald" />
+          </SummaryCard>
+        </div>
+
+        {/* Tabla de ventas (pagos) */}
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-xs font-semibold text-slate-700">
-                Pagos registrados
-              </h3>
+              <h3 className="text-xs font-semibold text-slate-700">Registro de ventas (pagos)</h3>
               <p className="text-[11px] text-slate-500">
-                Detalle de pagos por paciente, método de pago, descuento y
-                montos.
+                Mostrando pagos desde {appliedRange.fromKey} hasta {appliedRange.toKey}.
               </p>
             </div>
             <button
@@ -508,77 +798,69 @@ export function SalesView() {
                   <th className="px-3 py-1">ID</th>
                   <th className="px-3 py-1">Fecha pago</th>
                   <th className="px-3 py-1">Paciente</th>
+                  <th className="px-3 py-1">Profesional</th>
                   <th className="px-3 py-1">Servicio</th>
                   <th className="px-3 py-1">Método</th>
-                  <th className="px-3 py-1">Desc. (%)</th>
                   <th className="px-3 py-1">Anticipo</th>
                   <th className="px-3 py-1">Monto facturado</th>
                   <th className="px-3 py-1">Restante</th>
                   <th className="px-3 py-1 text-right">Opciones</th>
                 </tr>
               </thead>
+
               <tbody>
-                {payments.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={10}
-                      className="px-3 py-3 text-center text-slate-500"
-                    >
-                      Aún no hay pagos registrados.
-                    </td>
-                  </tr>
-                )}
-                {payments.map((p) => (
-                  <tr
-                    key={p.id}
-                    className="bg-slate-50/60 hover:bg-slate-100 transition-colors"
-                  >
-                    <td className="px-3 py-1 rounded-l-md text-slate-500">
-                      {p.id}
-                    </td>
-                    <td className="px-3 py-1">{p.fecha_pago}</td>
-                    <td className="px-3 py-1">{p.paciente_nombre}</td>
-                    <td className="px-3 py-1">{p.servicio_nombre}</td>
-                    <td className="px-3 py-1">{p.metodo_pago}</td>
-                    <td className="px-3 py-1">
-                      {Number(p.descuento_porcentaje || 0).toFixed(1)}%
-                    </td>
-                    <td className="px-3 py-1">
-                      ${Number(p.anticipo || 0).toFixed(2)}
-                    </td>
-                    <td className="px-3 py-1">
-                      ${Number(p.monto_facturado || 0).toFixed(2)}
-                    </td>
-                    <td className="px-3 py-1">
-                      ${Number(p.restante || 0).toFixed(2)}
-                    </td>
-                    <td className="px-3 py-1 rounded-r-md text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPayment(p)}
-                        className="inline-flex items-center px-2 py-1 rounded-md border border-slate-300 text-[11px] text-slate-700 hover:bg-slate-100"
-                      >
-                        Ver / editar
-                      </button>
+                {filteredPayments.map((p) => (
+                  <tr key={p.id} className="bg-slate-50/60 hover:bg-slate-100/70 rounded-md">
+                    <td className="px-3 py-2">{p.id}</td>
+                    <td className="px-3 py-2">{p.fecha_pago}</td>
+                    <td className="px-3 py-2">{p.paciente_nombre}</td>
+                    <td className="px-3 py-2">{p.profesional_nombre}</td>
+                    <td className="px-3 py-2">{p.servicio_nombre}</td>
+                    <td className="px-3 py-2">{p.metodo_pago}</td>
+                    <td className="px-3 py-2">${Number(p.anticipo || 0).toFixed(2)}</td>
+                    <td className="px-3 py-2">${Number(p.monto_facturado || 0).toFixed(2)}</td>
+                    <td className="px-3 py-2">${Number(p.restante || 0).toFixed(2)}</td>
+
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => setSelectedPayment(p)}
+                          className="text-[11px] px-3 py-1 rounded-md border border-slate-300 text-slate-700 hover:bg-white"
+                        >
+                          Ver / editar
+                        </button>
+                        <button
+                          onClick={() => handleTicketPdf(p.id)}
+                          className="text-[11px] px-3 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                          Ticket PDF
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
+
+                {!filteredPayments.length && (
+                  <tr>
+                    <td colSpan={10} className="px-3 py-6 text-center text-slate-400">
+                      No hay ventas dentro del rango seleccionado.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      {/* Modal detalle pago */}
+      {/* Modal editar pago */}
       {selectedPayment && (
         <PaymentDetailModal
           payment={selectedPayment}
           onClose={() => setSelectedPayment(null)}
           onUpdated={(updated) => {
-            setPayments((prev) =>
-              prev.map((p) => (p.id === updated.id ? updated : p)),
-            );
-            setSelectedPayment(updated);
+            setPayments((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+            setSelectedPayment(null);
           }}
         />
       )}

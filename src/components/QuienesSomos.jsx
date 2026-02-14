@@ -4,7 +4,7 @@ import { TextAnimate } from "@/components/ui/text-animate";
 
 export default function QuienesSomos({
     PRIMARY = "#004aad",
-    images = ["/rehabilitacion.png", "/electro.png", "/terapia.png", "/programa.png"],
+    images = ["/foto20.jpeg", "/foto21.jpeg", "/foto5.jpeg", "/foto10.jpeg"],
 }) {
     return (
         <section id="quienes" className="mt-16  max-w-6xl">
@@ -14,12 +14,13 @@ export default function QuienesSomos({
                         {images.slice(0, 4).map((src, i) => (
                             <div
                                 key={i}
-                                className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50"
+                                className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 aspect-[4/4]"
                             >
                                 <img
                                     src={src}
                                     alt=""
-                                    className="h-full w-full object-cover sm:h-52"
+                                    className="absolute inset-0 h-full w-full object-cover block"
+                                    loading="lazy"
                                 />
                             </div>
                         ))}

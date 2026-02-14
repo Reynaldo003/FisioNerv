@@ -5,11 +5,11 @@ export const API_BASE =
 export const PRIMARY = "#1E63C5";
 
 export const CLINIC = {
-  name: "FisioNerv",
+  name: "Fisionerv",
   tagline: "Clínica de fisioterapia",
   address: "Calle 15 entre Av. 2 y 4, Córdoba, Veracruz",
   phone: "+52 271 122 4494",
-  mapQuery: "FisioNerv, Calle 15 entre Avenidas 2 y 4, Córdoba, Veracruz",
+  mapQuery: "Fisionerv, Calle 15 entre Avenidas 2 y 4, Córdoba, Veracruz",
   hours: {
     mon: "8:00-21:00",
     tue: "8:00-21:00",
@@ -94,6 +94,10 @@ export const FALLBACK_SERVICES = [
 
 export const COLLAB_IMAGES = [
   "/oxygen.png",
+  "ironside.jpg",
+  "/logotipo.png",
+  "/metlife.png",
+  "/lycan.png",
   "/DENTISTA.png",
   "/auFitness.png",
   "/banorte.png",

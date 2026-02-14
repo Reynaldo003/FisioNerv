@@ -1,6 +1,12 @@
 // src/components/Servicios.jsx
-import { useEffect, useMemo, useState } from "react";
-import { HandHeart, Stethoscope, ClipboardList, TrendingUp, CheckCircle2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+    HandHeart,
+    Stethoscope,
+    ClipboardList,
+    TrendingUp,
+    CheckCircle2,
+} from "lucide-react";
 import { TextAnimate } from "@/components/ui/text-animate";
 
 const INTRO = {
@@ -13,6 +19,56 @@ const INTRO = {
         "Resultados medibles: metas claras y seguimiento continuo.",
     ],
 };
+
+function normalizeKey(str = "") {
+    return String(str)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // quita acentos
+        .replace(/[^a-z0-9\s]/g, " ") // quita puntuación
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+const SERVICE_IMAGE_RAW = {
+    "Valoracion Inicial a Domicilio": "/servicios/valoracion-domicilio.jpeg",
+    "Sesiones Subsecuentes a Domicilio": "/servicios/subsecuentes-domicilio.jpeg",
+    "Valoracion Inicial Hospital": "/servicios/valoracion-hospital.jpeg",
+    "Sesiones Subsecuentes Hospital": "/servicios/subsecuentes-hospital.jpeg",
+    "Paciente Convenio": "/servicios/valoracion-inicial.jpeg",
+    "Cita Nutriologa": "/servicios/nutriologa.jpeg",
+    "Sesiones Subsecuentes": "/servicios/subsecuentes.jpeg",
+    "Valoracion Inicial": "/servicios/valoracion-inicial.jpeg",
+    "Consulta Dental": "/servicios/dental.jpeg",
+    "Consulta de Seguimiento Nutricional": "/servicios/nutricional.jpeg",
+    "Consulta Nutricional": "/servicios/nutricional.jpeg",
+    "Consulta Medica": "/servicios/medica.jpeg",
+};
+
+const SERVICE_IMAGE_BY_NAME = Object.fromEntries(
+    Object.entries(SERVICE_IMAGE_RAW).map(([k, v]) => [normalizeKey(k), v])
+);
+
+function getServiceImageByName(name = "") {
+    const key = normalizeKey(name);
+    const found = SERVICE_IMAGE_BY_NAME[key];
+
+    // Si no match, fallback a una que SÍ exista
+    // (ajusta si tu default real es otro)
+    const fallback = "/servicios/valoracion.png";
+
+    if (!found) {
+        // Esto sí lo vas a ver en consola siempre que no matchee
+        // eslint-disable-next-line no-console
+        console.warn("[SERVICIOS] Sin match de imagen", {
+            nameFromDB: name,
+            normalizedDB: key,
+            availableKeys: Object.keys(SERVICE_IMAGE_BY_NAME),
+        });
+    }
+
+    return found || fallback;
+}
 
 function guessSpecialty(serviceName = "") {
     const n = serviceName.toLowerCase();
@@ -34,18 +90,26 @@ function moneyMXN(n) {
 }
 
 export default function ServiciosShowcase({ SERVICES = [], PRIMARY = "#1E63C5", variant }) {
-
     const normalized = useMemo(() => {
         return (SERVICES || []).map((s, idx) => {
-            const specialty = s.specialty || guessSpecialty(s.name || s.nombre || "");
+            const rawName = s.name ?? s.nombre ?? "";
+            const name = rawName || "Servicio";
+            const specialty = s.specialty || guessSpecialty(name);
+
+            const resolvedMedia = getServiceImageByName(name);
+
+            // Log útil para confirmar qué src se asignó
+            // eslint-disable-next-line no-console
+
+
             return {
                 id: s.id ?? idx,
-                name: s.name ?? s.nombre ?? "Servicio",
+                name,
                 description: s.description ?? s.descripcion ?? "",
                 price: s.price ?? s.precio ?? 0,
                 tag: s.tag ?? "",
                 duration: s.duration ?? s.duracion ?? "",
-                mediaSrc: s.mediaSrc ?? "/rehabilitacion.png",
+                mediaSrc: resolvedMedia,
                 specialty,
             };
         });
@@ -63,7 +127,6 @@ function ServiciosHeader({ PRIMARY }) {
     return (
         <div className="mb-10">
             <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-lg dark:border-neutral-700 dark:bg-neutral-900/40">
-
                 <div className="flex items-start gap-3">
                     <HandHeart className="mt-1 h-6 w-6" style={{ color: PRIMARY }} />
                     <div>
@@ -72,23 +135,25 @@ function ServiciosHeader({ PRIMARY }) {
                         </h2>
 
                         <p className="mt-4 max-w-4xl text-base leading-6 text-slate-600 dark:text-white/70">
-                            En Fisionerv transformamos la evidencia científica en un trato cercano, claro y profundamente humano.
-                            Valoramos cada caso con rigor, diseñamos planes de rehabilitación personalizados y acompañamos a
-                            nuestros pacientes paso a paso para recuperar movilidad, función y calidad de vida.
-                            Nuestro objetivo es ayudarte a volver a lo que amas, con confianza, seguridad y resultados reales.
+                            En Fisionerv transformamos la evidencia científica en un trato cercano,
+                            claro y profundamente humano. Valoramos cada caso con rigor, diseñamos
+                            planes de rehabilitación personalizados y acompañamos a nuestros pacientes
+                            paso a paso para recuperar movilidad, función y calidad de vida. Nuestro
+                            objetivo es ayudarte a volver a lo que amas, con confianza, seguridad y
+                            resultados reales.
                         </p>
                     </div>
                 </div>
 
                 <div className="my-6 h-px w-full bg-slate-200/70 dark:bg-white/10" />
 
-                <div className="flex flex-wrap gap-3 justify-center items-center">
+                <div className="flex flex-wrap items-center justify-center gap-3">
                     {HIGHLIGHTS.map((item) => (
                         <span
                             key={item}
                             className="inline-flex items-center gap-2 rounded-full border border-slate-200
-                                       bg-slate-50 px-4 py-2 text-am font-semibold text-slate-700
-                                       dark:border-neutral-700 dark:bg-white/10 dark:text-white/80"
+                         bg-slate-50 px-4 py-2 text-am font-semibold text-slate-700
+                         dark:border-neutral-700 dark:bg-white/10 dark:text-white/80"
                         >
                             <CheckCircle2 className="h-4 w-4" style={{ color: PRIMARY }} />
                             {item}
@@ -108,11 +173,15 @@ const HIGHLIGHTS = [
     "Actualización constante",
 ];
 
-
 function ServiciosVarianteMenu({ SERVICES, PRIMARY }) {
     const [selectedId, setSelectedId] = useState(SERVICES[0]?.id ?? null);
-    const selected = useMemo(() => SERVICES.find((s) => s.id === selectedId) || SERVICES[0], [selectedId, SERVICES]);
+    const selected = useMemo(
+        () => SERVICES.find((s) => s.id === selectedId) || SERVICES[0],
+        [selectedId, SERVICES]
+    );
 
+    // fallback REAL que sí existe
+    const fallbackImg = "/servicios/valoracion.png";
 
     return (
         <div className="grid gap-6 lg:grid-cols-5">
@@ -134,13 +203,13 @@ function ServiciosVarianteMenu({ SERVICES, PRIMARY }) {
                                 <button
                                     key={s.id}
                                     onClick={() => setSelectedId(s.id)}
-                                    className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition ${active
+                                    className={`w-full border-b px-4 py-3 text-left transition last:border-b-0 ${active
                                         ? "bg-slate-900/5 border-slate-200 dark:border-neutral-700"
-                                        : "hover:bg-slate-50 border-slate-200 dark:hover:bg-white/5 dark:border-neutral-700"
+                                        : "border-slate-200 hover:bg-slate-50 dark:border-neutral-700 dark:hover:bg-white/5"
                                         }`}
                                 >
                                     <div className="flex items-center justify-between gap-3">
-                                        <p className="text-base font-semibold text-slate-900 dark:text-white line-clamp-1">
+                                        <p className="line-clamp-1 text-base font-semibold text-slate-900 dark:text-white">
                                             {s.name}
                                         </p>
                                         <span className="text-base text-slate-500 dark:text-white/60">
@@ -167,9 +236,17 @@ function ServiciosVarianteMenu({ SERVICES, PRIMARY }) {
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900/40">
                     <div className="aspect-[16/9] w-full overflow-hidden">
                         <img
-                            src={selected?.mediaSrc || "/rehabilitacion.png"}
+                            src={selected?.mediaSrc || fallbackImg}
                             alt={selected?.name || "Servicio"}
                             className="h-full w-full object-cover"
+                            onError={(e) => {
+                                // eslint-disable-next-line no-console
+                                console.error("[IMG ERROR]", {
+                                    service: selected?.name,
+                                    srcTried: e.currentTarget?.src,
+                                });
+                                e.currentTarget.src = fallbackImg;
+                            }}
                         />
                     </div>
 
@@ -196,11 +273,22 @@ function ServiciosVarianteMenu({ SERVICES, PRIMARY }) {
                         </div>
 
                         <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                            <DetailChip icon={<Stethoscope className="h-4 w-4" />} title="Evaluación clínica" desc="Analizamos causa, función y objetivos." />
-                            <DetailChip icon={<ClipboardList className="h-4 w-4" />} title="Plan individual" desc="Nada genérico; todo se adapta a ti." />
-                            <DetailChip icon={<TrendingUp className="h-4 w-4" />} title="Progreso medible" desc="Metas, ajustes y seguimiento." />
+                            <DetailChip
+                                icon={<Stethoscope className="h-4 w-4" />}
+                                title="Evaluación clínica"
+                                desc="Analizamos causa, función y objetivos."
+                            />
+                            <DetailChip
+                                icon={<ClipboardList className="h-4 w-4" />}
+                                title="Plan individual"
+                                desc="Nada genérico; todo se adapta a ti."
+                            />
+                            <DetailChip
+                                icon={<TrendingUp className="h-4 w-4" />}
+                                title="Progreso medible"
+                                desc="Metas, ajustes y seguimiento."
+                            />
                         </div>
-
 
                         <div className="mt-6 flex flex-wrap gap-3">
                             <a
@@ -211,7 +299,7 @@ function ServiciosVarianteMenu({ SERVICES, PRIMARY }) {
                             </a>
                             <a
                                 href="/agenda"
-                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50 dark:bg-transparent dark:text-white dark:border-white/15"
+                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50 dark:border-white/15 dark:bg-transparent dark:text-white"
                             >
                                 Agendar valoración
                             </a>
@@ -228,7 +316,9 @@ function DetailChip({ icon, title, desc }) {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-neutral-700 dark:bg-black/20">
             <div className="flex items-center gap-2">
                 <span className="text-[#004aad]">{icon}</span>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">{title}</p>
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {title}
+                </p>
             </div>
             <p className="mt-1 text-sm text-slate-600 dark:text-white/70">{desc}</p>
         </div>

@@ -93,7 +93,7 @@ export default function MorphicNavbar({ items = [], className = "" }) {
           const isActive = activeId === it.id;
 
           return (
-            <li key={it.id} className="relative">
+            <li key={it.id} className="relative p-1">
               <button
                 type="button"
                 onClick={() => onClickItem(it)}

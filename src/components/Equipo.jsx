@@ -1,44 +1,61 @@
 // src/components/Equipo.jsx
-import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HeartHandshake, BadgeCheck, Activity, ArrowRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-const TEAM = [
-    {
-        id: "edgar",
-        name: "Lic. Edgar Mauricio Medina Cruz",
-        role: "Fisioterapeuta • Neuro–músculo–esquelético",
-        photo: "/equipo/edgar.jpg",
-        bio:
-            "Enfoque basado en evidencia, terapia manual y ejercicio terapéutico. Objetivos claros, progreso medible y acompañamiento cercano.",
-        tags: ["Terapia manual", "Ejercicio terapéutico", "Neuromuscular"],
-    },
-    {
-        id: "recepcion",
-        name: "Nombre Apellido",
-        role: "Recepción • Atención al paciente",
-        photo: "/equipo/recepcion.jpg",
-        bio:
-            "Te apoya con agenda, seguimiento y orientación para que tu visita sea clara y sin fricción.",
-        tags: ["Seguimiento", "Atención", "Agenda"],
-    },
-    {
-        id: "fisio2",
-        name: "Nombre Apellido",
-        role: "Fisioterapeuta",
-        photo: "/equipo/fisio2.jpg",
-        bio:
-            "Rehabilitación funcional y educación al paciente. Planes progresivos enfocados en recuperar movilidad y confianza.",
-        tags: ["Rehabilitación", "Funcional", "Educación"],
-    },
-];
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-export default function Equipo({ title = "Equipo", subtitle = "Conoce a las personas que te acompañan durante tu proceso." }) {
+export default function Equipo() {
     const [selected, setSelected] = useState(null);
-    const cards = useMemo(() => TEAM, []);
+    const [team, setTeam] = useState([]);
+    const [loading, setLoading] = useState(true);
+    function titleCase(str = "") {
+        return str
+            .toString()
+            .trim()
+            .replace(/[_-]+/g, " ")
+            .toLowerCase()
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    useEffect(() => {
+        async function load() {
+            try {
+                const resp = await fetch(`${API_BASE}/api/public/team/`);
+                const data = await resp.json();
 
+                // normaliza a lo que tu UI espera
+                const mapped = (data || []).map((u) => {
+                    const fullName =
+                        `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username;
+
+                    const rol = titleCase(u.rol_out || "Colaborador");
+
+                    return {
+                        id: u.id,
+                        name: fullName,
+                        role: rol,
+                        photo: u.foto_url,
+                        bio: u.descripcion_out || "",
+                    };
+                });
+
+                setTeam(mapped);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        }
+        load();
+    }, []);
+
+    const cards = useMemo(() => team, [team]);
     const dragLeft = -520;
+
+    if (loading) {
+        return <div className="p-8 text-slate-500">Cargando equipo…</div>;
+    }
 
     const highlights = [
         {
@@ -91,43 +108,32 @@ export default function Equipo({ title = "Equipo", subtitle = "Conoce a las pers
                                 layoutId={`card-${p.id}`}
                                 type="button"
                                 onClick={() => setSelected(p)}
-                                className="min-w-[280px] sm:min-w-[340px] text-left overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg hover:shadow-md transition-shadow dark:bg-black/40 dark:border-slate-800"
+                                className="w-[280px] sm:w-[340px] flex-shrink-0 h-[430px] text-left overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg hover:shadow-md transition-shadow"
                                 whileHover={{ y: -3 }}
                                 whileTap={{ scale: 0.985 }}
                             >
-                                <div className="relative h-48 w-full">
-                                    <img
-                                        src={p.photo}
-                                        alt={p.name}
-                                        className="h-full w-full object-cover"
-                                        draggable="false"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/15 to-transparent" />
-                                    <div className="absolute bottom-3 left-3 right-3">
-                                        <p className="text-white font-semibold">{p.name}</p>
-                                        <p className="text-white/85 text-xs">{p.role}</p>
-                                    </div>
-                                </div>
-
-                                <div className="p-4">
-                                    <p className="text-sm text-slate-700 dark:text-white/80 line-clamp-2">
-                                        {p.bio}
-                                    </p>
-
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        {(p.tags || []).slice(0, 3).map((t) => (
-                                            <span
-                                                key={t}
-                                                className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-700 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white/80 dark:ring-white/15"
-                                            >
-                                                {t}
-                                            </span>
-                                        ))}
+                                <div className="flex h-full flex-col">
+                                    <div className="relative h-48 w-full flex-shrink-0">
+                                        <img src={p.photo} alt={p.name} className="h-full w-full object-cover" draggable="false" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/15 to-transparent" />
+                                        <div className="absolute bottom-3 left-3 right-3">
+                                            <p className="text-white font-semibold">{p.name}</p>
+                                            <p className="text-white/85 text-xs">{p.role}</p>
+                                        </div>
                                     </div>
 
-                                    <p className="mt-3 text-xs font-semibold text-[#004aad] dark:text-white">
-                                        Ver perfil →
-                                    </p>
+                                    <div className="flex flex-1 flex-col p-4">
+                                        <p className="text-sm text-slate-700 line-clamp-2">
+                                            {p.bio}
+                                        </p>
+
+                                        {/* empuja al fondo */}
+                                        <div className="mt-auto">
+                                            <p className="text-xs font-semibold text-[#004aad]">
+                                                Ver perfil →
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </motion.button>
                         ))}
@@ -149,7 +155,7 @@ export default function Equipo({ title = "Equipo", subtitle = "Conoce a las pers
                                 className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-xl border border-slate-200"
                                 onClick={(e) => e.stopPropagation()}
                             >
-                                <div className="relative h-72 w-full">
+                                <div className="relative h-[400px] w-full">
                                     <img
                                         src={selected.photo}
                                         alt={selected.name}
@@ -212,8 +218,5 @@ export default function Equipo({ title = "Equipo", subtitle = "Conoce a las pers
 
 
         </section>
-
-
-
     );
 }
