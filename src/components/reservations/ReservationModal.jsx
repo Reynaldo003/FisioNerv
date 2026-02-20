@@ -28,9 +28,9 @@ function getStatusColorClasses(status) {
     case "confirmado":
       return "bg-amber-100 text-amber-900 border-amber-300";
     case "completado":
-      return "bg-pink-100 text-pink-900 border-pink-300";
+      return "bg-emerald-100 text-emerald-900 border-emerald-300";
     case "cancelado":
-      return "bg-orange-100 text-orange-900 border-orange-300";
+      return "bg-red-100 text-red-900 border-red-300";
     default:
       return "bg-slate-100 text-slate-700 border-slate-300";
   }

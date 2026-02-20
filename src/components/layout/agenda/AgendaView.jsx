@@ -1120,8 +1120,8 @@ export function AgendaView({
             <div className="flex items-center gap-2 shrink-0">
               <button
                 className={`text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "day"
-                    ? "bg-violet-50 text-violet-700 border-violet-200"
-                    : "bg-white hover:bg-slate-50 text-slate-600"
+                  ? "bg-violet-50 text-violet-700 border-violet-200"
+                  : "bg-white hover:bg-slate-50 text-slate-600"
                   }`}
                 onClick={() => setViewMode("day")}
               >
@@ -1132,8 +1132,8 @@ export function AgendaView({
                 <>
                   <button
                     className={`text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "week"
-                        ? "bg-violet-50 text-violet-700 border-violet-200"
-                        : "bg-white hover:bg-slate-50 text-slate-600"
+                      ? "bg-violet-50 text-violet-700 border-violet-200"
+                      : "bg-white hover:bg-slate-50 text-slate-600"
                       }`}
                     onClick={() => setViewMode("week")}
                     disabled={dualMode}
@@ -1143,8 +1143,8 @@ export function AgendaView({
                   </button>
                   <button
                     className={`hidden sm:inline-flex text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "month"
-                        ? "bg-violet-50 text-violet-700 border-violet-200"
-                        : "bg-white hover:bg-slate-50 text-slate-600"
+                      ? "bg-violet-50 text-violet-700 border-violet-200"
+                      : "bg-white hover:bg-slate-50 text-slate-600"
                       }`}
                     onClick={() => setViewMode("month")}
                     disabled={dualMode}

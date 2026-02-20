@@ -37,8 +37,8 @@ function mapCitaToAppointment(cita) {
 
     let color = "bg-blue-100 text-blue-900 border-blue-300";
     if (cita.estado === "confirmado") color = "bg-amber-100 text-amber-900 border-amber-300";
-    else if (cita.estado === "completado") color = "bg-pink-100 text-pink-900 border-pink-300";
-    else if (cita.estado === "cancelado") color = "bg-orange-100 text-orange-900 border-orange-300";
+    else if (cita.estado === "completado") color = "bg-emerald-100 text-emerald-900 border-emerald-300";
+    else if (cita.estado === "cancelado") color = "bg-red-100 text-red-900 border-red-300";
 
     return {
         id: cita.id,
@@ -259,8 +259,8 @@ function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab }) {
                                         onClose();
                                     }}
                                     className={`w-full text-left rounded-2xl px-4 py-3 text-sm font-semibold border ${active
-                                            ? "bg-slate-900 text-white border-slate-900"
-                                            : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+                                        ? "bg-slate-900 text-white border-slate-900"
+                                        : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
                                         }`}
                                     type="button"
                                 >
