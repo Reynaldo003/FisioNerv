@@ -7,7 +7,7 @@ import { TextAnimate } from "@/components/ui/text-animate";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 // Solo como “hint” (el backend ya lo fuerza)
-const DEFAULT_PUBLIC_PROFESSIONAL = "Edgar Mauricio Medina Cruz";
+const DEFAULT_PUBLIC_PROFESSIONAL = "L.F.T Edgar Mauricio Medina Cruz";
 
 export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" }) {
     const days = useMemo(() => nextDays(14), []);

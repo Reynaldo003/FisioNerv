@@ -1,5 +1,5 @@
 // src/components/Servicios.jsx
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
     HandHeart,
     Stethoscope,
@@ -7,79 +7,18 @@ import {
     TrendingUp,
     CheckCircle2,
 } from "lucide-react";
-import { TextAnimate } from "@/components/ui/text-animate";
 
-const INTRO = {
-    title: "Servicios",
-    subtitle:
-        "En Fisionerv transformamos la evidencia científica en un trato cercano y humano. Diseñamos planes personalizados y te acompañamos paso a paso para recuperar movilidad, función y calidad de vida.",
-    bullets: [
-        "Atención basada en evidencia y razonamiento clínico.",
-        "Instalaciones seguras, cómodas y en constante actualización.",
-        "Resultados medibles: metas claras y seguimiento continuo.",
-    ],
-};
-
-function normalizeKey(str = "") {
-    return String(str)
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // quita acentos
-        .replace(/[^a-z0-9\s]/g, " ") // quita puntuación
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-const SERVICE_IMAGE_RAW = {
-    "Valoracion Inicial a Domicilio": "/servicios/valoracion-domicilio.jpeg",
-    "Sesiones Subsecuentes a Domicilio": "/servicios/subsecuentes-domicilio.jpeg",
-    "Valoracion Inicial Hospital": "/servicios/valoracion-hospital.jpeg",
-    "Sesiones Subsecuentes Hospital": "/servicios/subsecuentes-hospital.jpeg",
-    "Paciente Convenio": "/servicios/valoracion-inicial.jpeg",
-    "Cita Nutriologa": "/servicios/nutriologa.jpeg",
-    "Sesiones Subsecuentes": "/servicios/subsecuentes.jpeg",
-    "Valoracion Inicial": "/servicios/valoracion-inicial.jpeg",
-    "Consulta Dental": "/servicios/dental.jpeg",
-    "Consulta de Seguimiento Nutricional": "/servicios/nutricional.jpeg",
-    "Consulta Nutricional": "/servicios/nutricional.jpeg",
-    "Consulta Medica": "/servicios/medica.jpeg",
-};
-
-const SERVICE_IMAGE_BY_NAME = Object.fromEntries(
-    Object.entries(SERVICE_IMAGE_RAW).map(([k, v]) => [normalizeKey(k), v])
-);
-
-function getServiceImageByName(name = "") {
-    const key = normalizeKey(name);
-    const found = SERVICE_IMAGE_BY_NAME[key];
-
-    // Si no match, fallback a una que SÍ exista
-    // (ajusta si tu default real es otro)
-    const fallback = "/servicios/valoracion.png";
-
-    if (!found) {
-        // Esto sí lo vas a ver en consola siempre que no matchee
-        // eslint-disable-next-line no-console
-        console.warn("[SERVICIOS] Sin match de imagen", {
-            nameFromDB: name,
-            normalizedDB: key,
-            availableKeys: Object.keys(SERVICE_IMAGE_BY_NAME),
-        });
-    }
-
-    return found || fallback;
-}
+// ✅ SOLO DEFAULT LOCAL (permitido)
+const DEFAULT_SERVICE_IMG = "/servicios/valoracion.png";
 
 function guessSpecialty(serviceName = "") {
-    const n = serviceName.toLowerCase();
-
+    const n = String(serviceName || "").toLowerCase();
     if (n.includes("neuro") || n.includes("neurol")) return "neurologica";
     if (n.includes("deport") || n.includes("rendimiento")) return "deportiva";
     if (n.includes("geri") || n.includes("adulto mayor")) return "geriatrica";
     if (n.includes("pedi") || n.includes("niñ") || n.includes("infan")) return "pediatrica";
     if (n.includes("reuma") || n.includes("artr") || n.includes("fibrom")) return "reumatologica";
     if (n.includes("pulmon") || n.includes("cardiac") || n.includes("cardio")) return "cardiorresp";
-
     return "ortopedica";
 }
 
@@ -89,28 +28,43 @@ function moneyMXN(n) {
     return `MXN $${num.toLocaleString("es-MX")}`;
 }
 
-export default function ServiciosShowcase({ SERVICES = [], PRIMARY = "#1E63C5", variant }) {
+/**
+ * ✅ Misma idea que Admin: usar la URL tal cual.
+ * Pero aquí soportamos ambos mundos:
+ * - si viene normalizado desde useServicios -> s.mediaSrc
+ * - si viene crudo del backend -> s.imagen_url / s.imagen
+ * - si no viene nada -> DEFAULT_SERVICE_IMG
+ */
+function pickImg(s) {
+    const img =
+        (s?.mediaSrc || s?.imagen_url || s?.imagen || "").toString().trim();
+
+    return img || DEFAULT_SERVICE_IMG;
+}
+
+export default function ServiciosShowcase({ SERVICES = [], PRIMARY = "#1E63C5" }) {
     const normalized = useMemo(() => {
         return (SERVICES || []).map((s, idx) => {
-            const rawName = s.name ?? s.nombre ?? "";
-            const name = rawName || "Servicio";
-            const specialty = s.specialty || guessSpecialty(name);
+            const idRaw = s.id ?? idx;
+            const id = String(idRaw);
 
-            const resolvedMedia = getServiceImageByName(name);
+            const name = s.nombre ?? s.name ?? "Servicio";
+            const description = s.descripcion ?? s.description ?? "";
+            const price = s.precio ?? s.price ?? 0;
+            const duration = s.duracion ?? s.duration ?? "";
+            const tag = s.tag ?? "";
 
-            // Log útil para confirmar qué src se asignó
-            // eslint-disable-next-line no-console
-
+            const mediaSrc = pickImg(s);
 
             return {
-                id: s.id ?? idx,
+                id,
                 name,
-                description: s.description ?? s.descripcion ?? "",
-                price: s.price ?? s.precio ?? 0,
-                tag: s.tag ?? "",
-                duration: s.duration ?? s.duracion ?? "",
-                mediaSrc: resolvedMedia,
-                specialty,
+                description,
+                price,
+                tag,
+                duration,
+                mediaSrc,
+                specialty: s.specialty || guessSpecialty(name),
             };
         });
     }, [SERVICES]);
@@ -138,9 +92,7 @@ function ServiciosHeader({ PRIMARY }) {
                             En Fisionerv transformamos la evidencia científica en un trato cercano,
                             claro y profundamente humano. Valoramos cada caso con rigor, diseñamos
                             planes de rehabilitación personalizados y acompañamos a nuestros pacientes
-                            paso a paso para recuperar movilidad, función y calidad de vida. Nuestro
-                            objetivo es ayudarte a volver a lo que amas, con confianza, seguridad y
-                            resultados reales.
+                            paso a paso para recuperar movilidad, función y calidad de vida.
                         </p>
                     </div>
                 </div>
@@ -152,8 +104,8 @@ function ServiciosHeader({ PRIMARY }) {
                         <span
                             key={item}
                             className="inline-flex items-center gap-2 rounded-full border border-slate-200
-                         bg-slate-50 px-4 py-2 text-am font-semibold text-slate-700
-                         dark:border-neutral-700 dark:bg-white/10 dark:text-white/80"
+              bg-slate-50 px-4 py-2 text-am font-semibold text-slate-700
+              dark:border-neutral-700 dark:bg-white/10 dark:text-white/80"
                         >
                             <CheckCircle2 className="h-4 w-4" style={{ color: PRIMARY }} />
                             {item}
@@ -175,13 +127,18 @@ const HIGHLIGHTS = [
 
 function ServiciosVarianteMenu({ SERVICES, PRIMARY }) {
     const [selectedId, setSelectedId] = useState(SERVICES[0]?.id ?? null);
-    const selected = useMemo(
-        () => SERVICES.find((s) => s.id === selectedId) || SERVICES[0],
-        [selectedId, SERVICES]
-    );
 
-    // fallback REAL que sí existe
-    const fallbackImg = "/servicios/valoracion.png";
+    useEffect(() => {
+        if (!SERVICES?.length) return;
+        const exists = SERVICES.some((s) => String(s.id) === String(selectedId));
+        if (!selectedId || !exists) setSelectedId(String(SERVICES[0].id));
+    }, [SERVICES, selectedId]);
+
+    const selected = useMemo(() => {
+        if (!SERVICES?.length) return null;
+        const sid = String(selectedId ?? "");
+        return SERVICES.find((s) => String(s.id) === sid) || SERVICES[0];
+    }, [selectedId, SERVICES]);
 
     return (
         <div className="grid gap-6 lg:grid-cols-5">
@@ -198,11 +155,11 @@ function ServiciosVarianteMenu({ SERVICES, PRIMARY }) {
 
                     <div className="max-h-[570px] overflow-auto">
                         {SERVICES.map((s) => {
-                            const active = s.id === selectedId;
+                            const active = String(s.id) === String(selectedId);
                             return (
                                 <button
                                     key={s.id}
-                                    onClick={() => setSelectedId(s.id)}
+                                    onClick={() => setSelectedId(String(s.id))}
                                     className={`w-full border-b px-4 py-3 text-left transition last:border-b-0 ${active
                                         ? "bg-slate-900/5 border-slate-200 dark:border-neutral-700"
                                         : "border-slate-200 hover:bg-slate-50 dark:border-neutral-700 dark:hover:bg-white/5"
@@ -236,16 +193,12 @@ function ServiciosVarianteMenu({ SERVICES, PRIMARY }) {
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900/40">
                     <div className="aspect-[16/9] w-full overflow-hidden">
                         <img
-                            src={selected?.mediaSrc || fallbackImg}
+                            src={selected?.mediaSrc || DEFAULT_SERVICE_IMG}
                             alt={selected?.name || "Servicio"}
                             className="h-full w-full object-cover"
+                            loading="lazy"
                             onError={(e) => {
-                                // eslint-disable-next-line no-console
-                                console.error("[IMG ERROR]", {
-                                    service: selected?.name,
-                                    srcTried: e.currentTarget?.src,
-                                });
-                                e.currentTarget.src = fallbackImg;
+                                e.currentTarget.src = DEFAULT_SERVICE_IMG;
                             }}
                         />
                     </div>

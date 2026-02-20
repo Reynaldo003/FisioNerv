@@ -10,6 +10,7 @@ export default function Equipo() {
     const [selected, setSelected] = useState(null);
     const [team, setTeam] = useState([]);
     const [loading, setLoading] = useState(true);
+
     function titleCase(str = "") {
         return str
             .toString()
@@ -18,6 +19,14 @@ export default function Equipo() {
             .toLowerCase()
             .replace(/\b\w/g, (c) => c.toUpperCase());
     }
+
+    // 👇 Mapeo de roles “técnicos” a nombres “humanos” para UI
+    function normalizeRole(rawRole) {
+        const r = String(rawRole || "").trim().toLowerCase();
+        if (r === "admin") return "Fisioterapeuta";
+        return titleCase(rawRole || "Colaborador");
+    }
+
     useEffect(() => {
         async function load() {
             try {
@@ -29,7 +38,7 @@ export default function Equipo() {
                     const fullName =
                         `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username;
 
-                    const rol = titleCase(u.rol_out || "Colaborador");
+                    const rol = normalizeRole(u.rol_out);
 
                     return {
                         id: u.id,
@@ -114,7 +123,12 @@ export default function Equipo() {
                             >
                                 <div className="flex h-full flex-col">
                                     <div className="relative h-48 w-full flex-shrink-0">
-                                        <img src={p.photo} alt={p.name} className="h-full w-full object-cover" draggable="false" />
+                                        <img
+                                            src={p.photo}
+                                            alt={p.name}
+                                            className="h-full w-full object-cover"
+                                            draggable="false"
+                                        />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/15 to-transparent" />
                                         <div className="absolute bottom-3 left-3 right-3">
                                             <p className="text-white font-semibold">{p.name}</p>
@@ -123,15 +137,10 @@ export default function Equipo() {
                                     </div>
 
                                     <div className="flex flex-1 flex-col p-4">
-                                        <p className="text-sm text-slate-700 line-clamp-2">
-                                            {p.bio}
-                                        </p>
+                                        <p className="text-sm text-slate-700 line-clamp-2">{p.bio}</p>
 
-                                        {/* empuja al fondo */}
                                         <div className="mt-auto">
-                                            <p className="text-xs font-semibold text-[#004aad]">
-                                                Ver perfil →
-                                            </p>
+                                            <p className="text-xs font-semibold text-[#004aad]">Ver perfil →</p>
                                         </div>
                                     </div>
                                 </div>
@@ -169,9 +178,7 @@ export default function Equipo() {
                                 </div>
 
                                 <div className="p-6">
-                                    <p className="text-sm leading-6 text-slate-700">
-                                        {selected.bio}
-                                    </p>
+                                    <p className="text-sm leading-6 text-slate-700">{selected.bio}</p>
 
                                     <div className="mt-4 flex flex-wrap gap-2">
                                         {(selected.tags || []).map((t) => (
@@ -215,8 +222,6 @@ export default function Equipo() {
                     </div>
                 ))}
             </div>
-
-
         </section>
     );
 }

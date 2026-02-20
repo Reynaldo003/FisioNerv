@@ -1,11 +1,23 @@
+// /componentes/reservations/ReservationModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CreditCard, Landmark, Banknote, Check, UserPlus } from "lucide-react";
+import {
+  CreditCard,
+  Landmark,
+  Banknote,
+  Check,
+  UserPlus,
+  MessageCircle,
+  Download,
+  X,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 function durationToMinutes(durationStr) {
   if (!durationStr) return 60;
-  const [h = "0", m = "0", s = "0"] = durationStr.split(":");
+  const [h = "0", m = "0", s = "0"] = String(durationStr).split(":");
   return Number(h) * 60 + Number(m) + Number(s) / 60;
 }
 
@@ -26,7 +38,7 @@ function getStatusColorClasses(status) {
 
 function addMinutesToTime(timeStr, minutesToAdd) {
   if (!timeStr) return "08:00";
-  const [h = "0", m = "0"] = timeStr.split(":");
+  const [h = "0", m = "0"] = String(timeStr).split(":");
   let total = Number(h) * 60 + Number(m) + Number(minutesToAdd || 0);
   if (total < 0) total = 0;
   const hh = String(Math.floor(total / 60) % 24).padStart(2, "0");
@@ -46,19 +58,7 @@ function getPatientLabel(p) {
   return full || `Paciente #${p.id}`;
 }
 
-function overlaps(startA, endA, startB, endB) {
-  return startA < endB && startB < endA;
-}
-
-function toMinutes(time) {
-  if (!time) return 0;
-  const hh = parseInt(String(time).slice(0, 2), 10) || 0;
-  const mm = parseInt(String(time).slice(3, 5), 10) || 0;
-  return hh * 60 + mm;
-}
-
 function isoToDate(d) {
-  // d: "YYYY-MM-DD"
   const [y, m, day] = String(d).split("-").map(Number);
   return new Date(y, (m || 1) - 1, day || 1);
 }
@@ -70,60 +70,170 @@ function dateToIso(date) {
   return `${y}-${m}-${d}`;
 }
 
-// Mapea L..S a getDay() (Dom=0, Lun=1... Sab=6)
 const DAYKEY_TO_JS = { D: 0, L: 1, M: 2, X: 3, J: 4, V: 5, S: 6 };
 
-function buildRepeatDates({ startDateIso, repeatDays, repeatWeeks, excludeStartDate }) {
+function buildRepeatDatesBySessions({
+  startDateIso,
+  repeatDays,
+  repeatSessions,
+  excludeStartDate,
+}) {
   const start = isoToDate(startDateIso);
   const daysSet = new Set((repeatDays || []).map(String));
-  const weeks = Math.max(1, Number(repeatWeeks || 1));
+  const sessions = Math.max(0, Number(repeatSessions || 0));
 
-  // Solo L-S en tu UI, pero lo dejamos flexible
   const targetJsDays = new Set(
     Array.from(daysSet)
       .map((k) => DAYKEY_TO_JS[k])
-      .filter((v) => typeof v === "number"),
+      .filter((v) => typeof v === "number")
   );
-
-  // Si por alguna razón viene vacío, no repitas nada
   if (targetJsDays.size === 0) return [];
+  if (sessions <= 0) return [];
 
-  // Generamos desde start (incluye) hasta start + (weeks*7 - 1)
-  const totalDays = weeks * 7;
   const out = [];
+  const maxIterations = 366 * 3;
 
-  for (let i = 0; i < totalDays; i++) {
+  for (let i = 0; i < maxIterations; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
+
+    const iso = dateToIso(d);
+    if (excludeStartDate && iso === startDateIso) continue;
 
     const jsDay = d.getDay();
     if (!targetJsDays.has(jsDay)) continue;
 
-    const iso = dateToIso(d);
-
-    if (excludeStartDate && iso === startDateIso) continue;
-
     out.push(iso);
+    if (out.length >= sessions) break;
   }
 
-  // Ordenadas y sin repetición
-  return Array.from(new Set(out)).sort((a, b) => a.localeCompare(b));
+  return out.sort((a, b) => a.localeCompare(b));
 }
 
 const PAYMENT_METHODS = [
-  { id: "tarjeta_credito", label: "Tarjeta de crédito", icon: CreditCard },
-  { id: "tarjeta_debito", label: "Tarjeta de débito", icon: CreditCard },
+  { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
   { id: "transferencia", label: "Transferencia", icon: Landmark },
   { id: "efectivo", label: "Efectivo", icon: Banknote },
+  { id: "otro", label: "Otro", icon: CreditCard },
 ];
+
+function normalizePhoneMX(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("52") && digits.length >= 12) return digits;
+  if (digits.length === 10) return `52${digits}`;
+  return digits;
+}
+
+function MessageModal({ open, title, message, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="text-sm font-semibold text-slate-800">{title}</div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-8 w-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center"
+          >
+            <X className="h-4 w-4 text-slate-600" />
+          </button>
+        </div>
+        <div className="px-4 py-4 text-sm text-slate-700">{message}</div>
+        <div className="px-4 py-3 border-t border-slate-200 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 px-4 rounded-md bg-violet-600 text-white text-sm hover:bg-violet-700"
+          >
+            Entendido
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteModal({ open, onClose, onConfirm }) {
+  const [value, setValue] = useState("");
+
+  useEffect(() => {
+    if (open) setValue("");
+  }, [open]);
+
+  if (!open) return null;
+
+  const ok = String(value || "").trim().toLowerCase() === "eliminar";
+
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Eliminar cita</div>
+            <div className="text-[11px] text-slate-600">
+              Escribe <span className="font-semibold">eliminar</span> para confirmar.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-8 w-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center"
+            title="Cerrar"
+          >
+            <X className="h-4 w-4 text-slate-600" />
+          </button>
+        </div>
+
+        <div className="px-4 py-4">
+          <input
+            autoFocus
+            type="text"
+            className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder='Escribe "eliminar"'
+          />
+          <p className="mt-2 text-[11px] text-slate-500">
+            Esta acción no se puede deshacer.
+          </p>
+        </div>
+
+        <div className="px-4 py-3 border-t border-slate-200 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 px-4 rounded-md border border-slate-200 bg-white text-sm hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={!ok}
+            onClick={onConfirm}
+            className="h-9 px-4 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-60"
+          >
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ReservationModal({
   appointment,
-  preset, // { date, time, professionalId }
+  preset,
   appointments,
   onClose,
-  onSave,   // 👈 IMPORTANTE: debe retornar "saved" del backend
+  onSave,
   onDelete,
+  onRefreshAppointment,
+  onRequestCloseModal,
+  allowSharedSlots = false,
 }) {
   const isEditing = Boolean(appointment?.id);
   const today = new Date().toISOString().slice(0, 10);
@@ -134,21 +244,28 @@ export function ReservationModal({
   const [loadingData, setLoadingData] = useState(true);
   const [savingRepeat, setSavingRepeat] = useState(false);
 
-  // ====== Paciente (combobox) ======
+  const [msg, setMsg] = useState({ open: false, title: "", message: "" });
+
+  const [lastPagoId, setLastPagoId] = useState(null);
+  const [paidFromBackend, setPaidFromBackend] = useState(0);
+
   const [patientQuery, setPatientQuery] = useState("");
   const [patientDropdownOpen, setPatientDropdownOpen] = useState(false);
   const patientBoxRef = useRef(null);
+
+  // ✅ modal seguro para eliminar
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const initialDate = appointment?.date ?? preset?.date ?? today;
   const initialTime = appointment?.time ?? preset?.time ?? "08:00";
 
   const DAYS = [
-    { k: "L", label: "L" },
-    { k: "M", label: "M" },
-    { k: "X", label: "X" },
-    { k: "J", label: "J" },
-    { k: "V", label: "V" },
-    { k: "S", label: "S" },
+    { k: "L", label: "Lun" },
+    { k: "M", label: "Mar" },
+    { k: "X", label: "Mie" },
+    { k: "J", label: "Jue" },
+    { k: "V", label: "Vie" },
+    { k: "S", label: "Sab" },
   ];
 
   function toggleRepeatDay(dayKey) {
@@ -181,33 +298,26 @@ export function ReservationModal({
     professionalId: appointment?.professionalId ?? preset?.professionalId ?? null,
 
     price: appointment?.price ?? 0,
-    metodo_pago: appointment?.metodo_pago ?? "",
     discountPct: appointment?.discountPct ?? 0,
-    deposit: appointment?.deposit ?? 0,
-    paid: appointment?.paid ?? false,
+
+    comprobante: appointment?.comprobante ?? "",
+    montoFacturado: appointment?.montoFacturado ?? 0,
+
+    paymentLines: [{ method: "efectivo", amount: 0 }],
+
     status: appointment?.status ?? "reservado",
     notesInternal: appointment?.notesInternal ?? "",
 
-    // ✅ Repetición: disponible SIEMPRE, no solo editar
     repeatEnabled: appointment?.repeatEnabled ?? false,
     repeatDays: appointment?.repeatDays ?? ["L", "M", "X", "J", "V", "S"],
     repeatWeeks: appointment?.repeatWeeks ?? 1,
+    repeatSessions: appointment?.repeatSessions ?? 1,
   });
 
-  const subtotal = Number(form.price || 0);
-  const discountPct = Number(form.discountPct || 0);
-  const deposit = Number(form.deposit || 0);
-  const discountAmount = (subtotal * discountPct) / 100;
-  const totalAfterDiscount = Math.max(0, subtotal - discountAmount);
-  const remaining = Math.max(0, totalAfterDiscount - deposit);
-
-  // Cerrar dropdown al click fuera
   useEffect(() => {
     const onDoc = (e) => {
       if (!patientBoxRef.current) return;
-      if (!patientBoxRef.current.contains(e.target)) {
-        setPatientDropdownOpen(false);
-      }
+      if (!patientBoxRef.current.contains(e.target)) setPatientDropdownOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
@@ -243,14 +353,16 @@ export function ReservationModal({
           const professionalId = prev.professionalId ?? (profsData[0]?.id ?? null);
 
           const service =
-            servicesData.find((s) => s.id === serviceId) ||
-            servicesData[0] ||
-            null;
+            servicesData.find((s) => s.id === serviceId) || servicesData[0] || null;
 
-          const durationMinutes = service ? durationToMinutes(service.duracion) : 60;
+          const durationMinutes = service
+            ? durationToMinutes(service.duracion || service.duracion_str || service.duracion_text)
+            : 60;
 
           const baseTime = prev.time || "08:00";
-          const endTime = prev.endTime || addMinutesToTime(baseTime, durationMinutes);
+          const endTime = addMinutesToTime(baseTime, durationMinutes);
+
+          const basePrice = prev.price || (service ? Number(service.precio) : 0);
 
           const patientId = prev.patientId ?? null;
           const p = patientsData.find((x) => x.id === patientId) || null;
@@ -259,7 +371,8 @@ export function ReservationModal({
             ...prev,
             serviceId: service ? service.id : serviceId,
             professionalId,
-            price: prev.price || (service ? Number(service.precio) : 0),
+            price: basePrice,
+            montoFacturado: prev.montoFacturado || basePrice,
             time: baseTime,
             endTime,
             ...(p && {
@@ -275,6 +388,11 @@ export function ReservationModal({
         });
       } catch (err) {
         console.error("Error cargando servicios/profesionales/pacientes:", err);
+        setMsg({
+          open: true,
+          title: "Error",
+          message: "No se pudieron cargar datos. Revisa consola.",
+        });
       } finally {
         setLoadingData(false);
       }
@@ -284,16 +402,50 @@ export function ReservationModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sincroniza query del paciente con el form
+  useEffect(() => {
+    const token = localStorage.getItem("auth.access");
+    const citaId = appointment?.id;
+    if (!token || !citaId) {
+      setPaidFromBackend(0);
+      return;
+    }
+
+    async function loadPayments() {
+      try {
+        const resp = await fetch(`${API_BASE}/api/pagos/?cita=${citaId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!resp.ok) {
+          setPaidFromBackend(Number(appointment?.deposit || 0));
+          return;
+        }
+
+        const data = await resp.json();
+        const list = Array.isArray(data) ? data : data?.results || [];
+        const sum = list.reduce((acc, p) => acc + Number(p?.anticipo || 0), 0);
+        setPaidFromBackend(sum);
+      } catch (e) {
+        console.warn("No se pudieron cargar pagos previos:", e);
+        setPaidFromBackend(Number(appointment?.deposit || 0));
+      }
+    }
+
+    loadPayments();
+  }, [appointment?.id]);
+
   useEffect(() => {
     setPatientQuery(form.patient || "");
   }, [form.patient]);
 
+  const getSelectedServiceDurationMinutes = (serviceId) => {
+    const s = (services || []).find((x) => Number(x.id) === Number(serviceId));
+    return s ? durationToMinutes(s.duracion || s.duracion_str || s.duracion_text) : 60;
+  };
+
   const handleChange = (field, value) => {
     if (field === "time") {
-      const service = services.find((s) => s.id === form.serviceId);
-      const durationMinutes = service ? durationToMinutes(service.duracion) : 60;
-
+      const durationMinutes = getSelectedServiceDurationMinutes(form.serviceId);
       setForm((prev) => ({
         ...prev,
         time: value,
@@ -302,9 +454,8 @@ export function ReservationModal({
       return;
     }
 
-    if (["price", "discountPct", "deposit", "repeatWeeks"].includes(field)) {
-      const num =
-        value === "" ? "" : Number(value);
+    if (["price", "discountPct", "repeatWeeks", "repeatSessions", "montoFacturado"].includes(field)) {
+      const num = value === "" ? "" : Number(value);
       setForm((prev) => ({ ...prev, [field]: num }));
       return;
     }
@@ -315,77 +466,34 @@ export function ReservationModal({
   const handleServiceChange = (serviceIdStr) => {
     const serviceId = Number(serviceIdStr);
     const service = services.find((s) => s.id === serviceId);
+    const durationMinutes = service
+      ? durationToMinutes(service.duracion || service.duracion_str || service.duracion_text)
+      : 60;
 
-    const durationMinutes = service ? durationToMinutes(service.duracion) : 60;
-
-    setForm((prev) => ({
-      ...prev,
-      serviceId,
-      price: service ? Number(service.precio) : prev.price,
-      endTime: addMinutesToTime(prev.time, durationMinutes),
-    }));
+    setForm((prev) => {
+      const newPrice = service ? Number(service.precio) : prev.price;
+      return {
+        ...prev,
+        serviceId,
+        price: newPrice,
+        montoFacturado: newPrice,
+        endTime: addMinutesToTime(prev.time, durationMinutes),
+      };
+    });
   };
 
-  // ====== Time slots ocupados (mismo día / mismo profesional) ======
+  // ✅ no “busy”: multi-citas permitidas
   const timeSlots = useMemo(() => {
-    const service = services.find((s) => s.id === form.serviceId);
-    const durationMinutes = service ? durationToMinutes(service.duracion) : 60;
-
-    const sameDayAppointments = (appointments || []).filter((a) => {
-      if (a.date !== form.date) return false;
-      if (a.id === form.id) return false;
-
-      if (form.professionalId != null && a.professionalId != null) {
-        return Number(a.professionalId) === Number(form.professionalId);
-      }
-      return true;
-    });
-
     const slots = [];
     for (let h = 7; h <= 21; h++) {
-      for (const m of [0, 15, 30, 45]) {
-        const hh = String(h).padStart(2, "0");
-        const mm = String(m).padStart(2, "0");
-        const time = `${hh}:${mm}`;
-
-        const start = h * 60 + m;
-        const end = start + durationMinutes;
-
-        const busy = sameDayAppointments.some((a) => {
-          const s = toMinutes(a.time);
-          const e = toMinutes(a.endTime || a.time);
-          return overlaps(start, end, s, e);
-        });
-
-        slots.push({ time, busy });
-      }
+      const hh = String(h).padStart(2, "0");
+      slots.push({ time: `${hh}:00`, busy: false });
     }
     return slots;
-  }, [appointments, form.date, form.id, form.serviceId, form.professionalId, services]);
+  }, []);
 
-  // ====== Validación simple de conflicto para UN payload ======
-  const hasConflict = (payload) => {
-    const sameDayAppointments = (appointments || []).filter((a) => {
-      if (a.date !== payload.date) return false;
-      if (a.id === payload.id) return false;
+  const isNewPatient = !form.patientId && String(form.patient || "").trim().length > 0;
 
-      if (payload.professionalId != null && a.professionalId != null) {
-        return Number(a.professionalId) === Number(payload.professionalId);
-      }
-      return true;
-    });
-
-    const startMinutes = toMinutes(payload.time);
-    const endMinutes = toMinutes(payload.endTime || payload.time);
-
-    return sameDayAppointments.some((a) => {
-      const s = toMinutes(a.time);
-      const e = toMinutes(a.endTime || a.time);
-      return overlaps(startMinutes, endMinutes, s, e);
-    });
-  };
-
-  // ====== Autocomplete paciente ======
   const patientMatches = useMemo(() => {
     const q = String(patientQuery || "").trim().toLowerCase();
     if (!q) return [];
@@ -417,109 +525,224 @@ export function ReservationModal({
     setPatientDropdownOpen(false);
   };
 
-  const isNewPatient = !form.patientId && String(form.patient || "").trim().length > 0;
+  const subtotal = Number(form.montoFacturado || form.price || 0);
+  const discountPct = Number(form.discountPct || 0);
+  const discountAmount = (subtotal * discountPct) / 100;
+  const totalAfterDiscount = Math.max(0, subtotal - discountAmount);
 
-  // ====== Construye payload “limpio” para guardar ======
+  const amountToPayToday = useMemo(() => {
+    return (form.paymentLines || []).reduce((acc, line) => acc + Number(line.amount || 0), 0);
+  }, [form.paymentLines]);
+
+  const totalPaidInternal = Number(paidFromBackend || 0) + Number(amountToPayToday || 0);
+  const remainingInternal = Math.max(0, totalAfterDiscount - totalPaidInternal);
+
+  function setPaymentLine(idx, patch) {
+    setForm((prev) => {
+      const lines = [...(prev.paymentLines || [])];
+      lines[idx] = { ...lines[idx], ...patch };
+      return { ...prev, paymentLines: lines };
+    });
+  }
+
+  function addPaymentLine() {
+    setForm((prev) => ({
+      ...prev,
+      paymentLines: [...(prev.paymentLines || []), { method: "efectivo", amount: 0 }],
+    }));
+  }
+
+  function removePaymentLine(idx) {
+    setForm((prev) => {
+      const lines = [...(prev.paymentLines || [])];
+      lines.splice(idx, 1);
+      return {
+        ...prev,
+        paymentLines: lines.length ? lines : [{ method: "efectivo", amount: 0 }],
+      };
+    });
+  }
+
   const buildPayload = (base, overrides = {}) => {
     const payload = { ...base, ...overrides };
 
-    // normalizaciones básicas
     payload.repeatEnabled = Boolean(payload.repeatEnabled);
     payload.repeatWeeks = Math.max(1, Number(payload.repeatWeeks || 1));
+    payload.repeatSessions = Math.max(1, Number(payload.repeatSessions || 1));
     payload.repeatDays = Array.isArray(payload.repeatDays) ? payload.repeatDays : [];
 
-    // Si es “nuevo paciente”, forzamos patientId null para que backend cree con nested paciente
     if (!payload.patientId) payload.patientId = null;
 
     return payload;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  async function createPaymentsForCita(citaId) {
+    const token = localStorage.getItem("auth.access");
+    const fechaPago = new Date().toISOString().slice(0, 10);
 
-    // Validaciones base de paciente
-    if (!form.patientId) {
-      if (!String(form.patient || "").trim()) {
-        alert("Escribe el nombre del paciente o selecciona uno existente.");
-        return;
-      }
+    const validLines = (form.paymentLines || [])
+      .map((l) => ({ method: String(l.method || "efectivo"), amount: Number(l.amount || 0) }))
+      .filter((l) => l.amount > 0);
+
+    if (validLines.length === 0) {
+      setLastPagoId(null);
+      return null;
     }
 
-    // ✅ Guardado SIN repetición
-    if (!form.repeatEnabled) {
-      const payload = buildPayload(form);
+    let lastId = null;
 
-      if (hasConflict(payload)) {
-        alert("La hora seleccionada ya está ocupada por otra cita en este día/profesional.");
-        return;
+    for (const line of validLines) {
+      const payloadPago = {
+        cita: citaId,
+        fecha_pago: fechaPago,
+        comprobante: String(form.comprobante || ""),
+        monto_facturado: Number(form.montoFacturado || form.price || 0),
+        metodo_pago: line.method,
+        descuento_porcentaje: Number(form.discountPct || 0),
+        anticipo: Number(line.amount || 0),
+      };
+
+      const resp = await fetch(`${API_BASE}/api/pagos/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payloadPago),
+      });
+
+      if (!resp.ok) {
+        let data = null;
+        try {
+          data = await resp.json();
+        } catch { }
+        console.error("Error creando pago:", resp.status, data);
+        throw new Error("No se pudo registrar el pago. Revisa consola.");
       }
 
-      await onSave(payload);
+      const savedPago = await resp.json();
+      lastId = savedPago?.id || lastId;
+    }
+
+    setLastPagoId(lastId);
+    return lastId;
+  }
+
+  async function downloadTicket(pagoId) {
+    if (!pagoId) return;
+    const token = localStorage.getItem("auth.access");
+
+    const resp = await fetch(`${API_BASE}/api/pagos/${pagoId}/ticket/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!resp.ok) {
+      setMsg({ open: true, title: "Ticket", message: "No se pudo generar el ticket. Revisa consola." });
       return;
     }
 
-    // ✅ Guardado CON repetición
+    const blob = await resp.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ticket_pago_${pagoId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  }
+
+  function openWhatsAppConfirm() {
+    const phone = normalizePhoneMX(form.telefono);
+    if (!phone) {
+      setMsg({ open: true, title: "WhatsApp", message: "Este paciente no tiene teléfono válido." });
+      return;
+    }
+
+    const service = services.find((s) => s.id === form.serviceId);
+    const serviceName = service?.nombre || "tu servicio";
+
+    const dateObj = isoToDate(form.date);
+    const dateLong = dateObj
+      .toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      .replace(/^\w/, (c) => c.toUpperCase());
+
+    const text = encodeURIComponent(
+      `Hola ${form.patient || ""}. Te confirmo tu cita de ${serviceName} el ${dateLong} a las ${form.time}.`
+    );
+    window.open(`https://wa.me/${phone}?text=${text}`, "_blank");
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!form.patientId && !String(form.patient || "").trim()) {
+      setMsg({
+        open: true,
+        title: "Validación",
+        message: "Escribe el nombre del paciente o selecciona uno existente.",
+      });
+      return;
+    }
+
     try {
       setSavingRepeat(true);
 
-      // 1) Generar fechas
-      const repeatDates = buildRepeatDates({
-        startDateIso: form.date,
-        repeatDays: form.repeatDays,
-        repeatWeeks: form.repeatWeeks,
-        excludeStartDate: isEditing, // en edición: no dupliques el mismo día
-      });
+      const durationMinutes = getSelectedServiceDurationMinutes(form.serviceId);
+      const fixed = { ...form, endTime: addMinutesToTime(form.time, durationMinutes) };
 
-      // 2) Guardar la cita base
-      const basePayload = buildPayload(form);
+      const basePayload = buildPayload(fixed);
+      const savedBase = await onSave?.(basePayload);
 
-      if (hasConflict(basePayload)) {
-        alert("La cita base tiene conflicto. Cambia la hora o profesional.");
-        return;
+      const savedCitaId = savedBase?.id || savedBase?.cita_id || savedBase?.pk;
+      if (!savedCitaId) throw new Error("El backend no devolvió el ID de la cita guardada.");
+
+      const pagoId = await createPaymentsForCita(savedCitaId);
+      const refreshed = await onRefreshAppointment?.(savedCitaId);
+
+      const paidNow = Boolean(refreshed?.pagado) || Boolean(refreshed?.paid) || remainingInternal <= 0;
+
+      if (paidNow && pagoId) {
+        await downloadTicket(pagoId);
       }
 
-      const savedBase = await onSave(basePayload);
+      if (form.repeatEnabled) {
+        const totalSessions = Math.max(1, Number(form.repeatSessions || 1));
+        const sessionsToCreate = Math.max(0, totalSessions - 1);
 
-      // Si tu onSave NO retorna saved, esto queda null y no podremos amarrar patientId correctamente
-      const savedPatientId =
-        savedBase?.paciente ?? savedBase?.patientId ?? basePayload.patientId ?? null;
+        const repeatDates = buildRepeatDatesBySessions({
+          startDateIso: form.date,
+          repeatDays: form.repeatDays,
+          repeatSessions: sessionsToCreate,
+          excludeStartDate: true,
+        });
 
-      // 3) Crear las demás citas
-      let created = 0;
-      let skipped = 0;
+        const savedPatientId = savedBase?.paciente ?? basePayload.patientId ?? null;
 
-      // Para repetir, necesitamos un payload con patientId fijo (para no crear pacientes duplicados)
-      const repeatTemplate = buildPayload(
-        {
-          ...basePayload,
-          id: null, // nuevas citas
-          patientId: savedPatientId || basePayload.patientId || null,
-        },
-        {},
-      );
-
-      // Si el paciente era nuevo y no logramos obtener ID, igual funciona porque backend hará get_or_create por teléfono,
-      // pero podría duplicar si cambia el teléfono. Aun así, hacemos best-effort.
-      for (const date of repeatDates) {
-        const nextPayload = buildPayload(repeatTemplate, { date });
-
-        // Evitar choques (y repetición accidental)
-        if (hasConflict(nextPayload)) {
-          skipped++;
-          continue;
+        let created = 0;
+        for (const date of repeatDates) {
+          const nextPayload = buildPayload({ ...basePayload, id: null, date, patientId: savedPatientId }, {});
+          await onSave?.(nextPayload);
+          created++;
         }
 
-        await onSave(nextPayload);
-        created++;
+        setMsg({
+          open: true,
+          title: "Listo",
+          message: `Cita guardada. Se crearon ${created} sesiones repetidas.`,
+        });
+      } else {
+        setMsg({
+          open: true,
+          title: "Listo",
+          message: pagoId
+            ? (paidNow ? "Cita guardada y PAGO COMPLETADO." : "Cita guardada y pago registrado.")
+            : "Cita guardada correctamente.",
+        });
       }
 
-      // 4) UX: mensaje simple
-      alert(
-        `Listo. Cita base guardada y se crearon ${created} repetidas. Omitidas por conflicto: ${skipped}.`,
-      );
+      onRequestCloseModal?.();
     } catch (err) {
-      console.error("Error repitiendo citas:", err);
-      alert("Ocurrió un error al repetir las citas. Revisa consola.");
+      console.error(err);
+      setMsg({ open: true, title: "Error", message: err?.message || "Ocurrió un error al guardar." });
     } finally {
       setSavingRepeat(false);
     }
@@ -536,502 +759,588 @@ export function ReservationModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-3 sm:p-6">
-      <div className="absolute inset-0" onClick={onClose} />
+    <>
+      <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-3 sm:p-6">
+        <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="relative z-10 w-[min(96vw,980px)] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-        <div className="flex flex-col max-h-[90vh]">
-          {/* Header */}
-          <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-start justify-between bg-slate-50 gap-3">
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-slate-800 truncate">
-                {isEditing ? `Editar cita de ${form.patient || "paciente"}` : "Nueva cita"}
-              </h2>
-              <p className="text-xs text-slate-500">Paciente, servicio, horario y notas.</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                className={
-                  "hidden sm:inline-flex items-center text-[11px] font-medium px-2 py-1 rounded-full border " +
-                  getStatusColorClasses(form.status)
-                }
-                value={form.status}
-                onChange={(e) => handleChange("status", e.target.value)}
-              >
-                <option value="reservado">Reservado / nuevo</option>
-                <option value="confirmado">Confirmado</option>
-                <option value="completado">Sí asistió</option>
-                <option value="cancelado">No asistió</option>
-              </select>
-
-              <button
-                onClick={onClose}
-                className="h-8 w-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-500 hover:bg-slate-100"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-
-          {/* Body */}
-          <form onSubmit={handleSubmit} autoComplete="off" className="px-4 sm:px-6 py-4 space-y-4 overflow-y-auto">
-            {/* Paciente */}
-            <div className="border border-slate-200 rounded-xl p-3 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold text-slate-600">Datos del paciente</p>
-
-                {form.patientId ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800">
-                    <Check className="h-3.5 w-3.5" />
-                    Existente
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-slate-200 bg-white text-slate-600">
-                    <UserPlus className="h-3.5 w-3.5" />
-                    Nuevo (si no seleccionas)
-                  </span>
-                )}
+        <div className="relative z-10 w-[min(96vw,980px)] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+          <div className="flex flex-col max-h-[90vh]">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-start justify-between bg-slate-50 gap-3">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-slate-800 truncate">
+                  {isEditing ? `Editar cita de ${form.patient || "paciente"}` : "Nueva cita"}
+                </h2>
+                <p className="text-xs text-slate-500">Paciente, servicio, horario, pagos y notas.</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="md:col-span-2" ref={patientBoxRef}>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                    Paciente (escribe para buscar)
-                  </label>
+              <div className="flex items-center gap-2">
+                <select
+                  className={
+                    "hidden sm:inline-flex items-center text-[11px] font-medium px-2 py-1 rounded-full border " +
+                    getStatusColorClasses(form.status)
+                  }
+                  value={form.status}
+                  onChange={(e) => handleChange("status", e.target.value)}
+                >
+                  <option value="reservado">Reservado / nuevo</option>
+                  <option value="confirmado">Confirmado</option>
+                  <option value="completado">Sí asistió</option>
+                  <option value="cancelado">No asistió</option>
+                </select>
 
-                  <div className="relative">
-                    <input
-                      type="text"
-                      name="paciente_no_autofill"
-                      autoComplete="off"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                      value={patientQuery}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setPatientQuery(v);
-                        setPatientDropdownOpen(true);
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-8 w-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-500 hover:bg-slate-100"
+                  title="Cerrar"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
 
-                        setForm((prev) => ({
-                          ...prev,
-                          patientId: null,
-                          patient: v,
-                        }));
-                      }}
-                      onFocus={() => setPatientDropdownOpen(true)}
-                      placeholder="Ej. Juan Pérez..."
-                    />
+            <form onSubmit={handleSubmit} autoComplete="off" className="px-4 sm:px-6 py-4 space-y-4 overflow-y-auto">
+              {/* Paciente */}
+              <div className="border border-slate-200 rounded-xl p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold text-slate-600">Datos del paciente</p>
 
-                    {patientDropdownOpen && patientQuery.trim() && (
-                      <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg overflow-hidden">
-                        {patientMatches.length > 0 ? (
-                          <>
-                            <div className="max-h-56 overflow-auto">
-                              {patientMatches.map((p) => (
+                  {form.patientId ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800">
+                      <Check className="h-3.5 w-3.5" />
+                      Existente
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-slate-200 bg-white text-slate-600">
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Nuevo (si no seleccionas)
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="md:col-span-2" ref={patientBoxRef}>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                      Paciente (escribe para buscar)
+                    </label>
+
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="paciente_no_autofill"
+                        autoComplete="off"
+                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        value={patientQuery}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setPatientQuery(v);
+                          setPatientDropdownOpen(true);
+                          setForm((prev) => ({ ...prev, patientId: null, patient: v }));
+                        }}
+                        onFocus={() => setPatientDropdownOpen(true)}
+                        placeholder="Ej. Juan Pérez..."
+                      />
+
+                      {patientDropdownOpen && patientQuery.trim() && (
+                        <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg overflow-hidden">
+                          {patientMatches.length > 0 ? (
+                            <>
+                              <div className="max-h-56 overflow-auto">
+                                {patientMatches.map((p) => (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      selectExistingPatient(p);
+                                    }}
+                                  >
+                                    <div className="font-medium text-slate-800">{getPatientLabel(p)}</div>
+                                    <div className="text-[11px] text-slate-500">
+                                      {p.telefono || "Sin teléfono"} · {p.correo || "Sin correo"}
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+
+                              <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
                                 <button
-                                  key={p.id}
                                   type="button"
-                                  className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+                                  className="text-[11px] text-slate-700 hover:underline"
                                   onMouseDown={(e) => {
                                     e.preventDefault();
-                                    selectExistingPatient(p);
+                                    markAsNewPatient();
                                   }}
                                 >
-                                  <div className="font-medium text-slate-800">
-                                    {getPatientLabel(p)}
-                                  </div>
-                                  <div className="text-[11px] text-slate-500">
-                                    {p.telefono || "Sin teléfono"} · {p.correo || "Sin correo"}
-                                  </div>
+                                  Usar como paciente nuevo aunque existan coincidencias
                                 </button>
-                              ))}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="px-3 py-3 text-sm text-slate-600">
+                              No hay coincidencias. Se registrará como paciente nuevo.
                             </div>
-
-                            <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
-                              <button
-                                type="button"
-                                className="text-[11px] text-slate-700 hover:underline"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  markAsNewPatient();
-                                }}
-                              >
-                                Usar como paciente nuevo aunque existan coincidencias
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="px-3 py-3 text-sm text-slate-600">
-                            No hay coincidencias. Se registrará como paciente nuevo.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Si seleccionas un paciente del desplegable, se usa el existente. Si no, se creará uno nuevo.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Teléfono</label>
-                  <input
-                    type="text"
-                    name="telefono_no_autofill"
-                    autoComplete="off"
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.telefono}
-                    onChange={(e) => handleChange("telefono", e.target.value)}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Correo</label>
-                  <input
-                    type="email"
-                    name="correo_no_autofill"
-                    autoComplete="off"
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.correo}
-                    onChange={(e) => handleChange("correo", e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Género</label>
-                  <input
-                    type="text"
-                    name="genero_no_autofill"
-                    autoComplete="off"
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.genero}
-                    onChange={(e) => handleChange("genero", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {isNewPatient && (
-                <div className="mt-2 rounded-xl border border-violet-200 bg-violet-50 p-3">
-                  <p className="text-[11px] font-semibold text-violet-800">Datos para paciente nuevo</p>
-
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Apellido paterno</label>
-                      <input
-                        type="text"
-                        autoComplete="off"
-                        name="ap_pat_no_autofill"
-                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                        value={form.apellido_pat}
-                        onChange={(e) => handleChange("apellido_pat", e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Apellido materno</label>
-                      <input
-                        type="text"
-                        autoComplete="off"
-                        name="ap_mat_no_autofill"
-                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                        value={form.apellido_mat}
-                        onChange={(e) => handleChange("apellido_mat", e.target.value)}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Fecha de nacimiento</label>
-                      <input
-                        type="date"
-                        autoComplete="off"
-                        name="fecha_nac_no_autofill"
-                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                        value={form.fecha_nac}
-                        onChange={(e) => handleChange("fecha_nac", e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Detalles */}
-            <div className="border border-slate-200 rounded-xl p-3 space-y-3">
-              <p className="text-[11px] font-semibold text-slate-600">Detalles de la cita</p>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Servicio</label>
-                  <select
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.serviceId ?? ""}
-                    onChange={(e) => handleServiceChange(e.target.value)}
-                  >
-                    {services.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Profesional</label>
-                  <select
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.professionalId ?? ""}
-                    onChange={(e) => handleChange("professionalId", Number(e.target.value))}
-                  >
-                    {professionals.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {getUserLabel(p) || `Profesional #${p.id}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Fecha</label>
-                  <input
-                    type="date"
-                    autoComplete="off"
-                    name="fecha_cita_no_autofill"
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.date}
-                    onChange={(e) => handleChange("date", e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Hora inicio</label>
-                  <select
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.time}
-                    onChange={(e) => handleChange("time", e.target.value)}
-                  >
-                    {timeSlots.map((slot) => (
-                      <option key={slot.time} value={slot.time} disabled={slot.busy}>
-                        {slot.time} {slot.busy ? "— Ocupado" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Hora termina</label>
-                  <input
-                    type="time"
-                    autoComplete="off"
-                    name="hora_fin_no_autofill"
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.endTime}
-                    onChange={(e) => handleChange("endTime", e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Repetición */}
-            <div className="border border-slate-200 rounded-xl p-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold text-slate-600">Repetición</p>
-
-                <label className="flex items-center gap-2 text-xs text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form.repeatEnabled)}
-                    onChange={(e) => handleChange("repeatEnabled", e.target.checked)}
-                  />
-                  Repetir cita
-                </label>
-              </div>
-
-              {form.repeatEnabled && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="md:col-span-2">
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Días (L–S)</label>
-
-                    <div className="flex gap-2 flex-wrap">
-                      {DAYS.map((d) => {
-                        const active = (form.repeatDays || []).includes(d.k);
-                        return (
-                          <button
-                            key={d.k}
-                            type="button"
-                            onClick={() => toggleRepeatDay(d.k)}
-                            className={
-                              "h-9 w-9 rounded-lg border text-sm font-semibold " +
-                              (active
-                                ? "bg-violet-600 text-white border-violet-600"
-                                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50")
-                            }
-                          >
-                            {d.label}
-                          </button>
-                        );
-                      })}
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <p className="text-[10px] text-slate-500 mt-1">
-                      Se repite desde la fecha elegida, por N semanas. (En edición: se repite hacia adelante sin duplicar el mismo día)
+                      Si seleccionas un paciente del desplegable, se usa el existente. Si no, se creará uno nuevo.
                     </p>
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Semanas</label>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Teléfono</label>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        name="telefono_no_autofill"
+                        autoComplete="off"
+                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                        value={form.telefono}
+                        onChange={(e) => handleChange("telefono", e.target.value)}
+                      />
+
+                      <button
+                        type="button"
+                        onClick={openWhatsAppConfirm}
+                        className="shrink-0 h-10 w-10 rounded-md border border-slate-200 hover:bg-slate-50 flex items-center justify-center"
+                        title="Confirmar por WhatsApp"
+                      >
+                        <MessageCircle className="h-5 w-5 text-emerald-600" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Correo</label>
                     <input
-                      type="number"
-                      min={1}
-                      max={52}
+                      type="email"
+                      name="correo_no_autofill"
+                      autoComplete="off"
                       className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.repeatWeeks}
-                      onChange={(e) => handleChange("repeatWeeks", Number(e.target.value || 1))}
+                      value={form.correo}
+                      onChange={(e) => handleChange("correo", e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Género</label>
+                    <input
+                      type="text"
+                      name="genero_no_autofill"
+                      autoComplete="off"
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                      value={form.genero}
+                      onChange={(e) => handleChange("genero", e.target.value)}
                     />
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Pago */}
-            <div className="border border-slate-200 rounded-xl p-3 space-y-3">
-              <p className="text-[11px] font-semibold text-slate-600">Pago</p>
+                {isNewPatient && (
+                  <div className="mt-2 rounded-xl border border-violet-200 bg-violet-50 p-3">
+                    <p className="text-[11px] font-semibold text-violet-800">Datos para paciente nuevo</p>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Precio</label>
-                  <input
-                    type="number"
-                    autoComplete="off"
-                    name="precio_no_autofill"
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.price}
-                    onChange={(e) => handleChange("price", e.target.value)}
-                  />
-                </div>
+                    <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">Apellido paterno</label>
+                        <input
+                          type="text"
+                          autoComplete="off"
+                          name="ap_pat_no_autofill"
+                          className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                          value={form.apellido_pat}
+                          onChange={(e) => handleChange("apellido_pat", e.target.value)}
+                        />
+                      </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Descuento %</label>
-                  <input
-                    type="number"
-                    autoComplete="off"
-                    name="descuento_no_autofill"
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.discountPct}
-                    onChange={(e) => handleChange("discountPct", e.target.value)}
-                  />
-                </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">Apellido materno</label>
+                        <input
+                          type="text"
+                          autoComplete="off"
+                          name="ap_mat_no_autofill"
+                          className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                          value={form.apellido_mat}
+                          onChange={(e) => handleChange("apellido_mat", e.target.value)}
+                        />
+                      </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Anticipo</label>
-                  <input
-                    type="number"
-                    autoComplete="off"
-                    name="anticipo_no_autofill"
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                    value={form.deposit}
-                    onChange={(e) => handleChange("deposit", e.target.value)}
-                  />
-                </div>
-
-                <div className="md:col-span-3">
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Método de pago</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {PAYMENT_METHODS.map((m) => {
-                      const Icon = m.icon;
-                      const active = form.metodo_pago === m.id;
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => handleChange("metodo_pago", m.id)}
-                          className={
-                            "flex items-center gap-2 px-3 py-2 rounded-lg border text-sm " +
-                            (active
-                              ? "bg-violet-50 border-violet-200 text-violet-800"
-                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50")
-                          }
-                        >
-                          <Icon className="h-4 w-4" />
-                          {m.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="md:col-span-3 rounded-lg border border-slate-200 p-3 bg-slate-50">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-600">
-                    <div>
-                      <div className="font-semibold">Subtotal</div>
-                      <div>${subtotal.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">Descuento</div>
-                      <div>-${discountAmount.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">Total</div>
-                      <div>${totalAfterDiscount.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">Restante</div>
-                      <div>${remaining.toFixed(2)}</div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">Fecha de nacimiento</label>
+                        <input
+                          type="date"
+                          autoComplete="off"
+                          name="fecha_nac_no_autofill"
+                          className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                          value={form.fecha_nac}
+                          onChange={(e) => handleChange("fecha_nac", e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="md:col-span-3">
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">Notas internas</label>
-                  <textarea
-                    autoComplete="off"
-                    name="notas_no_autofill"
-                    className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 min-h-[80px]"
-                    value={form.notesInternal}
-                    onChange={(e) => handleChange("notesInternal", e.target.value)}
-                  />
-                </div>
-
-                <div className="md:col-span-3 flex items-center gap-2">
-                  <input
-                    id="paid"
-                    type="checkbox"
-                    checked={Boolean(form.paid)}
-                    onChange={(e) => handleChange("paid", e.target.checked)}
-                  />
-                  <label htmlFor="paid" className="text-sm text-slate-700">
-                    Marcar como pagado
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {/* Acciones */}
-            <div className="flex items-center justify-between pt-2 gap-2">
-              <div className="flex items-center gap-2">
-                {isEditing && (
-                  <button
-                    type="button"
-                    onClick={() => onDelete?.(form.id)}
-                    className="h-10 px-4 rounded-md border border-red-200 text-red-700 hover:bg-red-50 text-sm"
-                    disabled={savingRepeat}
-                  >
-                    Eliminar
-                  </button>
                 )}
               </div>
 
-              <button
-                type="submit"
-                disabled={savingRepeat}
-                className="h-10 px-6 rounded-md bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-60"
-              >
-                {savingRepeat ? "Guardando repetición..." : isEditing ? "Guardar cambios" : "Crear cita"}
-              </button>
-            </div>
-          </form>
+              {/* Detalles */}
+              <div className="border border-slate-200 rounded-xl p-3 space-y-3">
+                <p className="text-[11px] font-semibold text-slate-600">Detalles de la cita</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Servicio</label>
+                    <select
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                      value={form.serviceId ?? ""}
+                      onChange={(e) => handleServiceChange(e.target.value)}
+                    >
+                      {services.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Profesional</label>
+                    <select
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                      value={form.professionalId ?? ""}
+                      onChange={(e) => handleChange("professionalId", Number(e.target.value))}
+                    >
+                      {professionals.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {getUserLabel(p) || `Profesional #${p.id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Fecha</label>
+                    <input
+                      type="date"
+                      autoComplete="off"
+                      name="fecha_cita_no_autofill"
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                      value={form.date}
+                      onChange={(e) => handleChange("date", e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Hora inicio (por hora)</label>
+                    <select
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                      value={form.time}
+                      onChange={(e) => handleChange("time", e.target.value)}
+                    >
+                      {timeSlots.map((slot) => (
+                        <option key={slot.time} value={slot.time}>
+                          {slot.time}
+                        </option>
+                      ))}
+                    </select>
+
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Se permiten múltiples citas dentro de la misma hora desde el panel administrativo.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Hora termina</label>
+                    <input
+                      type="time"
+                      autoComplete="off"
+                      name="hora_fin_no_autofill"
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 bg-slate-50 text-slate-600 cursor-not-allowed"
+                      value={form.endTime}
+                      readOnly
+                      disabled
+                      title="Se calcula automáticamente por duración del servicio"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Se calcula automático: inicio + duración del servicio.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Repetición */}
+              <div className="border border-slate-200 rounded-xl p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-semibold text-slate-600">Repetición</p>
+
+                  <label className="flex items-center gap-2 text-xs text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.repeatEnabled)}
+                      onChange={(e) => handleChange("repeatEnabled", e.target.checked)}
+                    />
+                    Repetir cita
+                  </label>
+                </div>
+
+                {form.repeatEnabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="md:col-span-2">
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Días (L–S)</label>
+
+                      <div className="flex gap-2 flex-wrap">
+                        {DAYS.map((d) => {
+                          const active = (form.repeatDays || []).includes(d.k);
+                          return (
+                            <button
+                              key={d.k}
+                              type="button"
+                              onClick={() => toggleRepeatDay(d.k)}
+                              className={
+                                "h-9 px-3 rounded-lg border text-xs font-semibold " +
+                                (active
+                                  ? "bg-violet-600 text-white border-violet-600"
+                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50")
+                              }
+                            >
+                              {d.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        ✅ “Sesiones” manda: se crean las siguientes N sesiones según los días elegidos.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Semanas</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={52}
+                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                        value={form.repeatWeeks}
+                        onChange={(e) => handleChange("repeatWeeks", Number(e.target.value || 1))}
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">Solo referencia.</p>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Sesiones (total)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={200}
+                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                        value={form.repeatSessions}
+                        onChange={(e) => handleChange("repeatSessions", Number(e.target.value || 1))}
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Ej: si pones 4, se guarda esta cita + 3 siguientes.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Pago */}
+              <div className="border border-slate-200 rounded-xl p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold text-slate-600">Pago</p>
+
+                  {lastPagoId && (
+                    <button
+                      type="button"
+                      onClick={() => downloadTicket(lastPagoId)}
+                      className="h-9 px-3 rounded-md border border-slate-200 hover:bg-slate-50 text-sm flex items-center gap-2"
+                      title="Descargar ticket PDF"
+                    >
+                      <Download className="h-4 w-4" />
+                      Ticket
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Precio</label>
+                    <input
+                      type="number"
+                      autoComplete="off"
+                      name="precio_no_autofill"
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                      value={form.price}
+                      onChange={(e) => handleChange("price", e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Monto a facturar</label>
+                    <input
+                      type="number"
+                      autoComplete="off"
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                      value={form.montoFacturado}
+                      onChange={(e) => handleChange("montoFacturado", e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Descuento %</label>
+                    <input
+                      type="number"
+                      autoComplete="off"
+                      name="descuento_no_autofill"
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                      value={form.discountPct}
+                      onChange={(e) => handleChange("discountPct", e.target.value)}
+                    />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Nº comprobante</label>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                      value={form.comprobante}
+                      onChange={(e) => handleChange("comprobante", e.target.value)}
+                      placeholder="Opcional"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[11px] font-semibold text-slate-600">
+                        Cantidad que se paga (puede ser múltiple)
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addPaymentLine}
+                        className="h-8 px-3 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-sm flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Agregar método
+                      </button>
+                    </div>
+
+                    <div className="mt-3 grid gap-2">
+                      {(form.paymentLines || []).map((line, idx) => (
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_140px_44px] gap-2 items-center">
+                          <select
+                            className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 bg-white"
+                            value={line.method}
+                            onChange={(e) => setPaymentLine(idx, { method: e.target.value })}
+                          >
+                            {PAYMENT_METHODS.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          <input
+                            type="number"
+                            min={0}
+                            className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 bg-white"
+                            value={line.amount}
+                            onChange={(e) => setPaymentLine(idx, { amount: Number(e.target.value || 0) })}
+                            placeholder="Monto"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => removePaymentLine(idx)}
+                            className="h-10 w-10 rounded-md border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center"
+                            title="Quitar"
+                          >
+                            <Trash2 className="h-4 w-4 text-slate-600" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-slate-600">
+                      <div>
+                        <div className="font-semibold">Total (con descuento)</div>
+                        <div>${totalAfterDiscount.toFixed(2)}</div>
+                      </div>
+
+                      <div>
+                        <div className="font-semibold">Cantidad a pagar (hoy)</div>
+                        <div>${Number(amountToPayToday || 0).toFixed(2)}</div>
+                      </div>
+
+                      <div>
+                        <div className="font-semibold">Descuento</div>
+                        <div>-${discountAmount.toFixed(2)}</div>
+                      </div>
+
+                      <div className="sm:col-span-3 text-[10px] text-slate-500">
+                        Si el pago completa el total, el ticket se descargará automáticamente al guardar.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Notas internas</label>
+                    <textarea
+                      autoComplete="off"
+                      name="notas_no_autofill"
+                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 min-h-[80px]"
+                      value={form.notesInternal}
+                      onChange={(e) => handleChange("notesInternal", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 gap-2">
+                <div className="flex items-center gap-2">
+                  {isEditing && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteOpen(true)}
+                      className="h-10 px-4 rounded-md border border-red-200 text-red-700 hover:bg-red-50 text-sm"
+                      disabled={savingRepeat}
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={savingRepeat}
+                  className="h-10 px-6 rounded-md bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-60"
+                >
+                  {savingRepeat ? "Guardando..." : isEditing ? "Guardar cambios" : "Crear cita"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+
+      <MessageModal
+        open={msg.open}
+        title={msg.title}
+        message={msg.message}
+        onClose={() => setMsg({ open: false, title: "", message: "" })}
+      />
+
+      <ConfirmDeleteModal
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => {
+          setDeleteOpen(false);
+          onDelete?.(form.id);
+        }}
+      />
+    </>
   );
 }
