@@ -2,6 +2,7 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { MiniCalendar } from "./MiniCalendar";
 import { DollarSign, Plus, Ban } from "lucide-react";
+import { notifySalesRefresh } from "../../../utils/salesSync";
 
 import {
   DndContext,
@@ -315,12 +316,19 @@ export function AgendaView({
     ],
     []
   );
+  const [includeSunday, setIncludeSunday] = useState(() => {
+    return localStorage.getItem("agenda.includeSunday") === "1";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("agenda.includeSunday", includeSunday ? "1" : "0");
+  }, [includeSunday]);
 
   const DAY_START_MIN = toMinutes(HOURS[0]);
   const DAY_END_MIN = toMinutes(HOURS[HOURS.length - 1]) + 60; // hasta 21:00
 
   // En móvil damos un poquito más de alto para facilitar touch
-  const HOUR_ROW_HEIGHT = isMobile ? 64 : 56;
+  const HOUR_ROW_HEIGHT = 64;
   const GRID_TOTAL_HEIGHT = HOURS.length * HOUR_ROW_HEIGHT;
 
   // ✅ DnD en móvil: TouchSensor + PointerSensor
@@ -367,9 +375,9 @@ export function AgendaView({
     headerMainLabel = formatLongDate(currentDate);
   } else if (viewMode === "week") {
     const monday = startOfWeekMonday(currentDate);
-    const saturday = new Date(monday);
-    saturday.setDate(monday.getDate() + 5); // Lun–Sáb
-    headerMainLabel = `${formatLongDate(monday)} – ${formatLongDate(saturday)}`;
+    const end = new Date(monday);
+    end.setDate(monday.getDate() + (includeSunday ? 6 : 5)); // Lun–Dom o Lun–Sáb
+    headerMainLabel = `${formatLongDate(monday)} – ${formatLongDate(end)}`;
   } else {
     headerMainLabel = currentDate
       .toLocaleDateString("es-MX", { month: "long", year: "numeric" })
@@ -399,12 +407,12 @@ export function AgendaView({
   // Lun–Sáb (sin Domingo)
   const weekDays = useMemo(
     () =>
-      Array.from({ length: 6 }, (_, i) => {
+      Array.from({ length: includeSunday ? 7 : 6 }, (_, i) => {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
         return d;
       }),
-    [monday]
+    [monday, includeSunday]
   );
 
   const searchTerm = quickSearch.trim().toLowerCase();
@@ -817,7 +825,7 @@ export function AgendaView({
             <div
               key={idx}
               style={{ height: HOUR_ROW_HEIGHT }}
-              className="border-b border-slate-100"
+              className="border-b border-slate-400 border-dashed"
             />
           ))}
         </div>
@@ -850,7 +858,7 @@ export function AgendaView({
                 >
                   <div
                     className={[
-                      "w-full h-full rounded-lg",
+                      "group w-[98%] h-[98%] rounded-lg",
                       "bg-white/70",
                       "p-1",
                       hasBlock ? "opacity-95" : "",
@@ -888,9 +896,9 @@ export function AgendaView({
                         className={[
                           "absolute right-2 top-2 z-[5]",
                           "h-8 w-8 rounded-md border border-slate-200 bg-white",
-                          "hover:bg-slate-50 shadow-sm",
-                          "flex items-center justify-center",
-                          "touch-manipulation",
+                          "shadow-sm flex items-center justify-center",
+                          "opacity-0 group-hover:opacity-100 transition",
+                          "hover:bg-slate-50",
                         ].join(" ")}
                         aria-label="Opciones de hora"
                         title="Opciones"
@@ -942,8 +950,8 @@ export function AgendaView({
 
   // Grid header: en móvil mostramos solo Hora + Día actual
   const headerGridStyleWeek = useMemo(
-    () => ({ gridTemplateColumns: "64px repeat(6, minmax(0, 1fr))" }),
-    []
+    () => ({ gridTemplateColumns: `64px repeat(${includeSunday ? 7 : 6}, minmax(0, 1fr))` }),
+    [includeSunday]
   );
   const headerGridStyleDay = useMemo(() => ({ gridTemplateColumns: "64px minmax(0, 1fr)" }), []);
 
@@ -1118,6 +1126,43 @@ export function AgendaView({
 
             {/* En móvil solo dejamos “Día” (simple y usable). En desktop sí todo */}
             <div className="flex items-center gap-2 shrink-0">
+
+              {!isMobile && (
+                <>
+                  <button
+                    className={[
+                      "text-xs px-3 py-1 rounded-md border",
+                      includeSunday
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-white hover:bg-slate-50 text-slate-600 border-slate-300",
+                    ].join(" ")}
+                    onClick={() => setIncludeSunday((v) => !v)}
+                    title="Mostrar/ocultar domingo en la vista semana"
+                  >
+                    Domingo
+                  </button>
+
+                  <button
+                    className="text-xs px-3 py-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-600"
+                    onClick={() => {
+                      // abre el modal de bloqueo sin depender de un slot específico
+                      const proId = selectedProfessionalId || null;
+                      const dateIso = dateKey(currentDate);
+                      onOpenBlockModal?.({
+                        date: dateIso,
+                        startTime: "08:00",
+                        endTime: "09:00",
+                        professionalId: proId,
+                      });
+                    }}
+                    title="Bloquear un rango horario"
+                  >
+                    Bloquear rango
+                  </button>
+
+                </>
+              )}
+
               <button
                 className={`text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "day"
                   ? "bg-violet-50 text-violet-700 border-violet-200"
@@ -1292,52 +1337,54 @@ export function AgendaView({
               </DragOverlay>
             </DndContext>
           </div>
-        </main>
-      </div>
+        </main >
+      </div >
 
       {/* HoverCard solo desktop */}
-      {!isMobile && (
-        <HoverCard open={Boolean(hoverAppt)} anchorRect={hoverRect}>
-          {hoverAppt && (
-            <div className="space-y-1">
-              <div className="text-xs font-semibold text-slate-800">
-                {isBlockItem(hoverAppt) ? "Horario bloqueado" : hoverAppt.patient}
-              </div>
-
-              {!isBlockItem(hoverAppt) && (
-                <>
-                  <div className="text-[11px] text-slate-600">
-                    <span className="font-semibold">Servicio:</span> {hoverAppt.service}
-                  </div>
-                  <div className="text-[11px] text-slate-600">
-                    <span className="font-semibold">Costo:</span> ${safeMoney(hoverAppt.price)}
-                  </div>
-                  <div className="text-[11px] text-slate-600">
-                    <span className="font-semibold">Pagado:</span>{" "}
-                    {hoverAppt.paid ? (
-                      <span className="text-emerald-700 font-semibold">Sí</span>
-                    ) : (
-                      <span className="text-slate-600">No</span>
-                    )}
-                  </div>
-                </>
-              )}
-
-              <div className="text-[11px] text-slate-600">
-                <span className="font-semibold">Horario:</span>{" "}
-                {String(hoverAppt.time || "").slice(0, 5)}
-                {hoverAppt.endTime ? ` – ${String(hoverAppt.endTime).slice(0, 5)}` : ""}
-              </div>
-
-              {isBlockItem(hoverAppt) && (
-                <div className="text-[11px] text-slate-600">
-                  <span className="font-semibold">Motivo:</span> {hoverAppt.motivo || "No disponible"}
+      {
+        !isMobile && (
+          <HoverCard open={Boolean(hoverAppt)} anchorRect={hoverRect}>
+            {hoverAppt && (
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-slate-800">
+                  {isBlockItem(hoverAppt) ? "Horario bloqueado" : hoverAppt.patient}
                 </div>
-              )}
-            </div>
-          )}
-        </HoverCard>
-      )}
+
+                {!isBlockItem(hoverAppt) && (
+                  <>
+                    <div className="text-[11px] text-slate-600">
+                      <span className="font-semibold">Servicio:</span> {hoverAppt.service}
+                    </div>
+                    <div className="text-[11px] text-slate-600">
+                      <span className="font-semibold">Costo:</span> ${safeMoney(hoverAppt.price)}
+                    </div>
+                    <div className="text-[11px] text-slate-600">
+                      <span className="font-semibold">Pagado:</span>{" "}
+                      {hoverAppt.paid ? (
+                        <span className="text-emerald-700 font-semibold">Sí</span>
+                      ) : (
+                        <span className="text-slate-600">No</span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                <div className="text-[11px] text-slate-600">
+                  <span className="font-semibold">Horario:</span>{" "}
+                  {String(hoverAppt.time || "").slice(0, 5)}
+                  {hoverAppt.endTime ? ` – ${String(hoverAppt.endTime).slice(0, 5)}` : ""}
+                </div>
+
+                {isBlockItem(hoverAppt) && (
+                  <div className="text-[11px] text-slate-600">
+                    <span className="font-semibold">Motivo:</span> {hoverAppt.motivo || "No disponible"}
+                  </div>
+                )}
+              </div>
+            )}
+          </HoverCard>
+        )
+      }
 
       <MenuPopover
         open={Boolean(slotMenu)}

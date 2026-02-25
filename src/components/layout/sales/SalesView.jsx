@@ -7,8 +7,9 @@ import {
   LegendList,
   BadgePill,
 } from "./SummaryParts";
-
+import { subscribeSalesRefresh } from "../../../utils/salesSync";
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import { notifySalesRefresh } from "../../../utils/salesSync";
 
 // =======================
 // Helpers fechas
@@ -552,13 +553,7 @@ export function SalesView() {
     ids: [],
   });
 
-  // Dentro de SalesView(), agrega este helper:
-  const refreshAfterMutations = async () => {
-    // recarga stats + pagos reales del backend (sin tener que cambiar de sección)
-    await loadAll("apply");
-  };
-
-
+  const refreshAfterMutations = async () => loadAll("apply");
   // Rango flexible (default: mes actual)
   const now = new Date();
   const defaultFrom = toDateKey(startOfMonth(now));
@@ -623,6 +618,14 @@ export function SalesView() {
 
     return resp.json();
   };
+  useEffect(() => {
+    // cuando borren una cita en otra pantalla, refresca ventas
+    const unsub = subscribeSalesRefresh(() => {
+      loadAll("apply");
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadAll = async (mode = "initial") => {
     const token = localStorage.getItem("auth.access");
@@ -675,13 +678,10 @@ export function SalesView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // recarga cuando cambian filtros aplicados
   useEffect(() => {
-    if (!stats) return;
     loadAll("apply");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appliedRange.fromKey, appliedRange.toKey, group, professionalId]);
-
   // Pagos filtrados por rango y profesional (frontend)
   const filteredPayments = useMemo(() => {
     const { fromKey: f, toKey: t } = appliedRange;
@@ -783,51 +783,61 @@ export function SalesView() {
 
     setDeleteModal({
       open: true,
-      title: "Eliminar registro de pago",
+      title: "Eliminar venta (cita pagada)",
       hint:
         ids.length > 1
-          ? `Este registro visual contiene ${ids.length} pagos (se eliminarán todos).`
-          : `Se eliminará el pago #${ids[0]}.`,
+          ? `Esta venta tiene ${ids.length} pagos. Se eliminará la CITA y todos los pagos.`
+          : `Se eliminará la CITA pagada y su pago #${ids[0]}.`,
       ids,
+      citaId: row?.cita, // ✅ clave
     });
   };
 
-  // Reemplaza handleConfirmDelete por este:
   const handleConfirmDelete = async () => {
-    const ids = deleteModal.ids || [];
     const token = localStorage.getItem("auth.access");
-    if (!token || !ids.length) {
+    const citaId = deleteModal.citaId;
+    const ids = deleteModal.ids || [];
+
+    if (!token || !citaId) {
       setDeleteModal((s) => ({ ...s, open: false }));
       return;
     }
 
     try {
-      // DELETE uno por uno
-      for (const id of ids) {
-        const resp = await fetch(`${API_BASE}/api/pagos/${id}/`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+      // ✅ borrar en backend: CITA + pagos (cascada)
+      const resp = await fetch(`${API_BASE}/api/pagos/by-cita/${citaId}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-        if (!resp.ok && resp.status !== 204) {
-          const err = await resp.text().catch(() => "");
-          console.error("No se pudo eliminar pago", id, resp.status, err);
-          alert("No se pudo eliminar uno de los pagos. Revisa consola.");
-          return;
-        }
+      if (!resp.ok && resp.status !== 204) {
+        const err = await resp.text().catch(() => "");
+        console.error("No se pudo eliminar venta por cita", citaId, resp.status, err);
+        alert("No se pudo eliminar la venta (cita). Revisa consola.");
+        return;
       }
 
-      // cerrar modal rápido (UX)
-      setDeleteModal((s) => ({ ...s, open: false, ids: [] }));
+      // cerrar modal
+      setDeleteModal((s) => ({ ...s, open: false, ids: [], citaId: null }));
 
-      // optimista: quitar del estado local inmediato
-      setPayments((prev) => prev.filter((p) => !ids.includes(p.id)));
+      // ✅ optimista: quita pagos del estado local (por si hay delay en refresh)
+      setPayments((prev) =>
+        prev.filter((p) => String(p.cita) !== String(citaId) && !ids.map(String).includes(String(p.id)))
+      );
 
-      // ✅ CLAVE: refrescar stats + pagos (esto actualiza gráficas)
+      // refresca panel ventas
       await refreshAfterMutations();
+
+      // ✅ notifica a otras vistas (agenda debe recargar)
+      notifySalesRefresh();
+
+      // Si quieres forzar que Agenda recargue desde el mismo bus:
+      try {
+        window.dispatchEvent(new Event("fisionerv:agenda-refresh"));
+      } catch { }
     } catch (e) {
       console.error(e);
-      alert("Error de red eliminando el pago.");
+      alert("Error de red eliminando la venta.");
     }
   };
   if (loading || !stats) {

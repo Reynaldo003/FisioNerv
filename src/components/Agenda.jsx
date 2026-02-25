@@ -10,12 +10,44 @@ const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const DEFAULT_PUBLIC_PROFESSIONAL = "L.F.T Edgar Mauricio Medina Cruz";
 
 export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" }) {
-    const days = useMemo(() => nextDays(14), []);
+    // const days = useMemo(() => nextDays(14), []);
+    // 1) primero el state
+    const [includeSunday, setIncludeSunday] = useState(() => {
+        return localStorage.getItem("agenda.includeSunday") === "1";
+    });
+
+    // 2) luego days ya puede usar includeSunday
+    const days = useMemo(() => {
+        const list = nextDays(14);
+        if (includeSunday) return list;
+        return list.filter((d) => d.getDay() !== 0);
+    }, [includeSunday]);
+
     const [selectedServiceId, setSelectedServiceId] = useState(SERVICES?.[0]?.id || null);
     const selectedService = useMemo(
         () => SERVICES.find((s) => s.id === selectedServiceId) || SERVICES?.[0] || null,
         [SERVICES, selectedServiceId]
     );
+    function toMinutes(hhmm) {
+        const [h = "0", m = "0"] = String(hhmm || "").split(":");
+        return (Number(h) || 0) * 60 + (Number(m) || 0);
+    }
+
+    function overlaps(aStart, aEnd, bStart, bEnd) {
+        return aStart < bEnd && bStart < aEnd;
+    }
+    function durationToMinutes(durationStr) {
+        if (!durationStr) return 60;
+        const [h = "0", m = "0", s = "0"] = String(durationStr).split(":");
+        return Number(h) * 60 + Number(m) + Number(s) / 60;
+    }
+
+    function addMinutesToLabel(label, mins) {
+        const total = toMinutes(label) + Number(mins || 0);
+        const hh = String(Math.floor(total / 60) % 24).padStart(2, "0");
+        const mm = String(total % 60).padStart(2, "0");
+        return `${hh}:${mm}`;
+    }
 
     const [selectedDate, setSelectedDate] = useState(days[0]);
     const [period, setPeriod] = useState("Todo");
@@ -27,7 +59,6 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
     const [booking, setBooking] = useState(false);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
-
     const slots = useMemo(() => buildSlots(selectedDate), [selectedDate]);
 
     const filtered = useMemo(() => {
@@ -36,7 +67,15 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
             .filter((s) => (period === "Todo" ? true : s.period === period))
             .map((s) => ({ ...s, disabled: s.disabled || busySet.has(s.label) }));
     }, [slots, period, busySlots]);
-
+    useEffect(() => {
+        if (!days?.length) return;
+        setSelectedDate((prev) => {
+            // si prev sigue estando en la lista, no toques nada
+            const exists = days.some((d) => d.toDateString() === prev?.toDateString());
+            return exists ? prev : days[0];
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [days]);
     useEffect(() => {
         async function loadBusy() {
             try {
@@ -47,13 +86,34 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
 
                 const resp = await fetch(`${API_BASE}/api/public/agenda/?fecha=${fecha}`);
                 if (!resp.ok) return setBusySlots([]);
-
                 const data = await resp.json();
-                const taken = (data || [])
-                    .map((c) => (c.hora_inicio || "").slice(0, 5))
-                    .filter(Boolean);
+                console.log("public agenda data:", data);
+                // slots visibles del día (labels como "08:00", "09:00", etc.)
+                const slotLabels = buildSlots(selectedDate).map((s) => s.label);
 
-                setBusySlots(taken);
+                // Generamos set de ocupados expandiendo duración
+                const takenSet = new Set();
+
+                for (const c of data || []) {
+                    const start = (c.hora_inicio || "").slice(0, 5);
+                    const end = (c.hora_termina || "").slice(0, 5);
+
+                    if (!start) continue;
+
+                    // Si no viene hora_termina, al menos bloquea la hora inicial
+                    const sMin = toMinutes(start);
+                    const eMin = end ? toMinutes(end) : sMin + 60;
+
+                    for (const label of slotLabels) {
+                        const slotStart = toMinutes(label);
+                        const slotEnd = slotStart + 60; // si tus slots son de 60 min
+                        if (overlaps(slotStart, slotEnd, sMin, eMin)) {
+                            takenSet.add(label);
+                        }
+                    }
+                }
+
+                setBusySlots(Array.from(takenSet));
             } catch {
                 setBusySlots([]);
             }
@@ -99,10 +159,32 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                 setError("No se pudo registrar la cita. Intenta de nuevo o escribe por WhatsApp.");
                 return;
             }
+            const created = await resp.json().catch(() => null);
 
             setMessage("Cita registrada. Te contactaremos para confirmar.");
-            setBusySlots((prev) => (prev.includes(selectedSlot) ? prev : [...prev, selectedSlot]));
 
+            // ✅ si el servicio dura 2h (o más), bloquea TODAS las horas que se traslapan
+            const slotLabels = buildSlots(selectedDate).map((s) => s.label);
+            const startMin = toMinutes(selectedSlot);
+
+            // prioridad: lo que regrese backend (hora_termina), si no, usa duración del servicio
+            const endLabel = created?.hora_termina
+                ? String(created.hora_termina).slice(0, 5)
+                : addMinutesToLabel(selectedSlot, durationToMinutes(selectedService?.duration));
+            const endMin = toMinutes(endLabel) || startMin + 60;
+
+            const taken = new Set();
+            for (const label of slotLabels) {
+                const aStart = toMinutes(label);
+                const aEnd = aStart + 60;
+                if (overlaps(aStart, aEnd, startMin, endMin)) taken.add(label);
+            }
+
+            setBusySlots((prev) => {
+                const all = new Set(prev);
+                for (const x of taken) all.add(x);
+                return Array.from(all);
+            });
             const text = encodeURIComponent(
                 `Hola, soy ${name}. Quiero confirmar mi cita de ${selectedService.name || selectedService.nombre} en ${CLINIC.name
                 } el ${formatDateLong(selectedDate)} a las ${selectedSlot}. Mi WhatsApp es ${phone}.`

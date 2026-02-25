@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 const DAYS = [
+    { k: "D", label: "Dom" },
     { k: "L", label: "Lun" },
     { k: "M", label: "Mar" },
     { k: "X", label: "Mie" },
@@ -40,7 +41,7 @@ export function BlockTimeModal({ preset, onClose, onSave }) {
             startTime: start,
             endTime: preset?.endTime || addMinutesToTime(start, 60),
             repeatEnabled: false,
-            repeatDays: ["L", "M", "X", "J", "V", "S"],
+            repeatDays: ["D", "L", "M", "X", "J", "V", "S"],
             repeatCount: 1,
         });
     }, [preset?.date, preset?.startTime, preset?.endTime, preset?.professionalId]);

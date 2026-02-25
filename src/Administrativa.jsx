@@ -1,5 +1,5 @@
 // src/Administrativa.jsx
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import "./index.css";
 
 import { NavTab } from "./components/layout/NavTab";
@@ -10,6 +10,7 @@ import { ReservationModal } from "./components/reservations/ReservationModal";
 import { CommentsModerationView } from "./components/layout/comments/CommentsModerationView";
 import { Equipo } from "./components/layout/equipo/Equipo";
 import { BlockTimeModal } from "./components/layout/agenda/BlockTimeModal";
+import { notifySalesRefresh } from "./utils/salesSync";
 
 import { ServiciosAdminView } from "./components/layout/servicios/ServiciosAdminView";
 import { UserProfileView } from "./components/layout/profile/UserProfileView";
@@ -269,12 +270,6 @@ function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab }) {
                             );
                         })}
                     </div>
-
-                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                        <p className="text-xs text-slate-600">
-                            Tip: en móvil conviene cerrar el menú al cambiar de sección (ya lo hace automáticamente).
-                        </p>
-                    </div>
                 </div>
             </div>
         </div>
@@ -284,7 +279,7 @@ function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab }) {
 export default function Administrativa() {
     const [activeTab, setActiveTab] = useState("agenda");
     const [branch, setBranch] = useState("Fisionerv Centro");
-
+    const savingLockRef = useRef(false);
     const [selectedProfessionalId, setSelectedProfessionalId] = useState(null);
 
     const [appointments, setAppointments] = useState([]);
@@ -364,7 +359,19 @@ export default function Administrativa() {
     const askConfirm = ({ title, message, danger = false, onConfirm }) => {
         setConfirmModal({ open: true, title, message, danger, onConfirm });
     };
-
+    async function safeJson(resp) {
+        try {
+            return await resp.json();
+        } catch (e) {
+            try {
+                const text = await resp.text();
+                if (!text) return null;
+                return JSON.parse(text);
+            } catch {
+                return null;
+            }
+        }
+    }
     // Cargar /api/me y /api/profesionales
     useEffect(() => {
         const token = tokenOrLogout();
@@ -423,7 +430,6 @@ export default function Administrativa() {
         try {
             setLoadingAppointments(true);
 
-            // ✅ ahora cargamos citas + bloqueos
             const [respCitas, respBloqs] = await Promise.all([
                 fetch(`${API_BASE}/api/citas/`, {
                     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -436,16 +442,10 @@ export default function Administrativa() {
             if (respCitas.status === 401 || respBloqs.status === 401) return forceLogout();
             if (!respCitas.ok) throw new Error("No se pudieron cargar las citas");
 
-            const citasData = await respCitas.json();
-            const citasMapped = (citasData || []).map(mapCitaToAppointment);
-
-            let bloqueosMapped = [];
-            if (respBloqs.ok) {
-                const bloqsData = await respBloqs.json();
-                bloqueosMapped = (bloqsData || []).map(mapBloqueoToAppointment);
-            } else {
-                bloqueosMapped = [];
-            }
+            const citasData = await safeJson(respCitas);
+            const citasMapped = (Array.isArray(citasData) ? citasData : []).map(mapCitaToAppointment);
+            const bloqsData = respBloqs.ok ? await safeJson(respBloqs) : null;
+            const bloqueosMapped = (Array.isArray(bloqsData) ? bloqsData : []).map(mapBloqueoToAppointment);
 
             const merged = [...citasMapped, ...bloqueosMapped].sort(sortAppointments);
             setAppointments(merged);
@@ -461,6 +461,11 @@ export default function Administrativa() {
     useEffect(() => {
         loadAgendaData();
     }, [loadAgendaData]);
+    useEffect(() => {
+        const onRefresh = () => loadAgendaData();
+        window.addEventListener("fisionerv:agenda-refresh", onRefresh);
+        return () => window.removeEventListener("fisionerv:agenda-refresh", onRefresh);
+    }, [loadAgendaData]);
 
     const refreshAppointmentById = useCallback(async (id) => {
         const token = tokenOrLogout();
@@ -473,7 +478,7 @@ export default function Administrativa() {
             if (resp.status === 401) return forceLogout();
             if (!resp.ok) return null;
 
-            const saved = await resp.json();
+            const saved = await safeJson(resp);
             const appt = mapCitaToAppointment(saved);
 
             setAppointments((prev) =>
@@ -521,7 +526,11 @@ export default function Administrativa() {
                 return;
             }
 
-            const saved = await resp.json();
+            const saved = await safeJson(resp);
+            if (!saved?.id) {
+                await loadAgendaData();
+                return;
+            }
             const appt = mapCitaToAppointment(saved);
 
             setAppointments((prev) => prev.map((a) => (a.id === appt.id ? appt : a)).sort(sortAppointments));
@@ -602,11 +611,22 @@ export default function Administrativa() {
             showInfo("Error de red creando bloqueo.");
         }
     };
-
+    const normalizePhoneMX = (raw) => {
+        const digits = String(raw || "").replace(/\D/g, "");
+        if (!digits) return "";
+        if (digits.startsWith("52") && digits.length >= 12) return digits;
+        if (digits.length === 10) return `52${digits}`;
+        return digits;
+    };
     const handleSaveReservation = async (form) => {
-        const token = tokenOrLogout();
-        if (!token) return null;
+        if (savingLockRef.current) return null;
+        savingLockRef.current = true;
 
+        const token = tokenOrLogout();
+        if (!token) {
+            savingLockRef.current = false;
+            return null;
+        }
         const isExistingPatient = Boolean(form.patientId);
 
         const basePrecio = Number(form.price || 0);
@@ -638,7 +658,7 @@ export default function Administrativa() {
                     apellido_mat: form.apellido_mat || "",
                     fecha_nac: form.fecha_nac || null,
                     genero: form.genero || "",
-                    telefono: form.telefono || "",
+                    telefono: normalizePhoneMX(form.telefono),
                     correo: form.correo || "",
                     molestia: form.molestia || "",
                     notas: form.notesInternal || "",
@@ -664,12 +684,15 @@ export default function Administrativa() {
             if (!resp.ok) {
                 const errorData = await resp.json().catch(() => null);
                 console.error("Error al guardar cita:", errorData || resp.status);
-                showInfo("Error al guardar la cita. Revisa la consola.");
+                showInfo("Error al guardar la cita. Corrige los campos");
                 return null;
             }
 
-            const saved = await resp.json();
-            const appt = mapCitaToAppointment(saved);
+            const saved = await safeJson(resp);
+            if (!saved?.id) {
+                await loadAgendaData();
+                return null;
+            } const appt = mapCitaToAppointment(saved);
 
             if (isEditing) {
                 setAppointments((prev) => prev.map((item) => (item.id === appt.id ? appt : item)).sort(sortAppointments));
@@ -682,47 +705,41 @@ export default function Administrativa() {
             console.error("Error de red guardando cita:", err);
             showInfo("Error de red guardando cita.");
             return null;
+        } finally {
+            savingLockRef.current = false;
         }
     };
 
     const handleDeleteReservation = async (id) => {
         if (!id) return;
 
-        askConfirm({
-            title: "Eliminar cita",
-            message: "¿Seguro que quieres eliminar esta cita? Esta acción no se puede deshacer.",
-            danger: true,
-            onConfirm: async () => {
-                const token = tokenOrLogout();
-                if (!token) return;
+        const token = tokenOrLogout();
+        if (!token) return;
 
-                try {
-                    const resp = await fetch(`${API_BASE}/api/citas/${id}/`, {
-                        method: "DELETE",
-                        headers: { Authorization: `Bearer ${token}` },
-                    });
+        try {
+            const resp = await fetch(`${API_BASE}/api/citas/${id}/`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
 
-                    if (resp.status === 401) return forceLogout();
+            if (resp.status === 401) return forceLogout();
 
-                    if (!resp.ok && resp.status !== 204) {
-                        const errorData = await resp.json().catch(() => null);
-                        console.error("Error al eliminar cita:", errorData || resp.status);
-                        showInfo("No se pudo eliminar la cita. Revisa la consola.");
-                        return;
-                    }
+            if (!resp.ok && resp.status !== 204) {
+                const errorData = await safeJson(resp);
+                console.error("Error al eliminar cita:", errorData || resp.status);
+                showInfo("No se pudo eliminar la cita. Revisa la consola.");
+                return;
+            }
 
-                    setAppointments((prev) => prev.filter((c) => c.id !== id));
-                    setModalOpen(false);
-                    setSelectedAppointment(null);
-                    setReservationPreset(null);
-                } catch (e) {
-                    console.error("Error al eliminar cita:", e);
-                    showInfo("Ocurrió un error al eliminar la cita.");
-                } finally {
-                    setConfirmModal((s) => ({ ...s, open: false }));
-                }
-            },
-        });
+            setAppointments((prev) => prev.filter((c) => c.id !== id));
+            setModalOpen(false);
+            setSelectedAppointment(null);
+            setReservationPreset(null);
+            notifySalesRefresh();
+        } catch (e) {
+            console.error("Error al eliminar cita:", e);
+            showInfo("Ocurrió un error al eliminar la cita.");
+        }
     };
 
     const handleLogout = () => forceLogout();

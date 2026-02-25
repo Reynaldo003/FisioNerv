@@ -1,6 +1,10 @@
 // Utilidades puras para fechas/horarios (sin React)
 export const formatDateLong = (d) =>
-  d.toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "short" });
+  d.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "2-digit",
+    month: "short",
+  });
 
 export const formatDayChip = (d) => ({
   dow: d.toLocaleDateString(undefined, { weekday: "short" }),
@@ -22,13 +26,32 @@ export function buildSlots(date) {
   const startHour = 8;
   const endHour = 21;
   const slots = [];
+
+  // ✅ lee la preferencia (si no existe, false)
+  const includeSunday =
+    typeof window !== "undefined" &&
+    window.localStorage &&
+    window.localStorage.getItem("agenda.includeSunday") === "1";
+
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
   for (let h = startHour; h < endHour; h++) {
     const label = `${String(h).padStart(2, "0")}:00`;
+
     const isSunday = date.getDay() === 0;
-    const disabled =
-      isSunday || (date.toDateString() === new Date().toDateString() && h <= new Date().getHours());
+
+    // ✅ domingo solo se deshabilita si NO está habilitado
+    const sundayDisabled = isSunday && !includeSunday;
+
+    // ✅ si es hoy, deshabilita horas ya pasadas
+    const pastDisabled = isToday && h <= now.getHours();
+
+    const disabled = sundayDisabled || pastDisabled;
+
     const period = h < 13 ? "Mañana" : h < 18 ? "Tarde" : "Noche";
     slots.push({ label, disabled, period });
   }
+
   return slots;
 }

@@ -125,6 +125,20 @@ function normalizePhoneMX(raw) {
   return digits;
 }
 
+/**
+ * ✅ Input tipo texto pero solo números (permite vacío)
+ * - No rompe la lógica (guardas Number() cuando corresponde)
+ * - Evita que se vea "0" al inicio
+ */
+function onlyDigitsString(v) {
+  return String(v ?? "").replace(/[^\d]/g, "");
+}
+function toNumberSafe(digitsStr, fallback = 0) {
+  if (digitsStr === "" || digitsStr == null) return fallback;
+  const n = Number(digitsStr);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function MessageModal({ open, title, message, onClose }) {
   if (!open) return null;
   return (
@@ -149,74 +163,6 @@ function MessageModal({ open, title, message, onClose }) {
             className="h-9 px-4 rounded-md bg-violet-600 text-white text-sm hover:bg-violet-700"
           >
             Entendido
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ConfirmDeleteModal({ open, onClose, onConfirm }) {
-  const [value, setValue] = useState("");
-
-  useEffect(() => {
-    if (open) setValue("");
-  }, [open]);
-
-  if (!open) return null;
-
-  const ok = String(value || "").trim().toLowerCase() === "eliminar";
-
-  return (
-    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
-        <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">Eliminar cita</div>
-            <div className="text-[11px] text-slate-600">
-              Escribe <span className="font-semibold">eliminar</span> para confirmar.
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-8 w-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center"
-            title="Cerrar"
-          >
-            <X className="h-4 w-4 text-slate-600" />
-          </button>
-        </div>
-
-        <div className="px-4 py-4">
-          <input
-            autoFocus
-            type="text"
-            className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder='Escribe "eliminar"'
-          />
-          <p className="mt-2 text-[11px] text-slate-500">
-            Esta acción no se puede deshacer.
-          </p>
-        </div>
-
-        <div className="px-4 py-3 border-t border-slate-200 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 px-4 rounded-md border border-slate-200 bg-white text-sm hover:bg-slate-50"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            disabled={!ok}
-            onClick={onConfirm}
-            className="h-9 px-4 rounded-md bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-60"
-          >
-            Eliminar
           </button>
         </div>
       </div>
@@ -253,9 +199,6 @@ export function ReservationModal({
   const [patientDropdownOpen, setPatientDropdownOpen] = useState(false);
   const patientBoxRef = useRef(null);
 
-  // ✅ modal seguro para eliminar
-  const [deleteOpen, setDeleteOpen] = useState(false);
-
   const initialDate = appointment?.date ?? preset?.date ?? today;
   const initialTime = appointment?.time ?? preset?.time ?? "08:00";
 
@@ -277,42 +220,68 @@ export function ReservationModal({
     });
   }
 
-  const [form, setForm] = useState({
-    id: appointment?.id ?? null,
+  function buildInitialForm({ appointment, preset, today }) {
+    const initialDate = appointment?.date ?? preset?.date ?? today;
+    const initialTime = appointment?.time ?? preset?.time ?? "08:00";
 
-    patientId: appointment?.patientId ?? null,
-    patient: appointment?.patient ?? "",
+    // ✅ estados numéricos como string vacía para NO mostrar "0"
+    const priceDigits = appointment?.price ? String(Number(appointment.price)) : "";
+    const discountDigits = appointment?.discountPct ? String(Number(appointment.discountPct)) : "";
+    const factDigits = appointment?.montoFacturado
+      ? String(Number(appointment.montoFacturado))
+      : "";
 
-    apellido_pat: appointment?.apellido_pat ?? "",
-    apellido_mat: appointment?.apellido_mat ?? "",
-    fecha_nac: appointment?.fecha_nac ?? "",
-    genero: appointment?.genero ?? "",
-    correo: appointment?.correo ?? "",
-    telefono: appointment?.telefono ?? "",
+    const depositDigits = appointment?.deposit ? String(Number(appointment.deposit)) : "";
 
-    date: initialDate,
-    time: initialTime,
-    endTime: appointment?.endTime ?? "09:00",
+    return {
+      id: appointment?.id ?? null,
 
-    serviceId: appointment?.serviceId ?? null,
-    professionalId: appointment?.professionalId ?? preset?.professionalId ?? null,
+      patientId: appointment?.patientId ?? null,
+      patient: appointment?.patient ?? "",
 
-    price: appointment?.price ?? 0,
-    discountPct: appointment?.discountPct ?? 0,
+      apellido_pat: appointment?.apellido_pat ?? "",
+      apellido_mat: appointment?.apellido_mat ?? "",
+      fecha_nac: appointment?.fecha_nac ?? "",
+      genero: appointment?.genero ?? "",
+      correo: appointment?.correo ?? "",
+      telefono: appointment?.telefono ?? "",
 
-    comprobante: appointment?.comprobante ?? "",
-    montoFacturado: appointment?.montoFacturado ?? 0,
+      date: initialDate,
+      time: initialTime,
+      endTime: appointment?.endTime ?? "09:00",
 
-    paymentLines: [{ method: "efectivo", amount: 0 }],
+      serviceId: appointment?.serviceId ?? null,
+      professionalId: appointment?.professionalId ?? preset?.professionalId ?? null,
 
-    status: appointment?.status ?? "reservado",
-    notesInternal: appointment?.notesInternal ?? "",
+      // ✅ ahora son strings (digits) para UI
+      price: priceDigits,
+      discountPct: discountDigits,
+      montoFacturado: factDigits,
+      comprobante: appointment?.comprobante ?? "",
 
-    repeatEnabled: appointment?.repeatEnabled ?? false,
-    repeatDays: appointment?.repeatDays ?? ["L", "M", "X", "J", "V", "S"],
-    repeatWeeks: appointment?.repeatWeeks ?? 1,
-    repeatSessions: appointment?.repeatSessions ?? 1,
-  });
+      // ✅ payment lines como string también
+      paymentLines: [{ method: "efectivo", amount: depositDigits }],
+
+      status: appointment?.status ?? "reservado",
+      notesInternal: appointment?.notesInternal ?? "",
+
+      repeatEnabled: Boolean(appointment?.repeatEnabled) || false,
+      repeatDays: appointment?.repeatDays ?? ["L", "M", "X", "J", "V", "S"],
+      repeatWeeks: String(Number(appointment?.repeatWeeks ?? 1)),
+      repeatSessions: String(Number(appointment?.repeatSessions ?? 1)),
+    };
+  }
+
+  const [form, setForm] = useState(() => buildInitialForm({ appointment, preset, today }));
+
+  useEffect(() => {
+    setForm(buildInitialForm({ appointment, preset, today }));
+    setPatientQuery(appointment?.patient ?? "");
+    setPatientDropdownOpen(false);
+    setLastPagoId(null);
+    setPaidFromBackend(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appointment?.id, preset?.date, preset?.time, preset?.professionalId]);
 
   useEffect(() => {
     const onDoc = (e) => {
@@ -362,7 +331,8 @@ export function ReservationModal({
           const baseTime = prev.time || "08:00";
           const endTime = addMinutesToTime(baseTime, durationMinutes);
 
-          const basePrice = prev.price || (service ? Number(service.precio) : 0);
+          const servicePrice = service ? Number(service.precio) : 0;
+          const basePriceNum = prev.price === "" ? servicePrice : toNumberSafe(prev.price, servicePrice);
 
           const patientId = prev.patientId ?? null;
           const p = patientsData.find((x) => x.id === patientId) || null;
@@ -371,8 +341,12 @@ export function ReservationModal({
             ...prev,
             serviceId: service ? service.id : serviceId,
             professionalId,
-            price: basePrice,
-            montoFacturado: prev.montoFacturado || basePrice,
+            // ✅ mantener strings pero recalcular si está vacío
+            price: prev.price === "" ? String(Math.max(0, basePriceNum || 0)) : prev.price,
+            montoFacturado:
+              prev.montoFacturado === ""
+                ? String(Math.max(0, basePriceNum || 0))
+                : prev.montoFacturado,
             time: baseTime,
             endTime,
             ...(p && {
@@ -417,7 +391,8 @@ export function ReservationModal({
         });
 
         if (!resp.ok) {
-          setPaidFromBackend(Number(appointment?.deposit || 0));
+          const fallback = toNumberSafe(form.paymentLines?.[0]?.amount ?? "", 0);
+          setPaidFromBackend(fallback);
           return;
         }
 
@@ -427,11 +402,13 @@ export function ReservationModal({
         setPaidFromBackend(sum);
       } catch (e) {
         console.warn("No se pudieron cargar pagos previos:", e);
-        setPaidFromBackend(Number(appointment?.deposit || 0));
+        const fallback = toNumberSafe(form.paymentLines?.[0]?.amount ?? "", 0);
+        setPaidFromBackend(fallback);
       }
     }
 
     loadPayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointment?.id]);
 
   useEffect(() => {
@@ -454,9 +431,10 @@ export function ReservationModal({
       return;
     }
 
+    // ✅ campos numéricos como string (solo dígitos)
     if (["price", "discountPct", "repeatWeeks", "repeatSessions", "montoFacturado"].includes(field)) {
-      const num = value === "" ? "" : Number(value);
-      setForm((prev) => ({ ...prev, [field]: num }));
+      const digits = onlyDigitsString(value);
+      setForm((prev) => ({ ...prev, [field]: digits }));
       return;
     }
 
@@ -471,18 +449,34 @@ export function ReservationModal({
       : 60;
 
     setForm((prev) => {
-      const newPrice = service ? Number(service.precio) : prev.price;
+      const newPrice = service ? Math.max(0, Number(service.precio || 0)) : toNumberSafe(prev.price, 0);
       return {
         ...prev,
         serviceId,
-        price: newPrice,
-        montoFacturado: newPrice,
+        // si el usuario ya escribió algo, no lo pisamos; si está vacío, sí lo llenamos
+        price: prev.price === "" ? String(newPrice) : prev.price,
+        montoFacturado: prev.montoFacturado === "" ? String(newPrice) : prev.montoFacturado,
         endTime: addMinutesToTime(prev.time, durationMinutes),
       };
     });
   };
 
-  // ✅ no “busy”: multi-citas permitidas
+  const normalizedPhone = useMemo(() => normalizePhoneMX(form.telefono), [form.telefono]);
+
+  const duplicatePatient = useMemo(() => {
+    if (form.patientId) return null;
+    if (!normalizedPhone) return null;
+
+    const match = (patients || []).find((p) => normalizePhoneMX(p.telefono) === normalizedPhone);
+    if (!match) return null;
+
+    if (appointment?.patientId && Number(match.id) === Number(appointment.patientId)) return null;
+
+    return match;
+  }, [patients, normalizedPhone, form.patientId, appointment?.patientId]);
+
+  const phoneDuplicateError = Boolean(duplicatePatient);
+
   const timeSlots = useMemo(() => {
     const slots = [];
     for (let h = 7; h <= 21; h++) {
@@ -525,13 +519,16 @@ export function ReservationModal({
     setPatientDropdownOpen(false);
   };
 
-  const subtotal = Number(form.montoFacturado || form.price || 0);
-  const discountPct = Number(form.discountPct || 0);
-  const discountAmount = (subtotal * discountPct) / 100;
+  // ✅ usa números para cálculos (strings -> Number)
+  const priceNum = toNumberSafe(form.price, 0);
+  const subtotal = toNumberSafe(form.montoFacturado, priceNum || 0);
+  const discountPctNum = toNumberSafe(form.discountPct, 0);
+
+  const discountAmount = (subtotal * discountPctNum) / 100;
   const totalAfterDiscount = Math.max(0, subtotal - discountAmount);
 
   const amountToPayToday = useMemo(() => {
-    return (form.paymentLines || []).reduce((acc, line) => acc + Number(line.amount || 0), 0);
+    return (form.paymentLines || []).reduce((acc, line) => acc + toNumberSafe(line.amount, 0), 0);
   }, [form.paymentLines]);
 
   const totalPaidInternal = Number(paidFromBackend || 0) + Number(amountToPayToday || 0);
@@ -540,7 +537,9 @@ export function ReservationModal({
   function setPaymentLine(idx, patch) {
     setForm((prev) => {
       const lines = [...(prev.paymentLines || [])];
-      lines[idx] = { ...lines[idx], ...patch };
+      const next = { ...lines[idx], ...patch };
+      if ("amount" in next) next.amount = onlyDigitsString(next.amount);
+      lines[idx] = next;
       return { ...prev, paymentLines: lines };
     });
   }
@@ -548,7 +547,7 @@ export function ReservationModal({
   function addPaymentLine() {
     setForm((prev) => ({
       ...prev,
-      paymentLines: [...(prev.paymentLines || []), { method: "efectivo", amount: 0 }],
+      paymentLines: [...(prev.paymentLines || []), { method: "efectivo", amount: "" }],
     }));
   }
 
@@ -558,7 +557,7 @@ export function ReservationModal({
       lines.splice(idx, 1);
       return {
         ...prev,
-        paymentLines: lines.length ? lines : [{ method: "efectivo", amount: 0 }],
+        paymentLines: lines.length ? lines : [{ method: "efectivo", amount: "" }],
       };
     });
   }
@@ -567,11 +566,23 @@ export function ReservationModal({
     const payload = { ...base, ...overrides };
 
     payload.repeatEnabled = Boolean(payload.repeatEnabled);
-    payload.repeatWeeks = Math.max(1, Number(payload.repeatWeeks || 1));
-    payload.repeatSessions = Math.max(1, Number(payload.repeatSessions || 1));
+
+    payload.repeatWeeks = Math.max(1, toNumberSafe(payload.repeatWeeks, 1));
+    payload.repeatSessions = Math.max(1, toNumberSafe(payload.repeatSessions, 1));
     payload.repeatDays = Array.isArray(payload.repeatDays) ? payload.repeatDays : [];
 
     if (!payload.patientId) payload.patientId = null;
+
+    // ✅ aquí convertimos strings numéricas a números para backend
+    payload.price = toNumberSafe(payload.price, 0);
+    payload.discountPct = toNumberSafe(payload.discountPct, 0);
+    payload.montoFacturado = toNumberSafe(payload.montoFacturado, payload.price || 0);
+
+    // paymentLines: amount string -> number
+    payload.paymentLines = (payload.paymentLines || []).map((l) => ({
+      method: String(l.method || "efectivo"),
+      amount: toNumberSafe(l.amount, 0),
+    }));
 
     return payload;
   };
@@ -581,7 +592,7 @@ export function ReservationModal({
     const fechaPago = new Date().toISOString().slice(0, 10);
 
     const validLines = (form.paymentLines || [])
-      .map((l) => ({ method: String(l.method || "efectivo"), amount: Number(l.amount || 0) }))
+      .map((l) => ({ method: String(l.method || "efectivo"), amount: toNumberSafe(l.amount, 0) }))
       .filter((l) => l.amount > 0);
 
     if (validLines.length === 0) {
@@ -596,9 +607,9 @@ export function ReservationModal({
         cita: citaId,
         fecha_pago: fechaPago,
         comprobante: String(form.comprobante || ""),
-        monto_facturado: Number(form.montoFacturado || form.price || 0),
+        monto_facturado: toNumberSafe(form.montoFacturado, toNumberSafe(form.price, 0)),
         metodo_pago: line.method,
-        descuento_porcentaje: Number(form.discountPct || 0),
+        descuento_porcentaje: toNumberSafe(form.discountPct, 0),
         anticipo: Number(line.amount || 0),
       };
 
@@ -682,6 +693,14 @@ export function ReservationModal({
       });
       return;
     }
+    if (!form.patientId && phoneDuplicateError) {
+      setMsg({
+        open: true,
+        title: "Validación",
+        message: "El teléfono ya existe en otro paciente. Selecciona al paciente existente o cambia el número.",
+      });
+      return;
+    }
 
     try {
       setSavingRepeat(true);
@@ -691,9 +710,17 @@ export function ReservationModal({
 
       const basePayload = buildPayload(fixed);
       const savedBase = await onSave?.(basePayload);
-
       const savedCitaId = savedBase?.id || savedBase?.cita_id || savedBase?.pk;
-      if (!savedCitaId) throw new Error("El backend no devolvió el ID de la cita guardada.");
+
+      if (!savedCitaId) {
+        setMsg({
+          open: true,
+          title: "Aviso",
+          message: "No se pudo confirmar el ID por un problema de red/respuesta. Cierra y refresca la agenda.",
+        });
+        onRequestCloseModal?.();
+        return;
+      }
 
       const pagoId = await createPaymentsForCita(savedCitaId);
       const refreshed = await onRefreshAppointment?.(savedCitaId);
@@ -705,7 +732,7 @@ export function ReservationModal({
       }
 
       if (form.repeatEnabled) {
-        const totalSessions = Math.max(1, Number(form.repeatSessions || 1));
+        const totalSessions = Math.max(1, toNumberSafe(form.repeatSessions, 1));
         const sessionsToCreate = Math.max(0, totalSessions - 1);
 
         const repeatDates = buildRepeatDatesBySessions({
@@ -748,6 +775,22 @@ export function ReservationModal({
     }
   };
 
+  // ✅ eliminar directo (sin confirmación)
+  const handleDeleteDirect = async () => {
+    if (!form.id || savingRepeat) return;
+    try {
+      setSavingRepeat(true);
+      await onDelete?.(form.id);
+      // onDelete en Administrativa ya cierra el modal, pero por si acaso:
+      onRequestCloseModal?.();
+    } catch (e) {
+      console.error(e);
+      setMsg({ open: true, title: "Error", message: "No se pudo eliminar la cita." });
+    } finally {
+      setSavingRepeat(false);
+    }
+  };
+
   if (loadingData) {
     return (
       <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4">
@@ -776,7 +819,7 @@ export function ReservationModal({
               <div className="flex items-center gap-2">
                 <select
                   className={
-                    "hidden sm:inline-flex items-center text-[11px] font-medium px-2 py-1 rounded-full border " +
+                    "inline-flex items-center text-[11px] font-medium px-2 py-1 rounded-full border " +
                     getStatusColorClasses(form.status)
                   }
                   value={form.status}
@@ -899,11 +942,13 @@ export function ReservationModal({
                         type="text"
                         name="telefono_no_autofill"
                         autoComplete="off"
-                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
+                        className={[
+                          "w-full text-sm rounded-md border px-3 py-2",
+                          phoneDuplicateError ? "border-red-400 ring-2 ring-red-200" : "border-slate-300",
+                        ].join(" ")}
                         value={form.telefono}
                         onChange={(e) => handleChange("telefono", e.target.value)}
                       />
-
                       <button
                         type="button"
                         onClick={openWhatsAppConfirm}
@@ -914,6 +959,13 @@ export function ReservationModal({
                       </button>
                     </div>
                   </div>
+
+                  {phoneDuplicateError && (
+                    <p className="mt-1 text-[11px] text-red-600 font-semibold">
+                      Número duplicado: ya existe en otro paciente ({getPatientLabel(duplicatePatient)}).
+                      Selecciónalo del desplegable o cambia el teléfono.
+                    </p>
+                  )}
 
                   <div className="md:col-span-2">
                     <label className="text-[11px] font-semibold text-slate-600 block mb-1">Correo</label>
@@ -1119,12 +1171,12 @@ export function ReservationModal({
                     <div>
                       <label className="text-[11px] font-semibold text-slate-600 block mb-1">Semanas</label>
                       <input
-                        type="number"
-                        min={1}
-                        max={52}
+                        type="text"
+                        inputMode="numeric"
                         className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
                         value={form.repeatWeeks}
-                        onChange={(e) => handleChange("repeatWeeks", Number(e.target.value || 1))}
+                        onChange={(e) => handleChange("repeatWeeks", e.target.value)}
+                        placeholder="1"
                       />
                       <p className="text-[10px] text-slate-500 mt-1">Solo referencia.</p>
                     </div>
@@ -1132,12 +1184,12 @@ export function ReservationModal({
                     <div>
                       <label className="text-[11px] font-semibold text-slate-600 block mb-1">Sesiones (total)</label>
                       <input
-                        type="number"
-                        min={1}
-                        max={200}
+                        type="text"
+                        inputMode="numeric"
                         className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
                         value={form.repeatSessions}
-                        onChange={(e) => handleChange("repeatSessions", Number(e.target.value || 1))}
+                        onChange={(e) => handleChange("repeatSessions", e.target.value)}
+                        placeholder="1"
                       />
                       <p className="text-[10px] text-slate-500 mt-1">
                         Ej: si pones 4, se guarda esta cita + 3 siguientes.
@@ -1169,35 +1221,41 @@ export function ReservationModal({
                   <div>
                     <label className="text-[11px] font-semibold text-slate-600 block mb-1">Precio</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       autoComplete="off"
                       name="precio_no_autofill"
                       className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
                       value={form.price}
                       onChange={(e) => handleChange("price", e.target.value)}
+                      placeholder="Ej. 500"
                     />
                   </div>
 
                   <div>
                     <label className="text-[11px] font-semibold text-slate-600 block mb-1">Monto a facturar</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       autoComplete="off"
                       className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
                       value={form.montoFacturado}
                       onChange={(e) => handleChange("montoFacturado", e.target.value)}
+                      placeholder="Ej. 500"
                     />
                   </div>
 
                   <div>
                     <label className="text-[11px] font-semibold text-slate-600 block mb-1">Descuento %</label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       autoComplete="off"
                       name="descuento_no_autofill"
                       className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
                       value={form.discountPct}
                       onChange={(e) => handleChange("discountPct", e.target.value)}
+                      placeholder="Ej. 10"
                     />
                   </div>
 
@@ -1244,11 +1302,11 @@ export function ReservationModal({
                           </select>
 
                           <input
-                            type="number"
-                            min={0}
+                            type="text"
+                            inputMode="numeric"
                             className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 bg-white"
                             value={line.amount}
-                            onChange={(e) => setPaymentLine(idx, { amount: Number(e.target.value || 0) })}
+                            onChange={(e) => setPaymentLine(idx, { amount: e.target.value })}
                             placeholder="Monto"
                           />
 
@@ -1304,9 +1362,10 @@ export function ReservationModal({
                   {isEditing && (
                     <button
                       type="button"
-                      onClick={() => setDeleteOpen(true)}
+                      onClick={handleDeleteDirect}
                       className="h-10 px-4 rounded-md border border-red-200 text-red-700 hover:bg-red-50 text-sm"
                       disabled={savingRepeat}
+                      title="Eliminar cita"
                     >
                       Eliminar
                     </button>
@@ -1315,7 +1374,7 @@ export function ReservationModal({
 
                 <button
                   type="submit"
-                  disabled={savingRepeat}
+                  disabled={savingRepeat || (!form.patientId && phoneDuplicateError)}
                   className="h-10 px-6 rounded-md bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-60"
                 >
                   {savingRepeat ? "Guardando..." : isEditing ? "Guardar cambios" : "Crear cita"}
@@ -1331,15 +1390,6 @@ export function ReservationModal({
         title={msg.title}
         message={msg.message}
         onClose={() => setMsg({ open: false, title: "", message: "" })}
-      />
-
-      <ConfirmDeleteModal
-        open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={() => {
-          setDeleteOpen(false);
-          onDelete?.(form.id);
-        }}
       />
     </>
   );

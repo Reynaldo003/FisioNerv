@@ -10,6 +10,7 @@ import OpinionesPage from "@/pages/OpinionesPage";
 import ConveniosPage from "@/pages/ConveniosPage";
 import ContactoPage from "@/pages/ContactoPage";
 import EquipoPage from "@/pages/EquipoPage";
+import ResetPassword from "@/pages/ResetPassword";
 
 import Login from "@/components/Login";
 import Administrativa from "@/Administrativa";
@@ -36,6 +37,7 @@ export default function App() {
         (fuera de SiteLayout)
       */}
       <Route path="/login" element={<Login />} />
+      <Route path="/reset-password/:uid/:token" element={<ResetPassword />} /> {/* ✅ NUEVO */}
       <Route path="/administrativa" element={<Administrativa />} />
     </Routes>
   );
