@@ -1,8 +1,7 @@
-// /components/layout/agenda/AgendaView.jsx
+// src/components/layout/agenda/AgendaView.jsx
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { MiniCalendar } from "./MiniCalendar";
 import { DollarSign, Plus, Ban } from "lucide-react";
-import { notifySalesRefresh } from "../../../utils/salesSync";
 
 import {
   DndContext,
@@ -135,10 +134,7 @@ function HoverCard({ open, anchorRect, children }) {
 }
 
 /**
- * Popover de menú que se auto-posiciona:
- * - Por default abre abajo
- * - Si no cabe abajo, se va arriba
- * - Evita salirse por la derecha
+ * Popover de menú que se auto-posiciona.
  */
 function MenuPopover({ open, anchorRect, preferUp = false, onClose, children }) {
   const menuRef = useRef(null);
@@ -196,7 +192,6 @@ function MenuPopover({ open, anchorRect, preferUp = false, onClose, children }) 
   if (!open || !anchorRect) return null;
 
   const left = clampedLeft != null ? clampedLeft : anchorRect.left + window.scrollX;
-
   const downTop = anchorRect.top + window.scrollY + anchorRect.height + 6;
   const upTop = anchorRect.top + window.scrollY - 6;
 
@@ -234,6 +229,7 @@ export function AgendaView({
   onOpenAppointment,
   onMoveAppointment,
   onOpenBlockModal,
+  onDeleteBlock, // ✅ callback del padre
 }) {
   const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -256,7 +252,6 @@ export function AgendaView({
     role === "fisioterapeuta" || role === "nutriologo" || role === "dentista";
   const canSeeAll = role === "admin" || role === "recepcion";
 
-  // En móvil: forzamos vista Día y desactivamos dual (mejor UX y evita min-w gigante)
   useEffect(() => {
     if (isMobile) {
       setDualMode(false);
@@ -275,7 +270,6 @@ export function AgendaView({
     if (dualMode) setViewMode("day");
   }, [dualMode]);
 
-  // limpiar hover cuando haya interacciones globales
   useEffect(() => {
     const clearHover = () => {
       setHoverAppt(null);
@@ -300,22 +294,11 @@ export function AgendaView({
 
   const HOURS = useMemo(
     () => [
-      "08:00",
-      "09:00",
-      "10:00",
-      "11:00",
-      "12:00",
-      "13:00",
-      "14:00",
-      "15:00",
-      "16:00",
-      "17:00",
-      "18:00",
-      "19:00",
-      "20:00",
+      "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00",
     ],
     []
   );
+
   const [includeSunday, setIncludeSunday] = useState(() => {
     return localStorage.getItem("agenda.includeSunday") === "1";
   });
@@ -325,21 +308,14 @@ export function AgendaView({
   }, [includeSunday]);
 
   const DAY_START_MIN = toMinutes(HOURS[0]);
-  const DAY_END_MIN = toMinutes(HOURS[HOURS.length - 1]) + 60; // hasta 21:00
+  const DAY_END_MIN = toMinutes(HOURS[HOURS.length - 1]) + 60;
 
-  // En móvil damos un poquito más de alto para facilitar touch
   const HOUR_ROW_HEIGHT = 64;
   const GRID_TOTAL_HEIGHT = HOURS.length * HOUR_ROW_HEIGHT;
 
-  // ✅ DnD en móvil: TouchSensor + PointerSensor
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 180, // tap normal no arrastra; mantener presionado para drag
-        tolerance: 8,
-      },
-    })
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } })
   );
 
   const proMap = useMemo(() => {
@@ -376,7 +352,7 @@ export function AgendaView({
   } else if (viewMode === "week") {
     const monday = startOfWeekMonday(currentDate);
     const end = new Date(monday);
-    end.setDate(monday.getDate() + (includeSunday ? 6 : 5)); // Lun–Dom o Lun–Sáb
+    end.setDate(monday.getDate() + (includeSunday ? 6 : 5));
     headerMainLabel = `${formatLongDate(monday)} – ${formatLongDate(end)}`;
   } else {
     headerMainLabel = currentDate
@@ -404,7 +380,6 @@ export function AgendaView({
 
   const monday = startOfWeekMonday(currentDate);
 
-  // Lun–Sáb (sin Domingo)
   const weekDays = useMemo(
     () =>
       Array.from({ length: includeSunday ? 7 : 6 }, (_, i) => {
@@ -441,9 +416,6 @@ export function AgendaView({
     return { label, key, items };
   });
 
-  /**
-   * Bloqueos por hora (por rango)
-   */
   const blockedSlots = useMemo(() => {
     const set = new Set();
     const list = dragSourceAppointments || [];
@@ -471,14 +443,33 @@ export function AgendaView({
           return overlapsMinutes(hourStart, hourEnd, s, e);
         });
 
-        if (covered) {
-          set.add(`${dateIso}|${Number(proId)}|${hour}`);
-        }
+        if (covered) set.add(`${dateIso}|${Number(proId)}|${hour}`);
       }
     }
 
     return set;
   }, [dragSourceAppointments, HOURS]);
+
+  const findBlockForSlot = useCallback(
+    ({ dateIso, professionalId, hour }) => {
+      const list = dragSourceAppointments || [];
+      const hourStart = toMinutes(hour);
+      const hourEnd = hourStart + 60;
+
+      return (
+        list.find((a) => {
+          if (!isBlockItem(a)) return false;
+          if (a.date !== dateIso) return false;
+          if (Number(a.professionalId) !== Number(professionalId)) return false;
+
+          const s = toMinutes(a.time);
+          const e = toMinutes(a.endTime || addMinutesToTime(a.time, 60));
+          return overlapsMinutes(hourStart, hourEnd, s, e);
+        }) || null
+      );
+    },
+    [dragSourceAppointments]
+  );
 
   const handleDragStart = (event) => {
     setActiveApptId(event?.active?.id ?? null);
@@ -493,7 +484,6 @@ export function AgendaView({
     const appt = (dragSourceAppointments || []).find((a) => a.id === activeId);
     if (!appt) return;
 
-    // ✅ nunca mover bloqueos
     if (isBlockItem(appt)) return;
 
     const parts = String(overId).split(":");
@@ -504,7 +494,6 @@ export function AgendaView({
     const hour = `${parts[3]}:00`;
     const newTime = `${parts[3]}:${parts[4]}`;
 
-    // ✅ bloqueo: no permitir drop a slot bloqueado
     const mapKey = `${newDate}|${newProfessionalId}|${hour}`;
     if (blockedSlots.has(mapKey)) {
       window?.navigator?.vibrate?.(15);
@@ -512,7 +501,6 @@ export function AgendaView({
       return;
     }
 
-    // ✅ mantener duración original
     const oldStart = toMinutes(appt.time);
     const oldEnd = toMinutes(appt.endTime || addMinutesToTime(appt.time, 60));
     const durMin = Math.max(60, oldEnd - oldStart);
@@ -566,14 +554,13 @@ export function AgendaView({
     const style = {
       transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
       opacity: isDragging ? 0.35 : 1,
-      cursor: isBlock ? "default" : "grab",
+      cursor: isBlock ? "pointer" : "grab",
       top: layout.top,
       height: layout.height,
       left: layout.left,
       width: layout.width,
     };
 
-    // ✅ IMPORTANTÍSIMO para móvil: evita que el navegador “robe” el gesto de drag
     const touchClass = !isBlock ? "touch-none" : "";
 
     return (
@@ -586,6 +573,22 @@ export function AgendaView({
           e.stopPropagation();
           setHoverAppt(null);
           setHoverRect(null);
+
+          // ✅ CLAVE: click en bloqueo abre el menú con "Eliminar bloqueo"
+          if (isBlock) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setSlotMenu({
+              date: appt.date,
+              hour: String(appt.time || "08:00").slice(0, 5),
+              professionalId: appt.professionalId,
+              hasBlock: true,
+              blockItem: appt,
+              preferUp: false,
+              anchorRect: rect,
+            });
+            return;
+          }
+
           onClick?.();
         }}
         onMouseEnter={(e) => {
@@ -627,34 +630,34 @@ export function AgendaView({
     );
   }
 
-  const openSlotMenu = useCallback((e, { date, hour, professionalId, hasBlock }) => {
-    const clickedAppt = e.target.closest?.("[data-appt='1']");
-    if (clickedAppt) return;
+  const openSlotMenu = useCallback(
+    (e, { date, hour, professionalId, hasBlock }) => {
+      const clickedAppt = e.target.closest?.("[data-appt='1']");
+      if (clickedAppt) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHoverAppt(null);
-    setHoverRect(null);
+      const rect = e.currentTarget.getBoundingClientRect();
+      setHoverAppt(null);
+      setHoverRect(null);
 
-    setSlotMenu({
-      date,
-      hour,
-      professionalId,
-      hasBlock: Boolean(hasBlock),
-      preferUp: false,
-      anchorRect: rect,
-    });
-  }, []);
+      const blockItem = hasBlock ? findBlockForSlot({ dateIso: date, professionalId, hour }) : null;
+
+      setSlotMenu({
+        date,
+        hour,
+        professionalId,
+        hasBlock: Boolean(hasBlock),
+        blockItem,
+        preferUp: false,
+        anchorRect: rect,
+      });
+    },
+    [findBlockForSlot]
+  );
 
   const dualSlots = useMemo(() => {
     return [
-      {
-        id: proA,
-        label: proA ? proMap.get(proA)?.label || "Profesional A" : "Profesional A",
-      },
-      {
-        id: proB,
-        label: proB ? proMap.get(proB)?.label || "Profesional B" : "Profesional B",
-      },
+      { id: proA, label: proA ? proMap.get(proA)?.label || "Profesional A" : "Profesional A" },
+      { id: proB, label: proB ? proMap.get(proB)?.label || "Profesional B" : "Profesional B" },
     ];
   }, [proA, proB, proMap]);
 
@@ -819,7 +822,6 @@ export function AgendaView({
 
     return (
       <div className="relative">
-        {/* Líneas de hora */}
         <div className="absolute inset-0 pointer-events-none">
           {HOURS.map((_, idx) => (
             <div
@@ -848,12 +850,7 @@ export function AgendaView({
                   id={slotId}
                   disabled={hasBlock}
                   onClick={(e) =>
-                    openSlotMenu(e, {
-                      date: dateIso,
-                      hour,
-                      professionalId,
-                      hasBlock,
-                    })
+                    openSlotMenu(e, { date: dateIso, hour, professionalId, hasBlock })
                   }
                 >
                   <div
@@ -864,7 +861,6 @@ export function AgendaView({
                       hasBlock ? "opacity-95" : "",
                     ].join(" ")}
                   >
-                    {/* Botón +: en móvil usamos pointerUp para asegurar disparo */}
                     {!hasBlock && (
                       <button
                         type="button"
@@ -912,7 +908,6 @@ export function AgendaView({
             );
           })}
 
-          {/* Bloqueos */}
           {(dayItems || [])
             .filter(isBlockItem)
             .map((b) => {
@@ -928,7 +923,6 @@ export function AgendaView({
               );
             })}
 
-          {/* Citas */}
           {(dayItems || [])
             .filter((a) => !isBlockItem(a))
             .map((a) => {
@@ -948,7 +942,6 @@ export function AgendaView({
     );
   }
 
-  // Grid header: en móvil mostramos solo Hora + Día actual
   const headerGridStyleWeek = useMemo(
     () => ({ gridTemplateColumns: `64px repeat(${includeSunday ? 7 : 6}, minmax(0, 1fr))` }),
     [includeSunday]
@@ -959,9 +952,7 @@ export function AgendaView({
 
   return (
     <>
-      {/* IMPORTANT: min-h-0 para que los hijos con overflow funcionen y no “desaparezcan” headers */}
       <div className="flex flex-col lg:flex-row w-full h-full min-h-0 overflow-hidden mb-10">
-        {/* Sidebar */}
         <aside className="w-full lg:w-72 lg:max-w-[88vw] bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col p-4 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1">Sucursal</label>
@@ -980,9 +971,7 @@ export function AgendaView({
               disabled={isProfessional}
               className={
                 "w-full text-sm rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent " +
-                (isProfessional
-                  ? "bg-slate-100 text-slate-500 cursor-not-allowed"
-                  : "bg-slate-50")
+                (isProfessional ? "bg-slate-100 text-slate-500 cursor-not-allowed" : "bg-slate-50")
               }
               value={selectedProfessionalId || ""}
               onChange={(e) => {
@@ -1006,7 +995,6 @@ export function AgendaView({
             )}
           </div>
 
-          {/* Dual mode solo en desktop/tablet grande */}
           {canSeeAll && !isMobile && (
             <div className="rounded-xl border border-slate-200 p-3 bg-slate-50">
               <div className="flex items-center justify-between">
@@ -1097,9 +1085,7 @@ export function AgendaView({
           </div>
         </aside>
 
-        {/* Main */}
         <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Header sticky en móvil para que NO se pierda */}
           <div className="h-16 px-3 sm:px-6 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3 sticky top-0 z-[30]">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <button
@@ -1124,9 +1110,7 @@ export function AgendaView({
               </div>
             </div>
 
-            {/* En móvil solo dejamos “Día” (simple y usable). En desktop sí todo */}
             <div className="flex items-center gap-2 shrink-0">
-
               {!isMobile && (
                 <>
                   <button
@@ -1145,7 +1129,6 @@ export function AgendaView({
                   <button
                     className="text-xs px-3 py-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-600"
                     onClick={() => {
-                      // abre el modal de bloqueo sin depender de un slot específico
                       const proId = selectedProfessionalId || null;
                       const dateIso = dateKey(currentDate);
                       onOpenBlockModal?.({
@@ -1159,14 +1142,13 @@ export function AgendaView({
                   >
                     Bloquear rango
                   </button>
-
                 </>
               )}
 
               <button
                 className={`text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "day"
-                  ? "bg-violet-50 text-violet-700 border-violet-200"
-                  : "bg-white hover:bg-slate-50 text-slate-600"
+                    ? "bg-violet-50 text-violet-700 border-violet-200"
+                    : "bg-white hover:bg-slate-50 text-slate-600"
                   }`}
                 onClick={() => setViewMode("day")}
               >
@@ -1177,8 +1159,8 @@ export function AgendaView({
                 <>
                   <button
                     className={`text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "week"
-                      ? "bg-violet-50 text-violet-700 border-violet-200"
-                      : "bg-white hover:bg-slate-50 text-slate-600"
+                        ? "bg-violet-50 text-violet-700 border-violet-200"
+                        : "bg-white hover:bg-slate-50 text-slate-600"
                       }`}
                     onClick={() => setViewMode("week")}
                     disabled={dualMode}
@@ -1188,8 +1170,8 @@ export function AgendaView({
                   </button>
                   <button
                     className={`hidden sm:inline-flex text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "month"
-                      ? "bg-violet-50 text-violet-700 border-violet-200"
-                      : "bg-white hover:bg-slate-50 text-slate-600"
+                        ? "bg-violet-50 text-violet-700 border-violet-200"
+                        : "bg-white hover:bg-slate-50 text-slate-600"
                       }`}
                     onClick={() => setViewMode("month")}
                     disabled={dualMode}
@@ -1204,9 +1186,7 @@ export function AgendaView({
 
           <div className="flex-1 overflow-auto bg-white min-h-0">
             <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-              {/* Desktop: semana con min-w. Móvil: NO min-w gigante */}
               <div className={isMobile ? "min-w-0" : "min-w-[980px]"}>
-                {/* MOBILE: solo día */}
                 {isMobile && (
                   <>
                     <div
@@ -1241,7 +1221,6 @@ export function AgendaView({
                   </>
                 )}
 
-                {/* DESKTOP: semana / dual */}
                 {!isMobile && !dualMode && (
                   <>
                     <div
@@ -1305,9 +1284,7 @@ export function AgendaView({
                       {dualSlots.map((slot) => (
                         <div key={String(slot.id)} className="border-r border-slate-100 relative">
                           {!slot.id ? (
-                            <div className="p-3 text-[11px] text-slate-400">
-                              Selecciona profesional.
-                            </div>
+                            <div className="p-3 text-[11px] text-slate-400">Selecciona profesional.</div>
                           ) : (
                             <DayColumn dateIso={keyDate} professionalId={slot.id} />
                           )}
@@ -1337,54 +1314,52 @@ export function AgendaView({
               </DragOverlay>
             </DndContext>
           </div>
-        </main >
-      </div >
+        </main>
+      </div>
 
-      {/* HoverCard solo desktop */}
-      {
-        !isMobile && (
-          <HoverCard open={Boolean(hoverAppt)} anchorRect={hoverRect}>
-            {hoverAppt && (
-              <div className="space-y-1">
-                <div className="text-xs font-semibold text-slate-800">
-                  {isBlockItem(hoverAppt) ? "Horario bloqueado" : hoverAppt.patient}
-                </div>
-
-                {!isBlockItem(hoverAppt) && (
-                  <>
-                    <div className="text-[11px] text-slate-600">
-                      <span className="font-semibold">Servicio:</span> {hoverAppt.service}
-                    </div>
-                    <div className="text-[11px] text-slate-600">
-                      <span className="font-semibold">Costo:</span> ${safeMoney(hoverAppt.price)}
-                    </div>
-                    <div className="text-[11px] text-slate-600">
-                      <span className="font-semibold">Pagado:</span>{" "}
-                      {hoverAppt.paid ? (
-                        <span className="text-emerald-700 font-semibold">Sí</span>
-                      ) : (
-                        <span className="text-slate-600">No</span>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                <div className="text-[11px] text-slate-600">
-                  <span className="font-semibold">Horario:</span>{" "}
-                  {String(hoverAppt.time || "").slice(0, 5)}
-                  {hoverAppt.endTime ? ` – ${String(hoverAppt.endTime).slice(0, 5)}` : ""}
-                </div>
-
-                {isBlockItem(hoverAppt) && (
-                  <div className="text-[11px] text-slate-600">
-                    <span className="font-semibold">Motivo:</span> {hoverAppt.motivo || "No disponible"}
-                  </div>
-                )}
+      {!isMobile && (
+        <HoverCard open={Boolean(hoverAppt)} anchorRect={hoverRect}>
+          {hoverAppt && (
+            <div className="space-y-1">
+              <div className="text-xs font-semibold text-slate-800">
+                {isBlockItem(hoverAppt) ? "Horario bloqueado" : hoverAppt.patient}
               </div>
-            )}
-          </HoverCard>
-        )
-      }
+
+              {!isBlockItem(hoverAppt) && (
+                <>
+                  <div className="text-[11px] text-slate-600">
+                    <span className="font-semibold">Servicio:</span> {hoverAppt.service}
+                  </div>
+                  <div className="text-[11px] text-slate-600">
+                    <span className="font-semibold">Costo:</span> ${safeMoney(hoverAppt.price)}
+                  </div>
+                  <div className="text-[11px] text-slate-600">
+                    <span className="font-semibold">Pagado:</span>{" "}
+                    {hoverAppt.paid ? (
+                      <span className="text-emerald-700 font-semibold">Sí</span>
+                    ) : (
+                      <span className="text-slate-600">No</span>
+                    )}
+                  </div>
+                </>
+              )}
+
+              <div className="text-[11px] text-slate-600">
+                <span className="font-semibold">Horario:</span>{" "}
+                {String(hoverAppt.time || "").slice(0, 5)}
+                {hoverAppt.endTime ? ` – ${String(hoverAppt.endTime).slice(0, 5)}` : ""}
+              </div>
+
+              {isBlockItem(hoverAppt) && (
+                <div className="text-[11px] text-slate-600">
+                  <span className="font-semibold">Motivo:</span>{" "}
+                  {hoverAppt.motivo || "No disponible"}
+                </div>
+              )}
+            </div>
+          )}
+        </HoverCard>
+      )}
 
       <MenuPopover
         open={Boolean(slotMenu)}
@@ -1419,6 +1394,32 @@ export function AgendaView({
             >
               <Plus className="h-4 w-4" />
               Agendar cita nueva
+            </button>
+          )}
+
+          {slotMenu?.hasBlock && (
+            <button
+              type="button"
+              onClick={() => {
+                const b = slotMenu?.blockItem;
+                setSlotMenu(null);
+                if (!b) {
+                  alert("No pude identificar el bloqueo de este horario.");
+                  return;
+                }
+
+                const ok = confirm(
+                  `¿Eliminar bloqueo?\n\n${b.date} ${String(b.time).slice(0, 5)}–${String(
+                    b.endTime || ""
+                  ).slice(0, 5)}\nMotivo: ${b.motivo || "No disponible"}`
+                );
+                if (!ok) return;
+
+                onDeleteBlock?.(b); // ✅ BD + estado lo hace el padre
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 hover:bg-rose-50 text-sm text-rose-700"
+            >
+              Eliminar bloqueo
             </button>
           )}
 

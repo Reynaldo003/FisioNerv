@@ -41,3 +41,15 @@ export async function apiFetch(url, options = {}) {
 
   return resp;
 }
+export async function deleteBloqueo(id) {
+  const resp = await apiFetch(`/api/bloqueos/${id}/`, {
+    method: "DELETE",
+  });
+
+  // DRF normalmente devuelve 204
+  if (!resp.ok && resp.status !== 204) {
+    const txt = await resp.text().catch(() => "");
+    throw new Error(txt || `HTTP ${resp.status}`);
+  }
+  return true;
+}

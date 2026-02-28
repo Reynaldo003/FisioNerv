@@ -71,7 +71,7 @@ function mapBloqueoToAppointment(b) {
     const motivo = String(b.motivo || "").trim();
 
     return {
-        id: `blk-${b.id}`,
+        id: `blk-${b.id}`, // ⚠️ id frontend
         date: b.fecha,
         time: time || "08:00",
         endTime: endTime || "09:00",
@@ -86,7 +86,7 @@ function mapBloqueoToAppointment(b) {
         type: "bloqueo",
         color: "bg-slate-200 text-slate-800 border-slate-300",
         _type: "bloqueo",
-        _raw: b,
+        _raw: b, // ✅ aquí está el id real de BD
     };
 }
 
@@ -260,8 +260,8 @@ function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab }) {
                                         onClose();
                                     }}
                                     className={`w-full text-left rounded-2xl px-4 py-3 text-sm font-semibold border ${active
-                                        ? "bg-slate-900 text-white border-slate-900"
-                                        : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+                                            ? "bg-slate-900 text-white border-slate-900"
+                                            : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
                                         }`}
                                     type="button"
                                 >
@@ -359,6 +359,7 @@ export default function Administrativa() {
     const askConfirm = ({ title, message, danger = false, onConfirm }) => {
         setConfirmModal({ open: true, title, message, danger, onConfirm });
     };
+
     async function safeJson(resp) {
         try {
             return await resp.json();
@@ -372,6 +373,7 @@ export default function Administrativa() {
             }
         }
     }
+
     // Cargar /api/me y /api/profesionales
     useEffect(() => {
         const token = tokenOrLogout();
@@ -461,6 +463,7 @@ export default function Administrativa() {
     useEffect(() => {
         loadAgendaData();
     }, [loadAgendaData]);
+
     useEffect(() => {
         const onRefresh = () => loadAgendaData();
         window.addEventListener("fisionerv:agenda-refresh", onRefresh);
@@ -611,6 +614,7 @@ export default function Administrativa() {
             showInfo("Error de red creando bloqueo.");
         }
     };
+
     const normalizePhoneMX = (raw) => {
         const digits = String(raw || "").replace(/\D/g, "");
         if (!digits) return "";
@@ -618,6 +622,7 @@ export default function Administrativa() {
         if (digits.length === 10) return `52${digits}`;
         return digits;
     };
+
     const handleSaveReservation = async (form) => {
         if (savingLockRef.current) return null;
         savingLockRef.current = true;
@@ -692,7 +697,8 @@ export default function Administrativa() {
             if (!saved?.id) {
                 await loadAgendaData();
                 return null;
-            } const appt = mapCitaToAppointment(saved);
+            }
+            const appt = mapCitaToAppointment(saved);
 
             if (isEditing) {
                 setAppointments((prev) => prev.map((item) => (item.id === appt.id ? appt : item)).sort(sortAppointments));
@@ -742,10 +748,64 @@ export default function Administrativa() {
         }
     };
 
+    // ✅ NUEVO: borrar bloqueo (BD + estado)
+    const handleDeleteBlock = useCallback(
+        async (blockAppt) => {
+            const token = tokenOrLogout();
+            if (!token) return;
+
+            // id real de BD:
+            // 1) si viene del mapper, está en _raw.id
+            // 2) si no, parsea "blk-123"
+            const rawId =
+                blockAppt?._raw?.id ??
+                (() => {
+                    const s = String(blockAppt?.id || "");
+                    if (s.startsWith("blk-")) return Number(s.slice(4));
+                    const n = Number(s);
+                    return Number.isFinite(n) ? n : null;
+                })();
+
+            if (!rawId) {
+                showInfo("No pude identificar el id del bloqueo en BD.");
+                return;
+            }
+
+            try {
+                const resp = await fetch(`${API_BASE}/api/bloqueos/${rawId}/`, {
+                    method: "DELETE",
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
+                if (resp.status === 401) return forceLogout();
+
+                if (!resp.ok && resp.status !== 204) {
+                    const err = await safeJson(resp);
+                    console.error("Error eliminando bloqueo:", err || resp.status);
+                    showInfo("No se pudo eliminar el bloqueo. Revisa consola.");
+                    return;
+                }
+
+                // ✅ quita del estado (usa el id frontend "blk-123")
+                setAppointments((prev) => prev.filter((x) => String(x.id) !== String(blockAppt.id)));
+
+                // opcional: si quieres sincronía perfecta
+                // await loadAgendaData();
+            } catch (e) {
+                console.error(e);
+                showInfo("Error de red eliminando el bloqueo.");
+            }
+        },
+        [loadAgendaData]
+    );
+
     const handleLogout = () => forceLogout();
 
     const initialLetter =
-        (me?.full_name?.trim()?.[0] || me?.username?.trim()?.[0] || userEmail?.trim()?.[0] || "U").toUpperCase();
+        (me?.full_name?.trim()?.[0] ||
+            me?.username?.trim()?.[0] ||
+            userEmail?.trim()?.[0] ||
+            "U").toUpperCase();
 
     if (loadingMe) {
         return (
@@ -783,7 +843,9 @@ export default function Administrativa() {
                         FN
                     </div>
                     <div className="min-w-0">
-                        <h1 className="text-lg font-semibold text-slate-900 truncate">Panel administrativo – Fisionerv</h1>
+                        <h1 className="text-lg font-semibold text-slate-900 truncate">
+                            Panel administrativo – Fisionerv
+                        </h1>
                         <p className="text-xs text-slate-500 truncate">
                             {rol ? `Rol: ${rol}` : "Panel"} • Agenda, pacientes, servicios y ventas en un mismo lugar.
                         </p>
@@ -868,6 +930,7 @@ export default function Administrativa() {
                             onOpenAppointment={handleOpenAppointment}
                             onMoveAppointment={handleMoveAppointment}
                             onOpenBlockModal={handleOpenBlockModal}
+                            onDeleteBlock={handleDeleteBlock} // ✅ NUEVO
                         />
                     ))}
 
