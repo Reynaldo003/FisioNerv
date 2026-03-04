@@ -28,13 +28,6 @@ function moneyMXN(n) {
     return `MXN $${num.toLocaleString("es-MX")}`;
 }
 
-/**
- * ✅ Misma idea que Admin: usar la URL tal cual.
- * Pero aquí soportamos ambos mundos:
- * - si viene normalizado desde useServicios -> s.mediaSrc
- * - si viene crudo del backend -> s.imagen_url / s.imagen
- * - si no viene nada -> DEFAULT_SERVICE_IMG
- */
 function pickImg(s) {
     const img =
         (s?.mediaSrc || s?.imagen_url || s?.imagen || "").toString().trim();

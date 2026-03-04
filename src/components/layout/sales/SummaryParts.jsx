@@ -15,7 +15,7 @@ export function KpiCard({ label, value, helper, pill }) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col gap-2 shadow-sm">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold text-slate-600">{label}</p>
+        <p className="text-lg font-semibold text-slate-600">{label}</p>
         {pill && (
           <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 text-[10px] px-2 py-0.5 border border-emerald-100">
             {pill}
@@ -23,7 +23,7 @@ export function KpiCard({ label, value, helper, pill }) {
         )}
       </div>
       <p className="text-xl font-semibold text-slate-900">{value}</p>
-      {helper && <p className="text-[11px] text-slate-500 leading-snug">{helper}</p>}
+      {helper && <p className="text-base text-slate-500 leading-snug">{helper}</p>}
     </div>
   );
 }

@@ -690,6 +690,15 @@ export function SalesView() {
       .filter((p) => (professionalId ? String(p.profesional_id) === String(professionalId) : true));
   }, [payments, appliedRange, professionalId]);
 
+  const kpiFromPayments = useMemo(() => {
+    const list = filteredPayments || [];
+
+    const totalCobrado = list.reduce((acc, p) => acc + Number(p.anticipo || 0), 0);
+    const totalPagos = list.length;
+
+    return { totalCobrado, totalPagos };
+  }, [filteredPayments]);
+
   // ✅ agrupación visual (sin backend)
   const visualRows = useMemo(() => groupPaymentsVisual(filteredPayments), [filteredPayments]);
 
@@ -851,20 +860,30 @@ export function SalesView() {
   // ====== KPIs ======
   const kpis = stats.kpis || {};
   const totalAsistencias = Number(kpis.total_asistencias || 0);
-  const totalCobrado = Number(kpis.total_cobrado || 0);
-  const totalPagos = Number(kpis.total_pagos || 0);
+  // const totalCobrado = Number(kpis.total_cobrado || 0);
+  // const totalPagos = Number(kpis.total_pagos || 0);
+  const totalCobrado = kpiFromPayments.totalCobrado;
+  const totalPagos = kpiFromPayments.totalPagos;
   const pacientesNuevos = Number(kpis.pacientes_nuevos || 0);
 
   // ====== Pie data (3 gráficas) ======
-  const paymentPie = (stats.payments_by_method || []).map((m) => ({
-    label: safeStr(m.metodo_pago, "Sin método"),
-    value: Number(m.total || 0),
-  }));
+  const paymentPie = useMemo(() => {
+    const map = new Map();
+    for (const p of filteredPayments || []) {
+      const metodo = safeStr(p.metodo_pago, "Sin método");
+      map.set(metodo, (map.get(metodo) || 0) + Number(p.anticipo || 0));
+    }
+    return Array.from(map.entries()).map(([label, value]) => ({ label, value }));
+  }, [filteredPayments]);
 
-  const servicePie = (stats.revenue_by_service || []).map((s) => ({
-    label: safeStr(s.cita__servicio__nombre, "Servicio"),
-    value: Number(s.total || 0),
-  }));
+  const servicePie = useMemo(() => {
+    const map = new Map();
+    for (const p of filteredPayments || []) {
+      const serv = safeStr(p.servicio_nombre, "Servicio");
+      map.set(serv, (map.get(serv) || 0) + Number(p.anticipo || 0));
+    }
+    return Array.from(map.entries()).map(([label, value]) => ({ label, value }));
+  }, [filteredPayments]);
 
   const patientStatusMap = (stats.patient_status_totals || []).reduce((acc, x) => {
     acc[x.estado_tratamiento] = Number(x.count || 0);
@@ -880,10 +899,7 @@ export function SalesView() {
       {/* Header */}
       <div className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 sm:px-6">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-slate-800">Ventas y estadísticas</h2>
-          <p className="text-xs text-slate-500 truncate">
-            Panel simplificado: 3 gráficas (pastel) + filtros + tabla.
-          </p>
+          <h2 className="text-lg font-semibold text-slate-800">Ventas y estadísticas</h2>
         </div>
       </div>
 
