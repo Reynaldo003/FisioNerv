@@ -89,6 +89,16 @@ function clamp(n, min, max) {
 function overlapsMinutes(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
 }
+function rectFromPoint(x, y) {
+  return {
+    left: x,
+    top: y,
+    right: x,
+    bottom: y,
+    width: 0,
+    height: 0,
+  };
+}
 
 /**
  * Detecta si un item es un bloqueo (robusto).
@@ -252,6 +262,14 @@ export function AgendaView({
     role === "fisioterapeuta" || role === "nutriologo" || role === "dentista";
   const canSeeAll = role === "admin" || role === "recepcion";
 
+  const [now, setNow] = useState(() => new Date());
+  const todayIso = useMemo(() => dateKey(new Date()), []);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30 * 1000); // cada 30s
+    return () => clearInterval(t);
+  }, []);
+
   useEffect(() => {
     if (isMobile) {
       setDualMode(false);
@@ -312,6 +330,11 @@ export function AgendaView({
 
   const HOUR_ROW_HEIGHT = 64;
   const GRID_TOTAL_HEIGHT = HOURS.length * HOUR_ROW_HEIGHT;
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowY = ((nowMinutes - DAY_START_MIN) / 60) * HOUR_ROW_HEIGHT; // px
+  const showNowLine = nowMinutes >= DAY_START_MIN && nowMinutes <= DAY_END_MIN;
+  const nowLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -576,7 +599,8 @@ export function AgendaView({
 
           // ✅ CLAVE: click en bloqueo abre el menú con "Eliminar bloqueo"
           if (isBlock) {
-            const rect = e.currentTarget.getBoundingClientRect();
+            // const rect = e.currentTarget.getBoundingClientRect();
+            const rect = rectFromPoint(e.clientX, e.clientY);
             setSlotMenu({
               date: appt.date,
               hour: String(appt.time || "08:00").slice(0, 5),
@@ -593,7 +617,8 @@ export function AgendaView({
         }}
         onMouseEnter={(e) => {
           if (isMobile) return;
-          const rect = e.currentTarget.getBoundingClientRect();
+          // const rect = e.currentTarget.getBoundingClientRect();
+          const rect = rectFromPoint(e.clientX, e.clientY);
           setHoverRect(rect);
           setHoverAppt(appt);
         }}
@@ -629,13 +654,13 @@ export function AgendaView({
       </button>
     );
   }
-
   const openSlotMenu = useCallback(
     (e, { date, hour, professionalId, hasBlock }) => {
       const clickedAppt = e.target.closest?.("[data-appt='1']");
       if (clickedAppt) return;
 
-      const rect = e.currentTarget.getBoundingClientRect();
+      //const rect = e.currentTarget.getBoundingClientRect();
+      const rect = rectFromPoint(e.clientX, e.clientY);
       setHoverAppt(null);
       setHoverRect(null);
 
@@ -823,6 +848,15 @@ export function AgendaView({
     return (
       <div className="relative">
         <div className="absolute inset-0 pointer-events-none">
+          {showNowLine && dateIso === todayIso && (
+            <div
+              className="absolute left-0 right-0 z-[6] pointer-events-none"
+              style={{ top: clamp(nowY, 0, GRID_TOTAL_HEIGHT) }}
+            >
+              <div className="h-[2px] bg-rose-500/90 w-full" />
+              <div className="absolute -left-1 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-rose-500" />
+            </div>
+          )}
           {HOURS.map((_, idx) => (
             <div
               key={idx}
@@ -867,7 +901,8 @@ export function AgendaView({
                         onPointerUp={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
+                          // const rect = e.currentTarget.getBoundingClientRect();
+                          const rect = rectFromPoint(e.clientX, e.clientY);
                           setSlotMenu({
                             date: dateIso,
                             hour,
@@ -879,7 +914,8 @@ export function AgendaView({
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          const rect = e.currentTarget.getBoundingClientRect();
+                          // const rect = e.currentTarget.getBoundingClientRect();
+                          const rect = rectFromPoint(e.clientX, e.clientY);
                           setSlotMenu({
                             date: dateIso,
                             hour,
@@ -949,6 +985,7 @@ export function AgendaView({
   const headerGridStyleDay = useMemo(() => ({ gridTemplateColumns: "64px minmax(0, 1fr)" }), []);
 
   const keyDate = dateKey(currentDate);
+  const weekHasToday = useMemo(() => weekDays.some((d) => dateKey(d) === todayIso), [weekDays, todayIso]);
 
   return (
     <>
@@ -1147,8 +1184,8 @@ export function AgendaView({
 
               <button
                 className={`text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "day"
-                    ? "bg-violet-50 text-violet-700 border-violet-200"
-                    : "bg-white hover:bg-slate-50 text-slate-600"
+                  ? "bg-violet-50 text-violet-700 border-violet-200"
+                  : "bg-white hover:bg-slate-50 text-slate-600"
                   }`}
                 onClick={() => setViewMode("day")}
               >
@@ -1159,8 +1196,8 @@ export function AgendaView({
                 <>
                   <button
                     className={`text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "week"
-                        ? "bg-violet-50 text-violet-700 border-violet-200"
-                        : "bg-white hover:bg-slate-50 text-slate-600"
+                      ? "bg-violet-50 text-violet-700 border-violet-200"
+                      : "bg-white hover:bg-slate-50 text-slate-600"
                       }`}
                     onClick={() => setViewMode("week")}
                     disabled={dualMode}
@@ -1170,8 +1207,8 @@ export function AgendaView({
                   </button>
                   <button
                     className={`hidden sm:inline-flex text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "month"
-                        ? "bg-violet-50 text-violet-700 border-violet-200"
-                        : "bg-white hover:bg-slate-50 text-slate-600"
+                      ? "bg-violet-50 text-violet-700 border-violet-200"
+                      : "bg-white hover:bg-slate-50 text-slate-600"
                       }`}
                     onClick={() => setViewMode("month")}
                     disabled={dualMode}
@@ -1202,7 +1239,10 @@ export function AgendaView({
                     </div>
 
                     <div className="grid text-xs" style={headerGridStyleDay}>
-                      <div className="border-r border-slate-200 bg-slate-50 text-right pr-3">
+                      <div
+                        className="border-r border-slate-200 bg-slate-50 text-right pr-3 relative"
+                        style={{ height: GRID_TOTAL_HEIGHT }}
+                      >
                         {HOURS.map((hour) => (
                           <div
                             key={hour}
@@ -1212,8 +1252,18 @@ export function AgendaView({
                             {hour}
                           </div>
                         ))}
-                      </div>
 
+                        {showNowLine && keyDate === todayIso && (
+                          <div
+                            className="absolute right-2 z-[10] pointer-events-none"
+                            style={{ top: clamp(nowY, 0, GRID_TOTAL_HEIGHT) - 8 }}
+                          >
+                            <div className="px-2 py-1 rounded-full bg-rose-500 text-white text-[10px] shadow">
+                              {nowLabel}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <div className="relative">
                         <DayColumn dateIso={keyDate} professionalId={selectedProfessionalId} />
                       </div>
@@ -1236,7 +1286,10 @@ export function AgendaView({
                     </div>
 
                     <div className="grid text-xs" style={headerGridStyleWeek}>
-                      <div className="border-r border-slate-200 bg-slate-50 text-right pr-3">
+                      <div
+                        className="border-r border-slate-200 bg-slate-50 text-right pr-3 relative"
+                        style={{ height: GRID_TOTAL_HEIGHT }}
+                      >
                         {HOURS.map((hour) => (
                           <div
                             key={hour}
@@ -1246,6 +1299,17 @@ export function AgendaView({
                             {hour}
                           </div>
                         ))}
+
+                        {showNowLine && weekHasToday && (
+                          <div
+                            className="absolute right-2 z-[10] pointer-events-none"
+                            style={{ top: clamp(nowY, 0, GRID_TOTAL_HEIGHT) - 8 }}
+                          >
+                            <div className="px-2 py-1 rounded-full bg-rose-500 text-white text-[10px] shadow">
+                              {nowLabel}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {groupedByDay.map((day) => {
@@ -1269,7 +1333,10 @@ export function AgendaView({
                     </div>
 
                     <div className="grid grid-cols-3 text-xs">
-                      <div className="border-r border-slate-200 bg-slate-50 text-right pr-3">
+                      <div
+                        className="border-r border-slate-200 bg-slate-50 text-right pr-3 relative"
+                        style={{ height: GRID_TOTAL_HEIGHT }}
+                      >
                         {HOURS.map((hour) => (
                           <div
                             key={hour}
@@ -1279,8 +1346,18 @@ export function AgendaView({
                             {hour}
                           </div>
                         ))}
-                      </div>
 
+                        {showNowLine && keyDate === todayIso && (
+                          <div
+                            className="absolute right-2 z-[10] pointer-events-none"
+                            style={{ top: clamp(nowY, 0, GRID_TOTAL_HEIGHT) - 8 }}
+                          >
+                            <div className="px-2 py-1 rounded-full bg-rose-500 text-white text-[10px] shadow">
+                              {nowLabel}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       {dualSlots.map((slot) => (
                         <div key={String(slot.id)} className="border-r border-slate-100 relative">
                           {!slot.id ? (

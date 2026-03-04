@@ -444,18 +444,19 @@ export function ReservationModal({
   const handleServiceChange = (serviceIdStr) => {
     const serviceId = Number(serviceIdStr);
     const service = services.find((s) => s.id === serviceId);
+
     const durationMinutes = service
       ? durationToMinutes(service.duracion || service.duracion_str || service.duracion_text)
       : 60;
 
     setForm((prev) => {
-      const newPrice = service ? Math.max(0, Number(service.precio || 0)) : toNumberSafe(prev.price, 0);
+      const newPrice = service ? Math.max(0, Number(service.precio || 0)) : 0;
+
       return {
         ...prev,
         serviceId,
-        // si el usuario ya escribió algo, no lo pisamos; si está vacío, sí lo llenamos
-        price: prev.price === "" ? String(newPrice) : prev.price,
-        montoFacturado: prev.montoFacturado === "" ? String(newPrice) : prev.montoFacturado,
+        price: String(newPrice),
+        montoFacturado: String(newPrice),
         endTime: addMinutesToTime(prev.time, durationMinutes),
       };
     });

@@ -1,9 +1,14 @@
 // src/components/layout/agenda/MiniCalendar.jsx
 
-// Recibe la fecha actual y una función para cambiarla
+// Recibe la fecha seleccionada (currentDate) y una función para cambiarla
 export function MiniCalendar({ currentDate, onChangeDate }) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth(); // 0 - 11
+
+  const now = new Date();
+  const todayDay = now.getDate();
+  const todayMonth = now.getMonth();
+  const todayYear = now.getFullYear();
 
   const monthLabel = currentDate
     .toLocaleDateString("es-MX", {
@@ -15,7 +20,7 @@ export function MiniCalendar({ currentDate, onChangeDate }) {
   const firstDayOfMonth = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-  // Queremos que la semana empiece en Lunes
+  // Semana empieza en Lunes
   const jsWeekday = firstDayOfMonth.getDay(); // 0=domingo, 1=lunes...
   const offset = (jsWeekday + 6) % 7; // 0=lunes, 6=domingo
 
@@ -31,10 +36,6 @@ export function MiniCalendar({ currentDate, onChangeDate }) {
       cells.push(dayNumber);
     }
   }
-
-  const todayDay = currentDate.getDate();
-  const todayMonth = currentDate.getMonth();
-  const todayYear = currentDate.getFullYear();
 
   const goPrevMonth = () => {
     const d = new Date(year, month - 1, 1);
@@ -82,23 +83,34 @@ export function MiniCalendar({ currentDate, onChangeDate }) {
 
       <div className="grid grid-cols-7 gap-1 text-[10px] text-center">
         {cells.map((day, idx) => {
-          if (!day) {
-            return <div key={idx} className="h-6" />;
-          }
+          if (!day) return <div key={idx} className="h-6" />;
 
-          const isSelected =
+          // seleccionado = lo que el usuario eligió (currentDate)
+          const isSelected = day === currentDate.getDate();
+
+          // hoy real (se mantiene marcado aunque selecciones otro)
+          const isToday =
             day === todayDay && month === todayMonth && year === todayYear;
+
+          const base =
+            "h-6 w-6 mx-auto flex items-center justify-center rounded-full transition";
+          const selectedCls = isSelected
+            ? "bg-violet-600 text-white font-semibold shadow-sm"
+            : "hover:bg-slate-100 text-slate-600";
+
+          const todayRing = isToday
+            ? isSelected
+              ? "ring-2 ring-violet-600 ring-offset-1 ring-offset-white"
+              : "ring-2 ring-violet-600 ring-offset-1 ring-offset-white"
+            : "";
 
           return (
             <button
               key={idx}
               type="button"
               onClick={() => handleSelectDay(day)}
-              className={`h-6 flex items-center justify-center rounded-full transition ${
-                isSelected
-                  ? "bg-violet-600 text-white font-semibold shadow-sm"
-                  : "hover:bg-slate-100 text-slate-600"
-              }`}
+              className={[base, selectedCls, todayRing].filter(Boolean).join(" ")}
+              aria-current={isSelected ? "date" : undefined}
             >
               {day}
             </button>

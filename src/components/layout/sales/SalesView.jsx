@@ -686,7 +686,7 @@ export function SalesView() {
   const filteredPayments = useMemo(() => {
     const { fromKey: f, toKey: t } = appliedRange;
     return (payments || [])
-      .filter((p) => inRange(p.fecha_pago, f, t))
+      .filter((p) => inRange(p.fecha_cita, f, t))
       .filter((p) => (professionalId ? String(p.profesional_id) === String(professionalId) : true));
   }, [payments, appliedRange, professionalId]);
 
@@ -1005,9 +1005,6 @@ export function SalesView() {
               <h3 className="text-xs font-semibold text-slate-700">Registro de ventas (pagos)</h3>
               <p className="text-[11px] text-slate-500">
                 Mostrando pagos desde {appliedRange.fromKey} hasta {appliedRange.toKey}.{" "}
-                <span className="text-slate-400">
-                  (Vista agrupada por cita, sin tocar backend)
-                </span>
               </p>
             </div>
             <button
@@ -1058,7 +1055,7 @@ export function SalesView() {
                             {safeStr(r.paciente_nombre, "Paciente")}
                           </p>
                           <p className="text-[10px] text-slate-500">
-                            Cita: {safeStr(r.fecha_cita, "-")}
+                            Fecha cita: {safeStr(r.fecha_cita, "-")}
                           </p>
                         </div>
                       </td>
