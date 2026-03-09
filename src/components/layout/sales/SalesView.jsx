@@ -1,3 +1,4 @@
+//src/components/layout/SalesView.jsx
 import { useEffect, useMemo, useState } from "react";
 import {
   FilterField,
@@ -686,7 +687,7 @@ export function SalesView() {
   const filteredPayments = useMemo(() => {
     const { fromKey: f, toKey: t } = appliedRange;
     return (payments || [])
-      .filter((p) => inRange(p.fecha_cita, f, t))
+      .filter((p) => inRange(p.fecha_pago, f, t))
       .filter((p) => (professionalId ? String(p.profesional_id) === String(professionalId) : true));
   }, [payments, appliedRange, professionalId]);
 
@@ -783,13 +784,13 @@ export function SalesView() {
 
     setDeleteModal({
       open: true,
-      title: "Eliminar venta (cita pagada)",
+      title: "Eliminar registro de pagos",
       hint:
         ids.length > 1
-          ? `Esta venta tiene ${ids.length} pagos. Se eliminará la CITA y todos los pagos.`
-          : `Se eliminará la CITA pagada y su pago #${ids[0]}.`,
+          ? `Esta venta tiene ${ids.length} pagos. Se eliminarán los pagos, pero la cita NO se borrará.`
+          : `Se eliminará el pago #${ids[0]}, pero la cita NO se borrará.`,
       ids,
-      citaId: row?.cita, // ✅ clave
+      citaId: row?.cita,
     });
   };
 
@@ -804,7 +805,6 @@ export function SalesView() {
     }
 
     try {
-      // ✅ borrar en backend: CITA + pagos (cascada)
       const resp = await fetch(`${API_BASE}/api/pagos/by-cita/${citaId}/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
@@ -812,32 +812,27 @@ export function SalesView() {
 
       if (!resp.ok && resp.status !== 204) {
         const err = await resp.text().catch(() => "");
-        console.error("No se pudo eliminar venta por cita", citaId, resp.status, err);
-        alert("No se pudo eliminar la venta (cita). Revisa consola.");
+        console.error("No se pudieron eliminar pagos por cita", citaId, resp.status, err);
+        alert("No se pudieron eliminar los pagos. Revisa consola.");
         return;
       }
 
-      // cerrar modal
       setDeleteModal((s) => ({ ...s, open: false, ids: [], citaId: null }));
 
-      // ✅ optimista: quita pagos del estado local (por si hay delay en refresh)
       setPayments((prev) =>
         prev.filter((p) => String(p.cita) !== String(citaId) && !ids.map(String).includes(String(p.id)))
       );
 
-      // refresca panel ventas
       await refreshAfterMutations();
 
-      // ✅ notifica a otras vistas (agenda debe recargar)
       notifySalesRefresh();
 
-      // Si quieres forzar que Agenda recargue desde el mismo bus:
       try {
         window.dispatchEvent(new Event("fisionerv:agenda-refresh"));
       } catch { }
     } catch (e) {
       console.error(e);
-      alert("Error de red eliminando la venta.");
+      alert("Error de red eliminando los pagos.");
     }
   };
   if (loading || !stats) {
@@ -1001,7 +996,7 @@ export function SalesView() {
             <div>
               <h3 className="text-xs font-semibold text-slate-700">Registro de ventas (pagos)</h3>
               <p className="text-[11px] text-slate-500">
-                Mostrando pagos desde {appliedRange.fromKey} hasta {appliedRange.toKey}.{" "}
+                Mostrando pagos por FECHA DE PAGO desde {appliedRange.fromKey} hasta {appliedRange.toKey}.
               </p>
             </div>
             <button

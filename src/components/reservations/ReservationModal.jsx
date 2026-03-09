@@ -182,7 +182,14 @@ export function ReservationModal({
   allowSharedSlots = false,
 }) {
   const isEditing = Boolean(appointment?.id);
-  const today = new Date().toISOString().slice(0, 10);
+  function getLocalDateMX() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  const today = getLocalDateMX();
 
   const [services, setServices] = useState([]);
   const [professionals, setProfessionals] = useState([]);
@@ -224,14 +231,13 @@ export function ReservationModal({
     const initialDate = appointment?.date ?? preset?.date ?? today;
     const initialTime = appointment?.time ?? preset?.time ?? "08:00";
 
-    // ✅ estados numéricos como string vacía para NO mostrar "0"
     const priceDigits = appointment?.price ? String(Number(appointment.price)) : "";
     const discountDigits = appointment?.discountPct ? String(Number(appointment.discountPct)) : "";
     const factDigits = appointment?.montoFacturado
       ? String(Number(appointment.montoFacturado))
-      : "";
-
-    const depositDigits = appointment?.deposit ? String(Number(appointment.deposit)) : "";
+      : appointment?.price
+        ? String(Number(appointment.price))
+        : "";
 
     return {
       id: appointment?.id ?? null,
@@ -253,14 +259,14 @@ export function ReservationModal({
       serviceId: appointment?.serviceId ?? null,
       professionalId: appointment?.professionalId ?? preset?.professionalId ?? null,
 
-      // ✅ ahora son strings (digits) para UI
       price: priceDigits,
       discountPct: discountDigits,
       montoFacturado: factDigits,
-      comprobante: appointment?.comprobante ?? "",
+      comprobante: "",
 
-      // ✅ payment lines como string también
-      paymentLines: [{ method: "efectivo", amount: depositDigits }],
+      // ✅ IMPORTANTE:
+      // no precargamos pagos anteriores como si fueran pago nuevo
+      paymentLines: [{ method: "efectivo", amount: "" }],
 
       status: appointment?.status ?? "reservado",
       notesInternal: appointment?.notesInternal ?? "",
@@ -271,7 +277,6 @@ export function ReservationModal({
       repeatSessions: String(Number(appointment?.repeatSessions ?? 1)),
     };
   }
-
   const [form, setForm] = useState(() => buildInitialForm({ appointment, preset, today }));
 
   useEffect(() => {
@@ -590,8 +595,7 @@ export function ReservationModal({
 
   async function createPaymentsForCita(citaId) {
     const token = localStorage.getItem("auth.access");
-    const fechaPago = new Date().toISOString().slice(0, 10);
-
+    const fechaPago = getLocalDateMX();
     const validLines = (form.paymentLines || [])
       .map((l) => ({ method: String(l.method || "efectivo"), amount: toNumberSafe(l.amount, 0) }))
       .filter((l) => l.amount > 0);
@@ -694,6 +698,7 @@ export function ReservationModal({
       });
       return;
     }
+
     if (!form.patientId && phoneDuplicateError) {
       setMsg({
         open: true,
@@ -723,9 +728,17 @@ export function ReservationModal({
         return;
       }
 
-      const pagoId = await createPaymentsForCita(savedCitaId);
-      const refreshed = await onRefreshAppointment?.(savedCitaId);
+      // ✅ Solo crear pagos nuevos si realmente el usuario capturó montos > 0
+      const hasNewPayments = (form.paymentLines || []).some(
+        (line) => toNumberSafe(line.amount, 0) > 0
+      );
 
+      let pagoId = null;
+      if (hasNewPayments) {
+        pagoId = await createPaymentsForCita(savedCitaId);
+      }
+
+      const refreshed = await onRefreshAppointment?.(savedCitaId);
       const paidNow = Boolean(refreshed?.pagado) || Boolean(refreshed?.paid) || remainingInternal <= 0;
 
       if (paidNow && pagoId) {
@@ -747,7 +760,16 @@ export function ReservationModal({
 
         let created = 0;
         for (const date of repeatDates) {
-          const nextPayload = buildPayload({ ...basePayload, id: null, date, patientId: savedPatientId }, {});
+          const nextPayload = buildPayload(
+            {
+              ...basePayload,
+              id: null,
+              date,
+              patientId: savedPatientId,
+              paymentLines: [], // ✅ las repetidas no duplican pagos
+            },
+            {}
+          );
           await onSave?.(nextPayload);
           created++;
         }
@@ -755,14 +777,16 @@ export function ReservationModal({
         setMsg({
           open: true,
           title: "Listo",
-          message: `Cita guardada. Se crearon ${created} sesiones repetidas.`,
+          message: hasNewPayments
+            ? `Cita guardada, pago registrado y se crearon ${created} sesiones repetidas.`
+            : `Cita guardada. Se crearon ${created} sesiones repetidas.`,
         });
       } else {
         setMsg({
           open: true,
           title: "Listo",
-          message: pagoId
-            ? (paidNow ? "Cita guardada y PAGO COMPLETADO." : "Cita guardada y pago registrado.")
+          message: hasNewPayments
+            ? (paidNow ? "Cita guardada y pago completado." : "Cita guardada y pago registrado.")
             : "Cita guardada correctamente.",
         });
       }

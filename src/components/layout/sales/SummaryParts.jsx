@@ -1,5 +1,4 @@
-// UI helpers para Ventas (dashboard simplificado)
-
+//src/components/layout/SummaryParts.jsx
 // Bloque de filtros superiores
 export function FilterField({ label, children }) {
   return (

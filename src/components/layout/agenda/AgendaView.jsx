@@ -31,7 +31,7 @@ function useMediaQuery(query) {
 
 function startOfWeekMonday(date) {
   const d = new Date(date);
-  const jsDay = d.getDay(); // 0=Dom..6=Sab
+  const jsDay = d.getDay();
   const deltaToMonday = (jsDay + 6) % 7;
   d.setDate(d.getDate() - deltaToMonday);
   return d;
@@ -89,6 +89,7 @@ function clamp(n, min, max) {
 function overlapsMinutes(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
 }
+
 function rectFromPoint(x, y) {
   return {
     left: x,
@@ -100,9 +101,13 @@ function rectFromPoint(x, y) {
   };
 }
 
-/**
- * Detecta si un item es un bloqueo (robusto).
- */
+function getClientPoint(e) {
+  const t = e?.touches?.[0] || e?.changedTouches?.[0];
+  const x = t?.clientX ?? e?.clientX ?? 0;
+  const y = t?.clientY ?? e?.clientY ?? 0;
+  return { x, y };
+}
+
 function isBlockItem(a) {
   if (!a) return false;
 
@@ -124,15 +129,11 @@ function isBlockItem(a) {
   return false;
 }
 
-/**
- * Tooltip bonito (popover) sin el title negro.
- * Nota: en móvil no hay hover; esto solo aplica desktop.
- */
 function HoverCard({ open, anchorRect, children }) {
   if (!open || !anchorRect) return null;
 
-  const top = anchorRect.top + window.scrollY - 8;
-  const left = anchorRect.left + window.scrollX + anchorRect.width + 10;
+  const top = anchorRect.top - 8;
+  const left = anchorRect.left + anchorRect.width + 10;
 
   return (
     <div className="fixed z-[80]" style={{ top, left, maxWidth: 280 }}>
@@ -143,9 +144,6 @@ function HoverCard({ open, anchorRect, children }) {
   );
 }
 
-/**
- * Popover de menú que se auto-posiciona.
- */
 function MenuPopover({ open, anchorRect, preferUp = false, onClose, children }) {
   const menuRef = useRef(null);
   const [autoUp, setAutoUp] = useState(Boolean(preferUp));
@@ -171,7 +169,9 @@ function MenuPopover({ open, anchorRect, preferUp = false, onClose, children }) 
     };
   }, [open, onClose]);
 
-  useEffect(() => setAutoUp(Boolean(preferUp)), [preferUp]);
+  useEffect(() => {
+    setAutoUp(Boolean(preferUp));
+  }, [preferUp]);
 
   useEffect(() => {
     if (!open || !anchorRect) return;
@@ -190,9 +190,9 @@ function MenuPopover({ open, anchorRect, preferUp = false, onClose, children }) 
       const shouldGoUp = menuH + margin > spaceBelow && spaceAbove >= menuH + margin;
       setAutoUp(shouldGoUp);
 
-      const rawLeft = anchorRect.left + window.scrollX;
-      const maxLeft = window.scrollX + window.innerWidth - menuW - margin;
-      const minLeft = window.scrollX + margin;
+      const rawLeft = anchorRect.left;
+      const maxLeft = window.innerWidth - menuW - margin;
+      const minLeft = margin;
       setClampedLeft(Math.min(Math.max(rawLeft, minLeft), maxLeft));
     });
 
@@ -201,9 +201,9 @@ function MenuPopover({ open, anchorRect, preferUp = false, onClose, children }) 
 
   if (!open || !anchorRect) return null;
 
-  const left = clampedLeft != null ? clampedLeft : anchorRect.left + window.scrollX;
-  const downTop = anchorRect.top + window.scrollY + anchorRect.height + 6;
-  const upTop = anchorRect.top + window.scrollY - 6;
+  const left = clampedLeft != null ? clampedLeft : anchorRect.left;
+  const downTop = anchorRect.top + anchorRect.height + 6;
+  const upTop = anchorRect.top - 6;
 
   return (
     <div
@@ -239,7 +239,7 @@ export function AgendaView({
   onOpenAppointment,
   onMoveAppointment,
   onOpenBlockModal,
-  onDeleteBlock, // ✅ callback del padre
+  onDeleteBlock,
 }) {
   const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -266,7 +266,7 @@ export function AgendaView({
   const todayIso = useMemo(() => dateKey(new Date()), []);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 30 * 1000); // cada 30s
+    const t = setInterval(() => setNow(new Date()), 30 * 1000);
     return () => clearInterval(t);
   }, []);
 
@@ -312,7 +312,19 @@ export function AgendaView({
 
   const HOURS = useMemo(
     () => [
-      "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00",
+      "08:00",
+      "09:00",
+      "10:00",
+      "11:00",
+      "12:00",
+      "13:00",
+      "14:00",
+      "15:00",
+      "16:00",
+      "17:00",
+      "18:00",
+      "19:00",
+      "20:00",
     ],
     []
   );
@@ -332,7 +344,7 @@ export function AgendaView({
   const GRID_TOTAL_HEIGHT = HOURS.length * HOUR_ROW_HEIGHT;
 
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const nowY = ((nowMinutes - DAY_START_MIN) / 60) * HOUR_ROW_HEIGHT; // px
+  const nowY = ((nowMinutes - DAY_START_MIN) / 60) * HOUR_ROW_HEIGHT;
   const showNowLine = nowMinutes >= DAY_START_MIN && nowMinutes <= DAY_END_MIN;
   const nowLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
@@ -495,10 +507,13 @@ export function AgendaView({
   );
 
   const handleDragStart = (event) => {
+    if (isMobile) return;
     setActiveApptId(event?.active?.id ?? null);
   };
 
   const handleDragEnd = (event) => {
+    if (isMobile) return;
+
     const activeId = event?.active?.id;
     const overId = event?.over?.id;
     setActiveApptId(null);
@@ -571,7 +586,7 @@ export function AgendaView({
 
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
       id: appt.id,
-      disabled: isBlock,
+      disabled: isBlock || isMobile,
     });
 
     const style = {
@@ -584,7 +599,7 @@ export function AgendaView({
       width: layout.width,
     };
 
-    const touchClass = !isBlock ? "touch-none" : "";
+    const touchClass = !isBlock && !isMobile ? "touch-none" : "";
 
     return (
       <button
@@ -597,10 +612,9 @@ export function AgendaView({
           setHoverAppt(null);
           setHoverRect(null);
 
-          // ✅ CLAVE: click en bloqueo abre el menú con "Eliminar bloqueo"
           if (isBlock) {
-            // const rect = e.currentTarget.getBoundingClientRect();
-            const rect = rectFromPoint(e.clientX, e.clientY);
+            const { x, y } = getClientPoint(e);
+            const rect = rectFromPoint(x, y);
             setSlotMenu({
               date: appt.date,
               hour: String(appt.time || "08:00").slice(0, 5),
@@ -617,8 +631,8 @@ export function AgendaView({
         }}
         onMouseEnter={(e) => {
           if (isMobile) return;
-          // const rect = e.currentTarget.getBoundingClientRect();
-          const rect = rectFromPoint(e.clientX, e.clientY);
+          const { x, y } = getClientPoint(e);
+          const rect = rectFromPoint(x, y);
           setHoverRect(rect);
           setHoverAppt(appt);
         }}
@@ -654,13 +668,15 @@ export function AgendaView({
       </button>
     );
   }
+
   const openSlotMenu = useCallback(
     (e, { date, hour, professionalId, hasBlock }) => {
       const clickedAppt = e.target.closest?.("[data-appt='1']");
       if (clickedAppt) return;
 
-      //const rect = e.currentTarget.getBoundingClientRect();
-      const rect = rectFromPoint(e.clientX, e.clientY);
+      const { x, y } = getClientPoint(e);
+      const rect = rectFromPoint(x, y);
+
       setHoverAppt(null);
       setHoverRect(null);
 
@@ -901,8 +917,8 @@ export function AgendaView({
                         onPointerUp={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          // const rect = e.currentTarget.getBoundingClientRect();
-                          const rect = rectFromPoint(e.clientX, e.clientY);
+                          const { x, y } = getClientPoint(e);
+                          const rect = rectFromPoint(x, y);
                           setSlotMenu({
                             date: dateIso,
                             hour,
@@ -914,8 +930,8 @@ export function AgendaView({
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          // const rect = e.currentTarget.getBoundingClientRect();
-                          const rect = rectFromPoint(e.clientX, e.clientY);
+                          const { x, y } = getClientPoint(e);
+                          const rect = rectFromPoint(x, y);
                           setSlotMenu({
                             date: dateIso,
                             hour,
@@ -1184,8 +1200,8 @@ export function AgendaView({
 
               <button
                 className={`text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "day"
-                  ? "bg-violet-50 text-violet-700 border-violet-200"
-                  : "bg-white hover:bg-slate-50 text-slate-600"
+                    ? "bg-violet-50 text-violet-700 border-violet-200"
+                    : "bg-white hover:bg-slate-50 text-slate-600"
                   }`}
                 onClick={() => setViewMode("day")}
               >
@@ -1196,8 +1212,8 @@ export function AgendaView({
                 <>
                   <button
                     className={`text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "week"
-                      ? "bg-violet-50 text-violet-700 border-violet-200"
-                      : "bg-white hover:bg-slate-50 text-slate-600"
+                        ? "bg-violet-50 text-violet-700 border-violet-200"
+                        : "bg-white hover:bg-slate-50 text-slate-600"
                       }`}
                     onClick={() => setViewMode("week")}
                     disabled={dualMode}
@@ -1207,8 +1223,8 @@ export function AgendaView({
                   </button>
                   <button
                     className={`hidden sm:inline-flex text-xs px-3 py-1 rounded-md border border-slate-300 ${viewMode === "month"
-                      ? "bg-violet-50 text-violet-700 border-violet-200"
-                      : "bg-white hover:bg-slate-50 text-slate-600"
+                        ? "bg-violet-50 text-violet-700 border-violet-200"
+                        : "bg-white hover:bg-slate-50 text-slate-600"
                       }`}
                     onClick={() => setViewMode("month")}
                     disabled={dualMode}
@@ -1429,8 +1445,7 @@ export function AgendaView({
 
               {isBlockItem(hoverAppt) && (
                 <div className="text-[11px] text-slate-600">
-                  <span className="font-semibold">Motivo:</span>{" "}
-                  {hoverAppt.motivo || "No disponible"}
+                  <span className="font-semibold">Motivo:</span> {hoverAppt.motivo || "No disponible"}
                 </div>
               )}
             </div>
@@ -1492,7 +1507,7 @@ export function AgendaView({
                 );
                 if (!ok) return;
 
-                onDeleteBlock?.(b); // ✅ BD + estado lo hace el padre
+                onDeleteBlock?.(b);
               }}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 hover:bg-rose-50 text-sm text-rose-700"
             >

@@ -45,8 +45,15 @@ function MessageModal({ open, title, message, onClose }) {
 }
 
 export function PaymentModal({ cita, onClose, onSaved }) {
-    const today = new Date().toISOString().slice(0, 10);
+    function getLocalDateMX() {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, "0");
+        const d = String(now.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    }
 
+    const today = getLocalDateMX();
     const precioBase = Number(cita?.precio ?? cita?.price ?? cita?.monto_final ?? 0);
     const descuentoInicial = Number(cita?.descuento_porcentaje ?? 0);
     const pagadoPrevio = Number(cita?.anticipo ?? 0);
