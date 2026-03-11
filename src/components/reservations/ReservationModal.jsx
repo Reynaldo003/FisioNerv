@@ -469,20 +469,6 @@ export function ReservationModal({
 
   const normalizedPhone = useMemo(() => normalizePhoneMX(form.telefono), [form.telefono]);
 
-  const duplicatePatient = useMemo(() => {
-    if (form.patientId) return null;
-    if (!normalizedPhone) return null;
-
-    const match = (patients || []).find((p) => normalizePhoneMX(p.telefono) === normalizedPhone);
-    if (!match) return null;
-
-    if (appointment?.patientId && Number(match.id) === Number(appointment.patientId)) return null;
-
-    return match;
-  }, [patients, normalizedPhone, form.patientId, appointment?.patientId]);
-
-  const phoneDuplicateError = Boolean(duplicatePatient);
-
   const timeSlots = useMemo(() => {
     const slots = [];
     for (let h = 7; h <= 21; h++) {
@@ -698,16 +684,6 @@ export function ReservationModal({
       });
       return;
     }
-
-    if (!form.patientId && phoneDuplicateError) {
-      setMsg({
-        open: true,
-        title: "Validación",
-        message: "El teléfono ya existe en otro paciente. Selecciona al paciente existente o cambia el número.",
-      });
-      return;
-    }
-
     try {
       setSavingRepeat(true);
 
@@ -955,7 +931,7 @@ export function ReservationModal({
                     </div>
 
                     <p className="text-[10px] text-slate-500 mt-1">
-                      Si seleccionas un paciente del desplegable, se usa el existente. Si no, se creará uno nuevo.
+                      Si seleccionas un paciente del desplegable, se usa el existente. Si no, se creará uno nuevo, aunque comparta teléfono con otro paciente.
                     </p>
                   </div>
 
@@ -967,10 +943,7 @@ export function ReservationModal({
                         type="text"
                         name="telefono_no_autofill"
                         autoComplete="off"
-                        className={[
-                          "w-full text-sm rounded-md border px-3 py-2",
-                          phoneDuplicateError ? "border-red-400 ring-2 ring-red-200" : "border-slate-300",
-                        ].join(" ")}
+                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
                         value={form.telefono}
                         onChange={(e) => handleChange("telefono", e.target.value)}
                       />
@@ -984,14 +957,6 @@ export function ReservationModal({
                       </button>
                     </div>
                   </div>
-
-                  {phoneDuplicateError && (
-                    <p className="mt-1 text-[11px] text-red-600 font-semibold">
-                      Número duplicado: ya existe en otro paciente ({getPatientLabel(duplicatePatient)}).
-                      Selecciónalo del desplegable o cambia el teléfono.
-                    </p>
-                  )}
-
                   <div className="md:col-span-2">
                     <label className="text-[11px] font-semibold text-slate-600 block mb-1">Correo</label>
                     <input
@@ -1399,7 +1364,7 @@ export function ReservationModal({
 
                 <button
                   type="submit"
-                  disabled={savingRepeat || (!form.patientId && phoneDuplicateError)}
+                  disabled={savingRepeat}
                   className="h-10 px-6 rounded-md bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-60"
                 >
                   {savingRepeat ? "Guardando..." : isEditing ? "Guardar cambios" : "Crear cita"}
