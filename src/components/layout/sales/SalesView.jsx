@@ -527,22 +527,24 @@ function groupPaymentsVisual(payments) {
     };
   });
 
-  function getTodayRangeState() {
-    const now = new Date();
-    const todayKey = toDateKey(now);
-
-    return {
-      preset: "day",
-      group: "day",
-      fromKey: todayKey,
-      toKey: todayKey,
-    };
-  }
-
   // orden final por fecha de pago desc
   out.sort((a, b) => String(b.fecha_pago || "").localeCompare(String(a.fecha_pago || "")));
   return out;
 }
+
+
+function getTodayRangeState() {
+  const now = new Date();
+  const todayKey = toDateKey(now);
+
+  return {
+    preset: "day",
+    group: "day",
+    fromKey: todayKey,
+    toKey: todayKey,
+  };
+}
+
 
 // =======================
 // SalesView
