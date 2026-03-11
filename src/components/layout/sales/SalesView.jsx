@@ -527,6 +527,18 @@ function groupPaymentsVisual(payments) {
     };
   });
 
+  function getTodayRangeState() {
+    const now = new Date();
+    const todayKey = toDateKey(now);
+
+    return {
+      preset: "day",
+      group: "day",
+      fromKey: todayKey,
+      toKey: todayKey,
+    };
+  }
+
   // orden final por fecha de pago desc
   out.sort((a, b) => String(b.fecha_pago || "").localeCompare(String(a.fecha_pago || "")));
   return out;
@@ -555,22 +567,31 @@ export function SalesView() {
   });
 
   const refreshAfterMutations = async () => loadAll("apply");
-  // Rango flexible (default: mes actual)
-  const now = new Date();
-  const todayKey = toDateKey(now);
 
-  const [preset, setPreset] = useState("day");
-  const [group, setGroup] = useState("day");
+  const initialRange = getTodayRangeState();
 
-  const [fromKey, setFromKey] = useState(todayKey);
-  const [toKey, setToKey] = useState(todayKey);
-
-  const [appliedRange, setAppliedRange] = useState(() => clampRange(todayKey, todayKey));
+  const [preset, setPreset] = useState(initialRange.preset);
+  const [group, setGroup] = useState(initialRange.group);
+  const [fromKey, setFromKey] = useState(initialRange.fromKey);
+  const [toKey, setToKey] = useState(initialRange.toKey);
+  const [appliedRange, setAppliedRange] = useState(() =>
+    clampRange(initialRange.fromKey, initialRange.toKey)
+  );
 
   const applyRange = (range) => {
     const clamped = clampRange(range.fromKey, range.toKey);
     setAppliedRange(clamped);
   };
+
+  useEffect(() => {
+    const todayRange = getTodayRangeState();
+
+    setPreset(todayRange.preset);
+    setGroup(todayRange.group);
+    setFromKey(todayRange.fromKey);
+    setToKey(todayRange.toKey);
+    setAppliedRange(clampRange(todayRange.fromKey, todayRange.toKey));
+  }, []);
 
   const setPresetRange = (id) => {
     const today = new Date();
