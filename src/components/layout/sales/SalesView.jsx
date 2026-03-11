@@ -557,16 +557,15 @@ export function SalesView() {
   const refreshAfterMutations = async () => loadAll("apply");
   // Rango flexible (default: mes actual)
   const now = new Date();
-  const defaultFrom = toDateKey(startOfMonth(now));
-  const defaultTo = toDateKey(endOfMonth(now));
+  const todayKey = toDateKey(now);
 
-  const [preset, setPreset] = useState("month");
-  const [group, setGroup] = useState("month");
+  const [preset, setPreset] = useState("day");
+  const [group, setGroup] = useState("day");
 
-  const [fromKey, setFromKey] = useState(defaultFrom);
-  const [toKey, setToKey] = useState(defaultTo);
+  const [fromKey, setFromKey] = useState(todayKey);
+  const [toKey, setToKey] = useState(todayKey);
 
-  const [appliedRange, setAppliedRange] = useState(() => clampRange(defaultFrom, defaultTo));
+  const [appliedRange, setAppliedRange] = useState(() => clampRange(todayKey, todayKey));
 
   const applyRange = (range) => {
     const clamped = clampRange(range.fromKey, range.toKey);
