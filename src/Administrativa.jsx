@@ -17,7 +17,7 @@ import { UserProfileView } from "./components/layout/profile/UserProfileView";
 
 import { Menu, X } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
 
 function mapFrontendPaymentMethodToBackend(metodo) {
     if (!metodo) return "";

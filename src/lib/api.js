@@ -1,5 +1,5 @@
 // src/api/api.js
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
 
 export async function apiFetch(url, options = {}) {
   const access = localStorage.getItem("auth.access");

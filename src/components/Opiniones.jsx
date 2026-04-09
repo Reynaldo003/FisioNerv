@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Quote, Star, CheckCircle2 } from "lucide-react";
 import { TextAnimate } from "@/components/ui/text-animate";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
 const CLINIC_ID = 1; // id_clinica que corresponde a Fisionerv
 
 export default function Opiniones() {

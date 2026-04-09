@@ -4,7 +4,7 @@ import { HeartHandshake, BadgeCheck, Activity, ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
 
 export default function Equipo() {
     const [selected, setSelected] = useState(null);

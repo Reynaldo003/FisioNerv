@@ -1,6 +1,6 @@
 // src/shared/clinicData.js
 export const API_BASE =
-  import.meta.env.VITE_API_BASE || "http://localhost:8000";
+  import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
 
 export const PRIMARY = "#1E63C5";
 

@@ -4,7 +4,7 @@ import { CalendarDays, Clock3, PhoneCall } from "lucide-react";
 import { nextDays, formatDateLong, formatDayChip, buildSlots } from "@/lib/schedule";
 import { TextAnimate } from "@/components/ui/text-animate";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
 
 // Solo como “hint” (el backend ya lo fuerza)
 const DEFAULT_PUBLIC_PROFESSIONAL = "L.F.T Edgar Mauricio Medina Cruz";

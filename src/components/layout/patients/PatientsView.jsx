@@ -3,7 +3,7 @@ import { Th, Td } from "./TableParts";
 import { FilterBlock } from "./FilterBlock";
 import { SlidersHorizontal, X } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
 
 function getFullName(p) {
   return `${p.nombres || ""} ${p.apellido_pat || ""} ${p.apellido_mat || ""}`.trim();

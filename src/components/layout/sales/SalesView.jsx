@@ -9,7 +9,7 @@ import {
   BadgePill,
 } from "./SummaryParts";
 import { subscribeSalesRefresh } from "../../../utils/salesSync";
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
 import { notifySalesRefresh } from "../../../utils/salesSync";
 
 // =======================
