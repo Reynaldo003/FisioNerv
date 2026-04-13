@@ -1,3 +1,4 @@
+//proyecto fisionerv
 // /componentes/reservations/ReservationModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -205,6 +206,7 @@ export function ReservationModal({
   const [patientQuery, setPatientQuery] = useState("");
   const [patientDropdownOpen, setPatientDropdownOpen] = useState(false);
   const patientBoxRef = useRef(null);
+  const originalPaymentLinesRef = useRef([]);
 
   const initialDate = appointment?.date ?? preset?.date ?? today;
   const initialTime = appointment?.time ?? preset?.time ?? "08:00";
@@ -227,6 +229,14 @@ export function ReservationModal({
     });
   }
 
+  function mapPagoApiToPaymentLine(pago) {
+    return {
+      id: pago?.id ?? null,
+      method: String(pago?.metodo_pago || "efectivo"),
+      amount: pago?.anticipo ? String(Number(pago.anticipo)) : "",
+      isPersisted: true,
+    };
+  }
   function buildInitialForm({ appointment, preset, today }) {
     const initialDate = appointment?.date ?? preset?.date ?? today;
     const initialTime = appointment?.time ?? preset?.time ?? "08:00";
@@ -262,11 +272,9 @@ export function ReservationModal({
       price: priceDigits,
       discountPct: discountDigits,
       montoFacturado: factDigits,
-      comprobante: "",
+      comprobante: appointment?.comprobante ?? "",
 
-      // ✅ IMPORTANTE:
-      // no precargamos pagos anteriores como si fueran pago nuevo
-      paymentLines: [{ method: "efectivo", amount: "" }],
+      paymentLines: [{ id: null, method: "efectivo", amount: "", isPersisted: false }],
 
       status: appointment?.status ?? "reservado",
       notesInternal: appointment?.notesInternal ?? "",
@@ -285,6 +293,7 @@ export function ReservationModal({
     setPatientDropdownOpen(false);
     setLastPagoId(null);
     setPaidFromBackend(0);
+    originalPaymentLinesRef.current = [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointment?.id, preset?.date, preset?.time, preset?.professionalId]);
 
@@ -384,8 +393,10 @@ export function ReservationModal({
   useEffect(() => {
     const token = localStorage.getItem("auth.access");
     const citaId = appointment?.id;
+
     if (!token || !citaId) {
       setPaidFromBackend(0);
+      originalPaymentLinesRef.current = [];
       return;
     }
 
@@ -396,19 +407,50 @@ export function ReservationModal({
         });
 
         if (!resp.ok) {
-          const fallback = toNumberSafe(form.paymentLines?.[0]?.amount ?? "", 0);
-          setPaidFromBackend(fallback);
+          setPaidFromBackend(0);
+          originalPaymentLinesRef.current = [];
+          setForm((prev) => ({
+            ...prev,
+            paymentLines: [{ id: null, method: "efectivo", amount: "", isPersisted: false }],
+          }));
           return;
         }
 
         const data = await resp.json();
         const list = Array.isArray(data) ? data : data?.results || [];
-        const sum = list.reduce((acc, p) => acc + Number(p?.anticipo || 0), 0);
+
+        const mappedLines = list
+          .filter((p) => Number(p?.cita) === Number(citaId))
+          .slice()
+          .sort((a, b) => Number(a.id) - Number(b.id))
+          .map(mapPagoApiToPaymentLine);
+
+        const sum = mappedLines.reduce(
+          (acc, line) => acc + toNumberSafe(line.amount, 0),
+          0
+        );
+
         setPaidFromBackend(sum);
+        originalPaymentLinesRef.current = mappedLines.map((line) => ({
+          id: line.id ?? null,
+          method: String(line.method || "efectivo"),
+          amount: toNumberSafe(line.amount, 0),
+        }));
+
+        setForm((prev) => ({
+          ...prev,
+          paymentLines: mappedLines.length
+            ? mappedLines
+            : [{ id: null, method: "efectivo", amount: "", isPersisted: false }],
+        }));
       } catch (e) {
         console.warn("No se pudieron cargar pagos previos:", e);
-        const fallback = toNumberSafe(form.paymentLines?.[0]?.amount ?? "", 0);
-        setPaidFromBackend(fallback);
+        setPaidFromBackend(0);
+        originalPaymentLinesRef.current = [];
+        setForm((prev) => ({
+          ...prev,
+          paymentLines: [{ id: null, method: "efectivo", amount: "", isPersisted: false }],
+        }));
       }
     }
 
@@ -519,11 +561,21 @@ export function ReservationModal({
   const discountAmount = (subtotal * discountPctNum) / 100;
   const totalAfterDiscount = Math.max(0, subtotal - discountAmount);
 
-  const amountToPayToday = useMemo(() => {
-    return (form.paymentLines || []).reduce((acc, line) => acc + toNumberSafe(line.amount, 0), 0);
+  const persistedPaymentsTotal = useMemo(() => {
+    return (form.paymentLines || [])
+      .filter((line) => Boolean(line?.id))
+      .reduce((acc, line) => acc + toNumberSafe(line.amount, 0), 0);
   }, [form.paymentLines]);
 
-  const totalPaidInternal = Number(paidFromBackend || 0) + Number(amountToPayToday || 0);
+  const newPaymentsTotal = useMemo(() => {
+    return (form.paymentLines || [])
+      .filter((line) => !line?.id)
+      .reduce((acc, line) => acc + toNumberSafe(line.amount, 0), 0);
+  }, [form.paymentLines]);
+
+  const amountToPayToday = newPaymentsTotal;
+
+  const totalPaidInternal = persistedPaymentsTotal + newPaymentsTotal;
   const remainingInternal = Math.max(0, totalAfterDiscount - totalPaidInternal);
 
   function setPaymentLine(idx, patch) {
@@ -535,21 +587,30 @@ export function ReservationModal({
       return { ...prev, paymentLines: lines };
     });
   }
-
   function addPaymentLine() {
     setForm((prev) => ({
       ...prev,
-      paymentLines: [...(prev.paymentLines || []), { method: "efectivo", amount: "" }],
+      paymentLines: [
+        ...(prev.paymentLines || []),
+        { id: null, method: "efectivo", amount: "", isPersisted: false },
+      ],
     }));
   }
 
   function removePaymentLine(idx) {
     setForm((prev) => {
       const lines = [...(prev.paymentLines || [])];
+      const current = lines[idx];
+
+      if (current?.id) return prev;
+
       lines.splice(idx, 1);
+
       return {
         ...prev,
-        paymentLines: lines.length ? lines : [{ method: "efectivo", amount: "" }],
+        paymentLines: lines.length
+          ? lines
+          : [{ id: null, method: "efectivo", amount: "", isPersisted: false }],
       };
     });
   }
@@ -558,56 +619,170 @@ export function ReservationModal({
     const payload = { ...base, ...overrides };
 
     payload.repeatEnabled = Boolean(payload.repeatEnabled);
-
     payload.repeatWeeks = Math.max(1, toNumberSafe(payload.repeatWeeks, 1));
     payload.repeatSessions = Math.max(1, toNumberSafe(payload.repeatSessions, 1));
     payload.repeatDays = Array.isArray(payload.repeatDays) ? payload.repeatDays : [];
 
     if (!payload.patientId) payload.patientId = null;
 
-    // ✅ aquí convertimos strings numéricas a números para backend
     payload.price = toNumberSafe(payload.price, 0);
     payload.discountPct = toNumberSafe(payload.discountPct, 0);
     payload.montoFacturado = toNumberSafe(payload.montoFacturado, payload.price || 0);
 
-    // paymentLines: amount string -> number
-    payload.paymentLines = (payload.paymentLines || []).map((l) => ({
-      method: String(l.method || "efectivo"),
-      amount: toNumberSafe(l.amount, 0),
+    payload.paymentLines = (payload.paymentLines || []).map((line) => ({
+      id: line?.id ?? null,
+      method: String(line?.method || "efectivo"),
+      amount: toNumberSafe(line?.amount, 0),
     }));
 
     return payload;
   };
 
-  async function createPaymentsForCita(citaId) {
+  async function syncPaymentsForCita(citaId) {
     const token = localStorage.getItem("auth.access");
     const fechaPago = getLocalDateMX();
-    const validLines = (form.paymentLines || [])
-      .map((l) => ({ method: String(l.method || "efectivo"), amount: toNumberSafe(l.amount, 0) }))
-      .filter((l) => l.amount > 0);
 
-    if (validLines.length === 0) {
-      setLastPagoId(null);
-      return null;
+    const currentLines = (form.paymentLines || []).map((line) => ({
+      id: line?.id ?? null,
+      method: String(line?.method || "efectivo"),
+      amount: toNumberSafe(line?.amount, 0),
+    }));
+
+    const originalLines = (originalPaymentLinesRef.current || []).map((line) => ({
+      id: line?.id ?? null,
+      method: String(line?.method || "efectivo"),
+      amount: toNumberSafe(line?.amount, 0),
+    }));
+
+    const originalById = new Map(
+      originalLines
+        .filter((line) => line.id)
+        .map((line) => [Number(line.id), line])
+    );
+
+    const totalAfterDiscountCalc = Math.max(
+      0,
+      toNumberSafe(form.montoFacturado, toNumberSafe(form.price, 0)) -
+      (toNumberSafe(form.montoFacturado, toNumberSafe(form.price, 0)) *
+        toNumberSafe(form.discountPct, 0)) /
+      100
+    );
+
+    const totalEditedPayments = currentLines.reduce(
+      (acc, line) => acc + Number(line.amount || 0),
+      0
+    );
+
+    if (totalEditedPayments > totalAfterDiscountCalc) {
+      throw new Error(
+        `La suma de pagos excede el total de la cita. Total permitido: $${totalAfterDiscountCalc.toFixed(2)}`
+      );
     }
 
     let lastId = null;
+    let changed = false;
+    let createdCount = 0;
 
-    for (const line of validLines) {
-      const payloadPago = {
-        cita: citaId,
-        fecha_pago: fechaPago,
-        comprobante: String(form.comprobante || ""),
-        monto_facturado: toNumberSafe(form.montoFacturado, toNumberSafe(form.price, 0)),
-        metodo_pago: line.method,
-        descuento_porcentaje: toNumberSafe(form.discountPct, 0),
-        anticipo: Number(line.amount || 0),
-      };
+    for (const line of currentLines) {
+      if (line.id) {
+        if (line.amount <= 0) {
+          throw new Error(
+            "Un pago ya registrado no puede quedar en 0. Ajusta el monto o registra correctamente la liquidación."
+          );
+        }
 
-      const resp = await fetch(`${API_BASE}/api/pagos/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payloadPago),
+        const prev = originalById.get(Number(line.id));
+        const lineChanged =
+          !prev ||
+          String(prev.method || "") !== String(line.method || "") ||
+          Number(prev.amount || 0) !== Number(line.amount || 0);
+
+        if (!lineChanged) {
+          lastId = line.id;
+          continue;
+        }
+
+        const payloadPago = {
+          fecha_pago: fechaPago,
+          comprobante: String(form.comprobante || ""),
+          monto_facturado: toNumberSafe(form.montoFacturado, toNumberSafe(form.price, 0)),
+          metodo_pago: line.method,
+          descuento_porcentaje: toNumberSafe(form.discountPct, 0),
+          anticipo: Number(line.amount || 0),
+        };
+
+        const resp = await fetch(`${API_BASE}/api/pagos/${line.id}/`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payloadPago),
+        });
+
+        if (!resp.ok) {
+          let data = null;
+          try {
+            data = await resp.json();
+          } catch { }
+          console.error("Error actualizando pago:", resp.status, data);
+          throw new Error("No se pudo actualizar un pago existente.");
+        }
+
+        const savedPago = await resp.json();
+        lastId = savedPago?.id || lastId;
+        changed = true;
+        continue;
+      }
+
+      if (line.amount > 0) {
+        const payloadPago = {
+          cita: citaId,
+          fecha_pago: fechaPago,
+          comprobante: String(form.comprobante || ""),
+          monto_facturado: toNumberSafe(form.montoFacturado, toNumberSafe(form.price, 0)),
+          metodo_pago: line.method,
+          descuento_porcentaje: toNumberSafe(form.discountPct, 0),
+          anticipo: Number(line.amount || 0),
+        };
+
+        const resp = await fetch(`${API_BASE}/api/pagos/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payloadPago),
+        });
+
+        if (!resp.ok) {
+          let data = null;
+          try {
+            data = await resp.json();
+          } catch { }
+          console.error("Error creando pago:", resp.status, data);
+          throw new Error("No se pudo registrar un nuevo pago.");
+        }
+
+        const savedPago = await resp.json();
+        lastId = savedPago?.id || lastId;
+        changed = true;
+        createdCount += 1;
+      }
+    }
+
+    const currentIds = new Set(
+      currentLines.filter((line) => line.id).map((line) => Number(line.id))
+    );
+
+    const removedIds = originalLines
+      .filter((line) => line.id && !currentIds.has(Number(line.id)))
+      .map((line) => Number(line.id));
+
+    for (const removedId of removedIds) {
+      const resp = await fetch(`${API_BASE}/api/pagos/${removedId}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!resp.ok) {
@@ -615,18 +790,16 @@ export function ReservationModal({
         try {
           data = await resp.json();
         } catch { }
-        console.error("Error creando pago:", resp.status, data);
-        throw new Error("No se pudo registrar el pago. Revisa consola.");
+        console.error("Error eliminando pago:", resp.status, data);
+        throw new Error("No se pudo eliminar un pago quitado del formulario.");
       }
 
-      const savedPago = await resp.json();
-      lastId = savedPago?.id || lastId;
+      changed = true;
     }
 
     setLastPagoId(lastId);
-    return lastId;
+    return { lastId, changed, createdCount };
   }
-
   async function downloadTicket(pagoId) {
     if (!pagoId) return;
     const token = localStorage.getItem("auth.access");
@@ -684,8 +857,11 @@ export function ReservationModal({
       });
       return;
     }
+
     try {
       setSavingRepeat(true);
+
+      const wasPaidBefore = Boolean(appointment?.paid);
 
       const durationMinutes = getSelectedServiceDurationMinutes(form.serviceId);
       const fixed = { ...form, endTime: addMinutesToTime(form.time, durationMinutes) };
@@ -704,21 +880,13 @@ export function ReservationModal({
         return;
       }
 
-      // ✅ Solo crear pagos nuevos si realmente el usuario capturó montos > 0
-      const hasNewPayments = (form.paymentLines || []).some(
-        (line) => toNumberSafe(line.amount, 0) > 0
-      );
-
-      let pagoId = null;
-      if (hasNewPayments) {
-        pagoId = await createPaymentsForCita(savedCitaId);
-      }
-
+      const paymentResult = await syncPaymentsForCita(savedCitaId);
       const refreshed = await onRefreshAppointment?.(savedCitaId);
-      const paidNow = Boolean(refreshed?.pagado) || Boolean(refreshed?.paid) || remainingInternal <= 0;
 
-      if (paidNow && pagoId) {
-        await downloadTicket(pagoId);
+      const paidNow = Boolean(refreshed?.pagado) || Boolean(refreshed?.paid);
+
+      if (!wasPaidBefore && paidNow && paymentResult?.changed && paymentResult?.lastId) {
+        await downloadTicket(paymentResult.lastId);
       }
 
       if (form.repeatEnabled) {
@@ -742,7 +910,7 @@ export function ReservationModal({
               id: null,
               date,
               patientId: savedPatientId,
-              paymentLines: [], // ✅ las repetidas no duplican pagos
+              paymentLines: [],
             },
             {}
           );
@@ -753,16 +921,16 @@ export function ReservationModal({
         setMsg({
           open: true,
           title: "Listo",
-          message: hasNewPayments
-            ? `Cita guardada, pago registrado y se crearon ${created} sesiones repetidas.`
-            : `Cita guardada. Se crearon ${created} sesiones repetidas.`,
+          message: `Cita guardada. Se crearon ${created} sesiones repetidas.`,
         });
       } else {
         setMsg({
           open: true,
           title: "Listo",
-          message: hasNewPayments
-            ? (paidNow ? "Cita guardada y pago completado." : "Cita guardada y pago registrado.")
+          message: paymentResult?.changed
+            ? paidNow
+              ? "Cita guardada y pago liquidado correctamente."
+              : "Cita guardada con pago parcial."
             : "Cita guardada correctamente.",
         });
       }
@@ -770,7 +938,11 @@ export function ReservationModal({
       onRequestCloseModal?.();
     } catch (err) {
       console.error(err);
-      setMsg({ open: true, title: "Error", message: err?.message || "Ocurrió un error al guardar." });
+      setMsg({
+        open: true,
+        title: "Error",
+        message: err?.message || "Ocurrió un error al guardar.",
+      });
     } finally {
       setSavingRepeat(false);
     }
