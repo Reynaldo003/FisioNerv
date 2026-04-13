@@ -1,12 +1,84 @@
 <!doctype html>
-<html lang="en">
+<html lang="es-MX" translate="no">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/onerv.png" />
+    <link rel="icon" type="image/png" href="/onerv.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fisionerv</title>
+
+    <!-- SEO básico -->
+    <title>Fisionerv | Fisioterapia avanzada con enfoque humano</title>
+    <meta
+      name="description"
+      content="Fisionerv es una clínica de fisioterapia enfocada en rehabilitación funcional, evaluación precisa y planes de tratamiento personalizados con enfoque humano."
+    />
+    <meta
+      name="keywords"
+      content="Fisionerv, fisioterapia, rehabilitación, clínica de fisioterapia, terapia física, rehabilitación funcional, tratamiento personalizado, salud, movilidad"
+    />
+    <meta name="author" content="Fisionerv" />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
+    <meta name="theme-color" content="#004aad" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Desactivar traducción -->
+    <meta name="google" content="notranslate" />
+    <meta http-equiv="Content-Language" content="es-MX" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="Fisionerv" />
+    <meta
+      property="og:title"
+      content="Fisionerv | Fisioterapia avanzada con enfoque humano"
+    />
+    <meta
+      property="og:description"
+      content="Evaluación precisa, rehabilitación funcional y seguimiento con metas claras en una clínica de fisioterapia con enfoque humano."
+    />
+    <meta property="og:image" content="/clinica.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Fisionerv | Fisioterapia avanzada con enfoque humano"
+    />
+    <meta
+      name="twitter:description"
+      content="Clínica de fisioterapia enfocada en rehabilitación funcional, tratamiento personalizado y seguimiento profesional."
+    />
+    <meta name="twitter:image" content="/clinica.png" />
+
+    <!-- Datos estructurados -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "MedicalClinic",
+        "name": "Fisionerv",
+        "description": "Clínica de fisioterapia avanzada con enfoque humano, rehabilitación funcional y planes de tratamiento personalizados.",
+        "medicalSpecialty": "PhysicalTherapy",
+        "image": ["/clinica.png", "/sala.png"],
+        "areaServed": "México",
+        "availableLanguage": ["es-MX", "Spanish"],
+        "hasCredential": {
+          "@type": "EducationalOccupationalCredential",
+          "credentialCategory": "Permiso sanitario",
+          "name": "COFEPRIS 2530062002AA00019"
+        }
+      }
+    </script>
   </head>
+
   <body>
+    <noscript>
+      Fisionerv es una clínica de fisioterapia avanzada con enfoque humano. Para
+      una mejor experiencia, habilita JavaScript en tu navegador.
+    </noscript>
+
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
