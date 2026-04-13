@@ -652,7 +652,7 @@ export function AgendaView({
         {...(!isBlock ? listeners : {})}
         {...(!isBlock ? attributes : {})}
       >
-        {appt.paid && !isBlock && <PaidMark />}
+        {(appt.paid || appt.pagado) && !isBlock && <PaidMark />}
 
         <div className="pl-2 min-w-0">
           <div className="font-semibold truncate">
@@ -1429,7 +1429,7 @@ export function AgendaView({
                   </div>
                   <div className="text-[11px] text-slate-600">
                     <span className="font-semibold">Pagado:</span>{" "}
-                    {hoverAppt.paid ? (
+                    {(hoverAppt.paid || hoverAppt.pagado) ? (
                       <span className="text-emerald-700 font-semibold">Sí</span>
                     ) : (
                       <span className="text-slate-600">No</span>

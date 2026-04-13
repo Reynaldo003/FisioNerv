@@ -260,8 +260,8 @@ function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab }) {
                                         onClose();
                                     }}
                                     className={`w-full text-left rounded-2xl px-4 py-3 text-sm font-semibold border ${active
-                                            ? "bg-slate-900 text-white border-slate-900"
-                                            : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+                                        ? "bg-slate-900 text-white border-slate-900"
+                                        : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
                                         }`}
                                     type="button"
                                 >
@@ -637,6 +637,10 @@ export default function Administrativa() {
         const basePrecio = Number(form.price || 0);
         const baseDescuento = Number(form.discountPct || 0);
 
+        const existingAppt = form.id
+            ? appointments.find((a) => String(a.id) === String(form.id))
+            : null;
+
         const basePayload = {
             servicio: form.serviceId,
             profesional: form.professionalId,
@@ -646,10 +650,14 @@ export default function Administrativa() {
             estado: form.status || "reservado",
             notas: form.notesInternal || "",
             precio: basePrecio,
-            pagado: Boolean(form.paid ?? false),
-            metodo_pago: mapFrontendPaymentMethodToBackend(form.metodo_pago),
+
+            // ✅ conservar valores actuales si el modal no los trae
+            pagado: Boolean(form.paid ?? existingAppt?.paid ?? false),
+            metodo_pago: mapFrontendPaymentMethodToBackend(
+                form.metodo_pago ?? existingAppt?.metodo_pago ?? ""
+            ),
             descuento_porcentaje: baseDescuento,
-            anticipo: Number(form.deposit || 0),
+            anticipo: Number(form.deposit ?? existingAppt?.deposit ?? 0),
             monto_final: basePrecio - (basePrecio * baseDescuento) / 100,
         };
 
