@@ -286,6 +286,22 @@ function tabLabel(tab) {
     }
 }
 
+function BrandLogo({ compact = false }) {
+    return (
+        <span
+            className={`relative flex shrink-0 items-center justify-center overflow-hidden border border-white/80 bg-white shadow-[0_12px_30px_rgba(0,0,0,0.24)] ${compact ? "h-11 w-11 rounded-xl p-1.5" : "h-14 w-14 rounded-2xl p-2"}`}
+        >
+            <span className="absolute inset-0 bg-gradient-to-br from-white via-slate-50 to-blue-100/80" />
+            <img
+                src="/onerv.png"
+                alt="Fisionerv"
+                className="relative z-10 h-full w-full object-contain drop-shadow-[0_2px_2px_rgba(15,23,42,0.16)]"
+                draggable="false"
+            />
+        </span>
+    );
+}
+
 function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab, me, initialLetter, onLogout }) {
     if (!open) return null;
 
@@ -293,35 +309,33 @@ function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab, me, in
         <div className="fixed inset-0 z-[9998] lg:hidden">
             <button
                 type="button"
-                className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-950/65 backdrop-blur-sm"
                 onClick={onClose}
                 aria-label="Cerrar menú"
             />
 
-            <aside className="absolute left-0 top-0 flex h-full w-[86%] max-w-[320px] flex-col bg-[#061a38] text-white shadow-2xl">
-                <div className="flex h-24 items-center justify-between border-b border-white/10 px-5">
-                    <div className="flex items-center gap-3">
-                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-950/30">
-                            <Activity className="h-6 w-6" />
-                        </span>
-                        <div>
-                            <p className="text-lg font-bold tracking-[0.12em]">FISIONERV</p>
-                            <p className="text-[10px] text-blue-200/70">Panel administrativo</p>
+            <aside className="absolute left-0 top-0 flex h-dvh w-[88%] max-w-[330px] flex-col overflow-hidden border-r border-white/10 bg-[#061a38] text-white shadow-[24px_0_60px_rgba(2,12,27,0.35)]">
+                <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-5 py-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <BrandLogo compact />
+                        <div className="min-w-0">
+                            <p className="truncate text-base font-bold tracking-[0.12em]">FISIONERV</p>
+                            <p className="mt-0.5 truncate text-[10px] text-blue-200/60">Panel administrativo</p>
                         </div>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/100"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:bg-white/10"
                         aria-label="Cerrar menú"
                     >
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <nav className="flex-1 overflow-auto px-3 py-5">
-                    <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-200/50">
-                        Navegación
+                <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-5 [scrollbar-width:thin] [scrollbar-color:rgba(147,197,253,0.25)_transparent]">
+                    <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-blue-200/45">
+                        Administración
                     </p>
                     <div className="space-y-1.5">
                         {allowedTabs.map((tab) => {
@@ -332,38 +346,64 @@ function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab, me, in
                                 <button
                                     key={tab}
                                     type="button"
+                                    aria-current={active ? "page" : undefined}
                                     onClick={() => {
                                         onSelectTab(tab);
                                         onClose();
                                     }}
-                                    className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-semibold transition ${active
-                                        ? "bg-blue-600 text-white shadow-lg shadow-blue-950/30"
-                                        : "text-blue-50/75 hover:bg-white/10 hover:text-white"
+                                    className={`group relative flex h-12 w-full items-center gap-3 overflow-hidden rounded-xl px-3 text-left text-sm font-semibold transition ${active
+                                        ? "bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.24)]"
+                                        : "text-blue-50/70 hover:bg-white/[0.08] hover:text-white"
                                         }`}
                                 >
-                                    <Icon className="h-5 w-5 shrink-0" />
-                                    <span className="flex-1">{config.label}</span>
-                                    {active && <ChevronRight className="h-4 w-4" />}
+                                    {active && <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-cyan-300" />}
+                                    <Icon className={`h-[19px] w-[19px] shrink-0 ${active ? "text-white" : "text-blue-100/60 group-hover:text-white"}`} />
+                                    <span className="min-w-0 flex-1 truncate">{config.label}</span>
+                                    {active && <ChevronRight className="h-4 w-4 shrink-0 text-blue-100" />}
                                 </button>
                             );
                         })}
                     </div>
                 </nav>
 
-                <div className="border-t border-white/10 p-4">
-                    <div className="mb-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-sm font-bold">
+                <div className="shrink-0 border-t border-white/10 bg-[#07172f]/95 p-3.5 backdrop-blur">
+                    <div className="mb-2 grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => { window.location.href = "/"; }}
+                            className="flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-[11px] font-semibold text-blue-50/80 transition hover:bg-white/10 hover:text-white"
+                        >
+                            <Globe2 className="h-4 w-4" />
+                            Sitio web
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onSelectTab("perfil");
+                                onClose();
+                            }}
+                            className="flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-[11px] font-semibold text-blue-50/80 transition hover:bg-white/10 hover:text-white"
+                        >
+                            <CircleUserRound className="h-4 w-4" />
+                            Mi perfil
+                        </button>
+                    </div>
+
+                    <div className="mb-2 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.055] p-3">
+                        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-950/30">
                             {initialLetter}
+                            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#07172f] bg-emerald-400" />
                         </span>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold">{me?.full_name || me?.username || "Usuario"}</p>
-                            <p className="truncate text-[11px] capitalize text-blue-200/60">{me?.rol || "Usuario"}</p>
+                            <p className="truncate text-[11px] capitalize text-blue-200/50">{me?.rol || "Usuario"}</p>
                         </div>
                     </div>
+
                     <button
                         type="button"
                         onClick={onLogout}
-                        className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-white/10 text-xs font-semibold text-white/100 hover:bg-white/20"
+                        className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-rose-300/10 bg-rose-500/10 text-xs font-semibold text-rose-100 transition hover:border-rose-300/20 hover:bg-rose-500/20 hover:text-white"
                     >
                         <LogOut className="h-4 w-4" />
                         Cerrar sesión
@@ -376,89 +416,94 @@ function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab, me, in
 
 function DesktopSidebar({ allowedTabs, activeTab, onSelectTab, me, initialLetter, onLogout, collapsed, onToggle }) {
     return (
-        <aside className={`relative hidden min-h-screen shrink-0 flex-col bg-[#061a38] text-white transition-[width] duration-300 lg:flex ${collapsed ? "w-[92px]" : "w-[268px]"}`}>
+        <aside
+            className={`relative hidden h-screen max-h-screen shrink-0 flex-col overflow-visible border-r border-white/10 bg-[#061a38] text-white shadow-[10px_0_35px_rgba(2,12,27,0.12)] transition-[width] duration-300 lg:sticky lg:top-0 lg:flex ${collapsed ? "w-[88px]" : "w-[268px]"}`}
+        >
             <button
                 type="button"
                 onClick={onToggle}
                 aria-label={collapsed ? "Expandir barra lateral" : "Contraer barra lateral"}
                 title={collapsed ? "Expandir" : "Contraer"}
-                className="absolute -right-[18px] top-24 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0a2f68] shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:scale-[1.03]"
+                className="absolute -right-[18px] top-[76px] z-50 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0a2f68] shadow-[0_10px_26px_rgba(15,23,42,0.22)] transition hover:scale-105 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-blue-200/40"
             >
-                {collapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+                {collapsed ? <ChevronsRight className="h-[18px] w-[18px]" /> : <ChevronsLeft className="h-[18px] w-[18px]" />}
             </button>
 
-            <div className={`flex h-[104px] items-center border-b border-white/10 ${collapsed ? "justify-center px-3" : "gap-3 px-6"}`}>
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 shadow-xl shadow-blue-950/40">
-                    <Activity className="h-7 w-7" />
-                </span>
+            <div className={`flex shrink-0 items-center border-b border-white/10 py-4 ${collapsed ? "justify-center px-3" : "gap-3 px-5"}`}>
+                <BrandLogo compact={collapsed} />
                 {!collapsed && (
                     <div className="min-w-0">
-                        <p className="truncate text-xl font-bold tracking-[0.12em]">FISIONERV</p>
-                        <p className="mt-1 truncate text-[9px] leading-tight text-blue-200/60">
+                        <p className="truncate text-lg font-bold tracking-[0.12em]">FISIONERV</p>
+                        <p className="mt-0.5 truncate text-[9px] leading-tight text-blue-200/50">
                             Evidencia científica<br />transformada en humanismo
                         </p>
                     </div>
                 )}
             </div>
 
-            <nav className={`flex-1 overflow-auto ${collapsed ? "px-2 py-6" : "px-3 py-6"}`}>
+            <nav className={`min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin] [scrollbar-color:rgba(147,197,253,0.20)_transparent] ${collapsed ? "px-2 py-5" : "px-3 py-5"}`}>
                 {!collapsed && (
-                    <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-200/50">
+                    <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-blue-200/40">
                         Administración
                     </p>
                 )}
+
                 <div className="space-y-1.5">
                     {allowedTabs.map((tab) => {
                         const config = getTabConfig(tab);
                         const Icon = config.icon;
                         const active = activeTab === tab;
+
                         return (
                             <button
                                 key={tab}
                                 type="button"
+                                aria-current={active ? "page" : undefined}
                                 onClick={() => onSelectTab(tab)}
                                 title={collapsed ? config.label : undefined}
-                                className={`group flex w-full items-center rounded-2xl text-left text-sm font-semibold transition ${collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-3"} ${active
-                                    ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-950/30"
-                                    : "text-blue-50/70 hover:bg-white/10 hover:text-white"
+                                className={`group relative flex h-12 w-full items-center overflow-hidden rounded-xl text-left text-sm font-semibold transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${active
+                                    ? "bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.23)]"
+                                    : "text-blue-50/70 hover:bg-white/[0.075] hover:text-white"
                                     }`}
                             >
-                                <Icon className={`h-5 w-5 shrink-0 ${active ? "text-white" : "text-blue-100/70 group-hover:text-white"}`} />
-                                {!collapsed && <span className="flex-1 truncate">{config.label}</span>}
-                                {!collapsed && active && <ChevronRight className="h-4 w-4" />}
+                                {active && <span className="absolute inset-y-2 left-0 w-1 rounded-r-full bg-cyan-300" />}
+                                <Icon className={`h-[19px] w-[19px] shrink-0 ${active ? "text-white" : "text-blue-100/60 group-hover:text-white"}`} />
+                                {!collapsed && <span className="min-w-0 flex-1 truncate">{config.label}</span>}
+                                {!collapsed && active && <ChevronRight className="h-4 w-4 shrink-0 text-blue-100" />}
                             </button>
                         );
                     })}
                 </div>
             </nav>
 
-            <div className={`space-y-3 border-t border-white/10 ${collapsed ? "p-3" : "p-4"}`}>
+            <div className={`shrink-0 border-t border-white/10 bg-[#07172f]/95 backdrop-blur ${collapsed ? "space-y-2 p-2.5" : "space-y-2.5 p-3.5"}`}>
                 <button
                     type="button"
-                    onClick={() => window.location.href = "/"}
+                    onClick={() => { window.location.href = "/"; }}
                     title={collapsed ? "Ver sitio web" : undefined}
-                    className={`flex h-11 w-full items-center rounded-2xl text-xs font-semibold text-blue-50/70 transition hover:bg-white/10 hover:text-white ${collapsed ? "justify-center px-0" : "gap-3 px-3"}`}
+                    className={`flex h-10 w-full items-center rounded-xl border border-white/10 bg-white/[0.045] text-xs font-semibold text-blue-50/70 transition hover:bg-white/[0.09] hover:text-white ${collapsed ? "justify-center px-0" : "gap-3 px-3"}`}
                 >
-                    <Globe2 className="h-4 w-4" />
-                    {!collapsed && "Ver sitio web"}
+                    <Globe2 className="h-[17px] w-[17px] shrink-0" />
+                    {!collapsed && <span>Ver sitio web</span>}
                 </button>
 
                 <button
                     type="button"
                     onClick={() => onSelectTab("perfil")}
-                    title={collapsed ? (me?.full_name || me?.username || "Usuario") : undefined}
-                    className={`flex w-full items-center rounded-2xl border border-white/10 bg-white/5 text-left transition hover:bg-white/10 ${collapsed ? "justify-center p-2.5" : "gap-3 p-3"}`}
+                    title={collapsed ? (me?.full_name || me?.username || "Mi perfil") : undefined}
+                    className={`flex w-full items-center rounded-xl border border-white/10 bg-white/[0.055] text-left transition hover:bg-white/[0.09] ${collapsed ? "justify-center p-2" : "gap-3 p-2.5"}`}
                 >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-sm font-bold shadow-lg shadow-blue-950/30">
+                    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-950/30">
                         {initialLetter}
+                        <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#07172f] bg-emerald-400" />
                     </span>
                     {!collapsed && (
                         <>
                             <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-semibold">{me?.full_name || me?.username || "Usuario"}</span>
-                                <span className="block truncate text-[11px] capitalize text-blue-200/60">{me?.rol || "Usuario"}</span>
+                                <span className="block truncate text-sm font-semibold text-white">{me?.full_name || me?.username || "Usuario"}</span>
+                                <span className="mt-0.5 block truncate text-[10px] capitalize text-blue-200/50">{me?.rol || "Usuario"}</span>
                             </span>
-                            <ChevronRight className="h-4 w-4 text-blue-200/50" />
+                            <ChevronRight className="h-4 w-4 shrink-0 text-blue-200/45" />
                         </>
                     )}
                 </button>
@@ -467,9 +512,9 @@ function DesktopSidebar({ allowedTabs, activeTab, onSelectTab, me, initialLetter
                     type="button"
                     onClick={onLogout}
                     title={collapsed ? "Cerrar sesión" : undefined}
-                    className={`flex h-11 w-full items-center rounded-2xl bg-[#102b53] text-xs font-semibold text-blue-50/100 transition hover:bg-[#173866] hover:text-white ${collapsed ? "justify-center px-0" : "justify-center gap-2"}`}
+                    className={`flex h-10 w-full items-center rounded-xl border border-rose-300/10 bg-rose-500/[0.08] text-xs font-semibold text-rose-100/80 transition hover:border-rose-300/20 hover:bg-rose-500/20 hover:text-white ${collapsed ? "justify-center px-0" : "justify-center gap-2"}`}
                 >
-                    <LogOut className="h-4 w-4" />
+                    <LogOut className="h-[17px] w-[17px]" />
                     {!collapsed && "Cerrar sesión"}
                 </button>
             </div>
@@ -553,6 +598,10 @@ export default function Administrativa() {
         window.addEventListener("resize", onResize);
         return () => window.removeEventListener("resize", onResize);
     }, []);
+
+    useEffect(() => {
+        localStorage.setItem("fisionerv.sidebarCollapsed", sidebarCollapsed ? "1" : "0");
+    }, [sidebarCollapsed]);
 
     const showInfo = (message, title = "Aviso") => {
         setInfoModal({ open: true, title, message });
@@ -1032,7 +1081,7 @@ export default function Administrativa() {
     const ActiveIcon = activeConfig.icon;
 
     return (
-        <div className="min-h-screen bg-[#061a38] text-slate-900">
+        <div className="h-screen overflow-hidden bg-[#061a38] text-slate-900">
             <MobileMenu
                 open={mobileMenuOpen}
                 onClose={() => setMobileMenuOpen(false)}
@@ -1044,7 +1093,7 @@ export default function Administrativa() {
                 onLogout={handleLogout}
             />
 
-            <div className="flex min-h-screen">
+            <div className="flex h-full min-h-0">
                 <DesktopSidebar
                     allowedTabs={allowedTabs}
                     activeTab={activeTab}
@@ -1056,8 +1105,8 @@ export default function Administrativa() {
                     onToggle={() => setSidebarCollapsed((v) => !v)}
                 />
 
-                <div className="flex min-w-0 flex-1 flex-col bg-[#f4f7fb]">
-                    <header className="sticky top-0 z-40 flex min-h-[96px] items-center justify-between gap-4 bg-gradient-to-r from-[#082354] via-[#0a2f68] to-[#073779] px-4 py-4 text-white shadow-[0_10px_30px_rgba(2,12,27,0.18)] sm:px-6 lg:px-8">
+                <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#f4f7fb]">
+                    <header className=" flex min-h-[96px] shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-[#082354] via-[#0a2f68] to-[#073779] px-4 py-4 text-white shadow-[0_10px_30px_rgba(2,12,27,0.18)] sm:px-6 lg:px-8">
                         <div className="flex min-w-0 items-center gap-3">
                             <button
                                 type="button"

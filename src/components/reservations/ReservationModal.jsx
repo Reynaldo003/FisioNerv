@@ -1134,8 +1134,8 @@ export function ReservationModal({
                     type="button"
                     onClick={() => setActiveSection(section.id)}
                     className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition sm:min-w-0 ${active
-                        ? "border-blue-200 bg-blue-50 text-blue-800 shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                      ? "border-blue-200 bg-blue-50 text-blue-800 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
                       }`}
                   >
                     <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? "bg-blue-600 text-white" : completed ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>

@@ -389,6 +389,7 @@ export function AgendaView({
   const [hoverRect, setHoverRect] = useState(null);
 
   const [slotMenu, setSlotMenu] = useState(null);
+  const [appointmentGroupMenu, setAppointmentGroupMenu] = useState(null);
 
   const isProfessional =
     role === "fisioterapeuta" || role === "nutriologo" || role === "dentista";
@@ -472,7 +473,7 @@ export function AgendaView({
   const DAY_START_MIN = toMinutes(HOURS[0]);
   const DAY_END_MIN = toMinutes(HOURS[HOURS.length - 1]) + 60;
 
-  const HOUR_ROW_HEIGHT = 64;
+  const HOUR_ROW_HEIGHT = 76;
   const GRID_TOTAL_HEIGHT = HOURS.length * HOUR_ROW_HEIGHT;
 
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -710,16 +711,25 @@ export function AgendaView({
     );
   }
 
-  function PaidMark() {
+  function PaidMark({ compact = false }) {
     return (
-      <span className="absolute left-0 top-0 bottom-0 w-3 bg-emerald-500 rounded-l-md flex items-center justify-center">
-        <DollarSign className="h-3 w-3 text-white" />
-      </span>
+      <span
+        className={[
+          "absolute bottom-0 left-0 top-0 bg-emerald-500",
+          compact ? "w-1" : "w-1.5",
+        ].join(" ")}
+        aria-label="Cita pagada"
+        title="Cita pagada"
+      />
     );
   }
 
   function AppointmentBlock({ appt, layout, onClick }) {
     const isBlock = isBlockItem(appt);
+    const compact = !isBlock && Number(layout?.columns || 1) > 1;
+    const veryCompact = !isBlock && Number(layout?.columns || 1) > 2;
+    const paid = Boolean(appt.paid || appt.pagado);
+    const normalizedStatus = normalizeAppointmentStatus(appt.status);
 
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
       id: appt.id,
@@ -734,9 +744,16 @@ export function AgendaView({
       height: layout.height,
       left: layout.left,
       width: layout.width,
+      zIndex: isDragging ? 40 : 10 + Number(layout?.column || 0),
     };
 
     const touchClass = !isBlock && !isMobile ? "touch-none" : "";
+    const patientLineStyle = {
+      display: "-webkit-box",
+      WebkitBoxOrient: "vertical",
+      WebkitLineClamp: compact ? 2 : 1,
+      overflow: "hidden",
+    };
 
     return (
       <button
@@ -748,6 +765,7 @@ export function AgendaView({
           e.stopPropagation();
           setHoverAppt(null);
           setHoverRect(null);
+          setAppointmentGroupMenu(null);
 
           if (isBlock) {
             const { x, y } = getClientPoint(e);
@@ -768,9 +786,7 @@ export function AgendaView({
         }}
         onMouseEnter={(e) => {
           if (isMobile) return;
-          const { x, y } = getClientPoint(e);
-          const rect = rectFromPoint(x, y);
-          setHoverRect(rect);
+          setHoverRect(e.currentTarget.getBoundingClientRect());
           setHoverAppt(appt);
         }}
         onMouseLeave={() => {
@@ -779,40 +795,152 @@ export function AgendaView({
           setHoverRect(null);
         }}
         className={[
-          "absolute overflow-hidden rounded-xl border text-left shadow-[0_8px_18px_rgba(15,23,42,0.08)] transition hover:-translate-y-[1px] hover:shadow-[0_12px_26px_rgba(15,23,42,0.14)]",
-          "px-2.5 py-2.5 backdrop-blur-sm",
+          "absolute overflow-hidden border text-left transition duration-150",
+          "hover:z-30 hover:-translate-y-px hover:shadow-[0_10px_24px_rgba(15,23,42,0.14)]",
+          compact
+            ? "rounded-lg px-2 py-1.5 shadow-[0_3px_10px_rgba(15,23,42,0.08)]"
+            : "rounded-xl px-3 py-2.5 shadow-[0_5px_14px_rgba(15,23,42,0.08)]",
           appt.color || "bg-slate-50 border-slate-200 text-slate-800",
-          "text-[11px]",
           touchClass,
         ].join(" ")}
         {...(!isBlock ? listeners : {})}
         {...(!isBlock ? attributes : {})}
       >
-        {(appt.paid || appt.pagado) && !isBlock && <PaidMark />}
+        {paid && !isBlock && <PaidMark compact={compact} />}
 
-        <div className="pl-2 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="truncate text-[11px] font-bold tracking-tight">
+        <div className={paid && !isBlock ? (compact ? "min-w-0 pl-1" : "min-w-0 pl-1.5") : "min-w-0"}>
+          <div className="flex min-w-0 items-start gap-1.5">
+            <div className="min-w-0 flex-1">
+              <div
+                className={[
+                  "font-bold leading-tight tracking-[-0.01em]",
+                  compact ? "text-[10px]" : "text-[11px]",
+                ].join(" ")}
+                style={patientLineStyle}
+                title={isBlock ? "Horario bloqueado" : appt.patient || "Paciente"}
+              >
                 {isBlock ? "Horario bloqueado" : appt.patient || "Paciente"}
               </div>
-              <div className="mt-0.5 truncate text-[10px] opacity-90">
-                {isBlock ? appt.motivo || "No disponible" : appt.service || "Servicio"}
-              </div>
+
+              {!compact && (
+                <div
+                  className={[
+                    "mt-1 truncate leading-tight opacity-75",
+                    compact ? "text-[9px]" : "text-[10px]",
+                  ].join(" ")}
+                  title={isBlock ? appt.motivo || "No disponible" : appt.service || "Servicio"}
+                >
+                  {isBlock ? appt.motivo || "No disponible" : appt.service || "Servicio"}
+                </div>
+              )}
             </div>
-            {!isBlock && <span className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold ${appointmentStatusPill(appt.status)}`}>{normalizeAppointmentStatus(appt.status).replace("_", " ")}</span>}
+
+            {!isBlock && (
+              <span
+                className={[
+                  "mt-0.5 h-2 w-2 shrink-0 rounded-full ring-2 ring-white/70",
+                  normalizedStatus === "confirmado"
+                    ? "bg-amber-500"
+                    : normalizedStatus === "si_asistio"
+                      ? "bg-emerald-500"
+                      : normalizedStatus === "no_asistio"
+                        ? "bg-rose-500"
+                        : "bg-blue-500",
+                ].join(" ")}
+                title={normalizedStatus.replace("_", " ")}
+              />
+            )}
           </div>
 
-          <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
-            <div className="font-semibold opacity-80">
+          <div className={[
+            "flex items-end justify-between gap-1 font-semibold leading-none opacity-80",
+            compact ? "mt-1.5 text-[9px]" : "mt-2 text-[10px]",
+          ].join(" ")}>
+            <span className="truncate">
               {String(appt.time || "").slice(0, 5)}
-              {appt.endTime ? ` – ${String(appt.endTime).slice(0, 5)}` : ""}
-            </div>
-            {!isBlock && (
-              <span className={`rounded-full px-2 py-0.5 font-semibold ${(appt.paid || appt.pagado) ? "bg-emerald-100 text-emerald-700" : "bg-white/70 text-slate-600"}`}>
-                {(appt.paid || appt.pagado) ? "Pagada" : "Pendiente"}
+              {!veryCompact && appt.endTime ? ` – ${String(appt.endTime).slice(0, 5)}` : ""}
+            </span>
+
+            {!isBlock && !compact && (
+              <span className={paid ? "text-emerald-700" : "text-slate-500"}>
+                {paid ? "Pagada" : "Pendiente"}
               </span>
             )}
+          </div>
+        </div>
+      </button>
+    );
+  }
+
+  function AppointmentGroupBlock({ group, layout }) {
+    const items = group.groupItems || [];
+    const visibleItems = items.slice(0, 2);
+    const extra = Math.max(0, items.length - visibleItems.length);
+    const paidCount = items.filter((item) => item.paid || item.pagado).length;
+
+    return (
+      <button
+        type="button"
+        data-appt="1"
+        style={{
+          top: layout.top,
+          height: layout.height,
+          left: layout.left,
+          width: layout.width,
+          zIndex: 15,
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSlotMenu(null);
+          setHoverAppt(null);
+          setHoverRect(null);
+          setAppointmentGroupMenu({
+            items,
+            anchorRect: e.currentTarget.getBoundingClientRect(),
+          });
+        }}
+        className="absolute overflow-hidden rounded-xl border border-blue-200 bg-white px-2.5 py-2 text-left shadow-[0_5px_16px_rgba(37,99,235,0.10)] transition hover:z-30 hover:-translate-y-px hover:border-blue-300 hover:shadow-[0_10px_26px_rgba(37,99,235,0.16)]"
+      >
+        <span className="absolute bottom-0 left-0 top-0 w-1 bg-blue-500" />
+
+        <div className="min-w-0 pl-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-blue-700">
+              {items.length} citas simultáneas
+            </span>
+            <span className="shrink-0 text-[9px] font-semibold text-slate-500">
+              {String(group.time || "").slice(0, 5)}
+            </span>
+          </div>
+
+          <div className="mt-1.5 space-y-1">
+            {visibleItems.map((item) => {
+              const status = normalizeAppointmentStatus(item.status);
+              return (
+                <div key={item.id} className="flex min-w-0 items-center gap-1.5">
+                  <span
+                    className={[
+                      "h-1.5 w-1.5 shrink-0 rounded-full",
+                      status === "confirmado"
+                        ? "bg-amber-500"
+                        : status === "si_asistio"
+                          ? "bg-emerald-500"
+                          : status === "no_asistio"
+                            ? "bg-rose-500"
+                            : "bg-blue-500",
+                    ].join(" ")}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-slate-800">
+                    {item.patient || "Paciente"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-1.5 flex items-center justify-between gap-2 text-[9px] font-semibold text-slate-500">
+            <span>{extra ? `+${extra} más` : "Ver detalle"}</span>
+            <span>{paidCount}/{items.length} pagadas</span>
           </div>
         </div>
       </button>
@@ -829,6 +957,7 @@ export function AgendaView({
 
       setHoverAppt(null);
       setHoverRect(null);
+      setAppointmentGroupMenu(null);
 
       const blockItem = hasBlock ? findBlockForSlot({ dateIso: date, professionalId, hour }) : null;
 
@@ -851,6 +980,40 @@ export function AgendaView({
       { id: proB, label: proB ? proMap.get(proB)?.label || "Profesional B" : "Profesional B" },
     ];
   }, [proA, proB, proMap]);
+
+  function buildRenderableAppointments(items) {
+    const blocks = (items || []).filter(isBlockItem);
+    const appointmentsOnly = (items || []).filter((item) => !isBlockItem(item));
+    const groups = new Map();
+
+    for (const appt of appointmentsOnly) {
+      const endTime = appt.endTime || addMinutesToTime(appt.time, 60);
+      const key = `${String(appt.time || "").slice(0, 5)}|${String(endTime).slice(0, 5)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(appt);
+    }
+
+    const renderable = [];
+    for (const [key, groupItems] of groups.entries()) {
+      if (groupItems.length <= 2) {
+        renderable.push(...groupItems);
+        continue;
+      }
+
+      const first = groupItems[0];
+      renderable.push({
+        ...first,
+        id: `group-${first.date}-${first.professionalId}-${key}`,
+        patient: `${groupItems.length} citas simultáneas`,
+        service: "Selecciona una cita para ver el detalle",
+        groupItems,
+        isAppointmentGroup: true,
+        paid: groupItems.every((item) => item.paid || item.pagado),
+      });
+    }
+
+    return { blocks, appointments: renderable };
+  }
 
   function computeLayoutsForDay(items) {
     const appts = (items || [])
@@ -945,12 +1108,14 @@ export function AgendaView({
       const widthPct = 100 / maxCols;
       const leftPct = col * widthPct;
 
-      const padding = 2;
+      const padding = maxCols > 1 ? 1.5 : 3;
       layouts.set(a.id, {
-        top: topPx,
-        height: Math.max(28, heightPx),
+        top: topPx + 2,
+        height: Math.max(34, heightPx - 4),
         left: `calc(${leftPct}% + ${padding}px)`,
         width: `calc(${widthPct}% - ${padding * 2}px)`,
+        columns: maxCols,
+        column: col,
       });
     }
 
@@ -973,10 +1138,12 @@ export function AgendaView({
       const topPx = ((b.__s - DAY_START_MIN) / 60) * HOUR_ROW_HEIGHT;
       const heightPx = ((b.__e - b.__s) / 60) * HOUR_ROW_HEIGHT;
       layouts.set(b.id, {
-        top: topPx,
-        height: Math.max(28, heightPx),
-        left: `0px`,
-        width: `100%`,
+        top: topPx + 2,
+        height: Math.max(34, heightPx - 4),
+        left: `3px`,
+        width: `calc(100% - 6px)`,
+        columns: 1,
+        column: 0,
       });
     }
     return layouts;
@@ -989,8 +1156,9 @@ export function AgendaView({
       );
     }, [dragSourceAppointments, dateIso, professionalId]);
 
-    const blockLayouts = useMemo(() => computeBlockLayoutsForDay(dayItems), [dayItems]);
-    const apptLayouts = useMemo(() => computeLayoutsForDay(dayItems), [dayItems]);
+    const renderable = useMemo(() => buildRenderableAppointments(dayItems), [dayItems]);
+    const blockLayouts = useMemo(() => computeBlockLayoutsForDay(renderable.blocks), [renderable.blocks]);
+    const apptLayouts = useMemo(() => computeLayoutsForDay(renderable.appointments), [renderable.appointments]);
 
     const blockedByHour = useMemo(() => {
       const m = new Map();
@@ -1110,42 +1278,43 @@ export function AgendaView({
             );
           })}
 
-          {(dayItems || [])
-            .filter(isBlockItem)
-            .map((b) => {
-              const layout = blockLayouts.get(b.id);
-              if (!layout) return null;
-              return (
-                <AppointmentBlock
-                  key={b.id}
-                  appt={b}
-                  layout={layout}
-                  onClick={() => onOpenAppointment?.(b)}
-                />
-              );
-            })}
+          {(renderable.blocks || []).map((b) => {
+            const layout = blockLayouts.get(b.id);
+            if (!layout) return null;
+            return (
+              <AppointmentBlock
+                key={b.id}
+                appt={b}
+                layout={layout}
+                onClick={() => onOpenAppointment?.(b)}
+              />
+            );
+          })}
 
-          {(dayItems || [])
-            .filter((a) => !isBlockItem(a))
-            .map((a) => {
-              const layout = apptLayouts.get(a.id);
-              if (!layout) return null;
-              return (
-                <AppointmentBlock
-                  key={a.id}
-                  appt={a}
-                  layout={layout}
-                  onClick={() => onOpenAppointment?.(a)}
-                />
-              );
-            })}
+          {(renderable.appointments || []).map((a) => {
+            const layout = apptLayouts.get(a.id);
+            if (!layout) return null;
+
+            if (a.isAppointmentGroup) {
+              return <AppointmentGroupBlock key={a.id} group={a} layout={layout} />;
+            }
+
+            return (
+              <AppointmentBlock
+                key={a.id}
+                appt={a}
+                layout={layout}
+                onClick={() => onOpenAppointment?.(a)}
+              />
+            );
+          })}
         </div>
       </div>
     );
   }
 
   const headerGridStyleWeek = useMemo(
-    () => ({ gridTemplateColumns: `64px repeat(${includeSunday ? 7 : 6}, minmax(0, 1fr))` }),
+    () => ({ gridTemplateColumns: `56px repeat(${includeSunday ? 7 : 6}, minmax(210px, 1fr))` }),
     [includeSunday]
   );
   const headerGridStyleDay = useMemo(() => ({ gridTemplateColumns: "56px minmax(0, 1fr)" }), []);
@@ -1280,7 +1449,7 @@ export function AgendaView({
   const goalPercentage = Math.min(100, Math.round((dailyStats.scheduled / dailyGoal) * 100));
   const dayGridColumns = Math.max(1, dayProfessionals.length);
   const dayGridStyle = {
-    gridTemplateColumns: `56px repeat(${dayGridColumns}, minmax(${isMobile ? 0 : 180}px, 1fr))`,
+    gridTemplateColumns: `56px repeat(${dayGridColumns}, minmax(${isMobile ? 0 : 230}px, 1fr))`,
   };
   const weekProfessional = proMap.get(effectiveProfessionalId);
 
@@ -1537,7 +1706,7 @@ export function AgendaView({
                     {viewMode === "day" && (
                       <div
                         className="min-w-max"
-                        style={{ minWidth: isMobile ? "100%" : `${56 + Math.max(1, dayProfessionals.length) * 180}px` }}
+                        style={{ minWidth: isMobile ? "100%" : `${56 + Math.max(1, dayProfessionals.length) * 230}px` }}
                       >
                         <div
                           className="grid border-b border-slate-200 bg-slate-50/80 text-xs text-slate-500"
@@ -1579,7 +1748,7 @@ export function AgendaView({
                     )}
 
                     {viewMode === "week" && (
-                      <div className="min-w-[1040px]">
+                      <div style={{ minWidth: `${56 + (includeSunday ? 7 : 6) * 210}px` }}>
                         <div className="grid border-b border-slate-200 bg-slate-50/80 text-xs text-slate-500" style={headerGridStyleWeek}>
                           <div className="p-3 text-right font-semibold">Hora</div>
                           {groupedByDay.map((day) => (
@@ -1730,6 +1899,67 @@ export function AgendaView({
           )}
         </HoverCard>
       )}
+
+      <MenuPopover
+        open={Boolean(appointmentGroupMenu)}
+        anchorRect={appointmentGroupMenu?.anchorRect}
+        preferUp={false}
+        onClose={() => setAppointmentGroupMenu(null)}
+      >
+        <div className="min-w-[300px] p-1">
+          <div className="border-b border-slate-100 px-2 pb-2">
+            <p className="text-xs font-bold text-slate-900">Citas simultáneas</p>
+            <p className="mt-0.5 text-[10px] text-slate-500">
+              Selecciona el paciente que deseas consultar o editar.
+            </p>
+          </div>
+
+          <div className="mt-2 max-h-[320px] space-y-1 overflow-auto">
+            {(appointmentGroupMenu?.items || []).map((item) => {
+              const status = normalizeAppointmentStatus(item.status);
+              const paid = Boolean(item.paid || item.pagado);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setAppointmentGroupMenu(null);
+                    onOpenAppointment?.(item);
+                  }}
+                  className="flex w-full items-start gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left transition hover:border-blue-100 hover:bg-blue-50/60"
+                >
+                  <span
+                    className={[
+                      "mt-1 h-2.5 w-2.5 shrink-0 rounded-full",
+                      status === "confirmado"
+                        ? "bg-amber-500"
+                        : status === "si_asistio"
+                          ? "bg-emerald-500"
+                          : status === "no_asistio"
+                            ? "bg-rose-500"
+                            : "bg-blue-500",
+                    ].join(" ")}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-bold text-slate-800">
+                      {item.patient || "Paciente"}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[10px] text-slate-500">
+                      {item.service || "Servicio"} · {String(item.time || "").slice(0, 5)}
+                    </span>
+                  </span>
+                  <span className={[
+                    "shrink-0 rounded-full px-2 py-1 text-[9px] font-bold",
+                    paid ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600",
+                  ].join(" ")}>
+                    {paid ? "Pagada" : "Pendiente"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </MenuPopover>
 
       <MenuPopover
         open={Boolean(slotMenu)}
