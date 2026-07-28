@@ -2,16 +2,30 @@
 // /componentes/reservations/ReservationModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  CreditCard,
-  Landmark,
   Banknote,
+  CalendarDays,
   Check,
-  UserPlus,
-  MessageCircle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  CreditCard,
   Download,
-  X,
+  Landmark,
+  Mail,
+  MessageCircle,
+  NotebookPen,
+  Phone,
   Plus,
+  ReceiptText,
+  Repeat2,
+  Stethoscope,
   Trash2,
+  UserPlus,
+  UserRound,
+  UsersRound,
+  WalletCards,
+  X,
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
@@ -140,11 +154,43 @@ function toNumberSafe(digitsStr, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function onlyMoneyString(value) {
+  const normalized = String(value ?? "")
+    .replace(/,/g, ".")
+    .replace(/[^\d.]/g, "");
+
+  const [integer = "", ...decimals] = normalized.split(".");
+  const decimal = decimals.join("").slice(0, 2);
+  return normalized.includes(".") ? `${integer}.${decimal}` : integer;
+}
+
+function onlyPercentageString(value) {
+  const sanitized = onlyMoneyString(value);
+  if (sanitized === "") return "";
+  return String(Math.min(100, Math.max(0, Number(sanitized) || 0)));
+}
+
+function normalizeGender(value) {
+  const gender = String(value || "").trim().toLowerCase();
+  if (["m", "masculino", "hombre", "male"].includes(gender)) return "masculino";
+  if (["f", "femenino", "mujer", "female"].includes(gender)) return "femenino";
+  if (["otro", "otros", "no binario", "no_binario", "other"].includes(gender)) return "otro";
+  return "";
+}
+
+function formatMoney(value) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    minimumFractionDigits: 2,
+  }).format(Number(value || 0));
+}
+
 function MessageModal({ open, title, message, onClose }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
         <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
           <div className="text-sm font-semibold text-slate-800">{title}</div>
@@ -161,7 +207,7 @@ function MessageModal({ open, title, message, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="h-9 px-4 rounded-md bg-violet-600 text-white text-sm hover:bg-violet-700"
+            className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
           >
             Entendido
           </button>
@@ -199,6 +245,7 @@ export function ReservationModal({
   const [savingRepeat, setSavingRepeat] = useState(false);
 
   const [msg, setMsg] = useState({ open: false, title: "", message: "" });
+  const [activeSection, setActiveSection] = useState("paciente");
 
   const [lastPagoId, setLastPagoId] = useState(null);
   const [paidFromBackend, setPaidFromBackend] = useState(0);
@@ -258,9 +305,10 @@ export function ReservationModal({
       apellido_pat: appointment?.apellido_pat ?? "",
       apellido_mat: appointment?.apellido_mat ?? "",
       fecha_nac: appointment?.fecha_nac ?? "",
-      genero: appointment?.genero ?? "",
+      genero: normalizeGender(appointment?.genero),
       correo: appointment?.correo ?? "",
       telefono: appointment?.telefono ?? "",
+      molestia: appointment?.molestia ?? "",
 
       date: initialDate,
       time: initialTime,
@@ -291,6 +339,7 @@ export function ReservationModal({
     setForm(buildInitialForm({ appointment, preset, today }));
     setPatientQuery(appointment?.patient ?? "");
     setPatientDropdownOpen(false);
+    setActiveSection("paciente");
     setLastPagoId(null);
     setPaidFromBackend(0);
     originalPaymentLinesRef.current = [];
@@ -478,10 +527,18 @@ export function ReservationModal({
       return;
     }
 
-    // ✅ campos numéricos como string (solo dígitos)
-    if (["price", "discountPct", "repeatWeeks", "repeatSessions", "montoFacturado"].includes(field)) {
-      const digits = onlyDigitsString(value);
-      setForm((prev) => ({ ...prev, [field]: digits }));
+    if (["price", "montoFacturado"].includes(field)) {
+      setForm((prev) => ({ ...prev, [field]: onlyMoneyString(value) }));
+      return;
+    }
+
+    if (field === "discountPct") {
+      setForm((prev) => ({ ...prev, discountPct: onlyPercentageString(value) }));
+      return;
+    }
+
+    if (["repeatWeeks", "repeatSessions"].includes(field)) {
+      setForm((prev) => ({ ...prev, [field]: onlyDigitsString(value) }));
       return;
     }
 
@@ -540,9 +597,10 @@ export function ReservationModal({
       apellido_pat: p.apellido_pat || "",
       apellido_mat: p.apellido_mat || "",
       fecha_nac: p.fecha_nac || "",
-      genero: p.genero || "",
+      genero: normalizeGender(p.genero),
       correo: p.correo || "",
       telefono: p.telefono || "",
+      molestia: p.molestia || "",
     }));
     setPatientQuery(getPatientLabel(p));
     setPatientDropdownOpen(false);
@@ -582,7 +640,7 @@ export function ReservationModal({
     setForm((prev) => {
       const lines = [...(prev.paymentLines || [])];
       const next = { ...lines[idx], ...patch };
-      if ("amount" in next) next.amount = onlyDigitsString(next.amount);
+      if ("amount" in next) next.amount = onlyMoneyString(next.amount);
       lines[idx] = next;
       return { ...prev, paymentLines: lines };
     });
@@ -850,10 +908,41 @@ export function ReservationModal({
     e.preventDefault();
 
     if (!form.patientId && !String(form.patient || "").trim()) {
+      setActiveSection("paciente");
       setMsg({
         open: true,
-        title: "Validación",
+        title: "Falta el paciente",
         message: "Escribe el nombre del paciente o selecciona uno existente.",
+      });
+      return;
+    }
+
+    if (!form.serviceId || !form.professionalId || !form.date || !form.time) {
+      setActiveSection("cita");
+      setMsg({
+        open: true,
+        title: "Datos incompletos",
+        message: "Selecciona servicio, profesional, fecha y hora antes de guardar.",
+      });
+      return;
+    }
+
+    if (form.repeatEnabled && !(form.repeatDays || []).length) {
+      setActiveSection("cita");
+      setMsg({
+        open: true,
+        title: "Repetición incompleta",
+        message: "Selecciona al menos un día para repetir la cita.",
+      });
+      return;
+    }
+
+    if (toNumberSafe(form.discountPct, 0) > 100) {
+      setActiveSection("pago");
+      setMsg({
+        open: true,
+        title: "Descuento inválido",
+        message: "El descuento no puede ser mayor a 100%.",
       });
       return;
     }
@@ -966,593 +1055,468 @@ export function ReservationModal({
 
   if (loadingData) {
     return (
-      <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl px-6 py-4 shadow-xl text-sm text-slate-600">
-          Cargando datos de servicios y profesionales...
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-2xl">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          Cargando información de la cita...
         </div>
       </div>
     );
   }
 
+  const selectedService = services.find((s) => Number(s.id) === Number(form.serviceId));
+  const selectedProfessional = professionals.find((p) => Number(p.id) === Number(form.professionalId));
+  const sections = [
+    { id: "paciente", label: "Paciente", helper: "Identidad y contacto", icon: UsersRound },
+    { id: "cita", label: "Cita", helper: "Servicio y horario", icon: CalendarDays },
+    { id: "pago", label: "Pago y notas", helper: "Cobro y seguimiento", icon: WalletCards },
+  ];
+  const activeIndex = sections.findIndex((section) => section.id === activeSection);
+  const todayDate = getLocalDateMX();
+
+  const goPrevious = () => {
+    if (activeIndex > 0) setActiveSection(sections[activeIndex - 1].id);
+  };
+
+  const goNext = () => {
+    if (activeSection === "paciente" && !form.patientId && !String(form.patient || "").trim()) {
+      setMsg({ open: true, title: "Falta el paciente", message: "Escribe el nombre del paciente o selecciona uno existente." });
+      return;
+    }
+    if (activeIndex < sections.length - 1) setActiveSection(sections[activeIndex + 1].id);
+  };
+
   return (
     <>
-      <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-3 sm:p-6">
-        <div className="absolute inset-0" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-0 backdrop-blur-[3px] sm:p-4 lg:p-6">
+        <button type="button" className="absolute inset-0" onClick={onClose} aria-label="Cerrar modal" />
 
-        <div className="relative z-10 w-[min(96vw,980px)] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-          <div className="flex flex-col max-h-[90vh]">
-            <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-start justify-between bg-slate-50 gap-3">
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-slate-800 truncate">
-                  {isEditing ? `Editar cita de ${form.patient || "paciente"}` : "Nueva cita"}
-                </h2>
-                <p className="text-xs text-slate-500">Paciente, servicio, horario, pagos y notas.</p>
+        <div className="relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden bg-[#f5f7fb] shadow-2xl sm:h-auto sm:max-h-[94vh] sm:w-[min(96vw,1120px)] sm:rounded-[26px] sm:border sm:border-white/80">
+          <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0a2f68] text-white shadow-lg shadow-blue-950/20">
+                  <CalendarDays className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">
+                    {isEditing ? "Edición de reservación" : "Nueva reservación"}
+                  </p>
+                  <h2 className="truncate text-lg font-bold text-slate-950 sm:text-xl">
+                    {isEditing ? form.patient || "Editar cita" : "Agendar nueva cita"}
+                  </h2>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                    <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{form.date || "Sin fecha"}</span>
+                    <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" />{form.time || "--:--"} – {form.endTime || "--:--"}</span>
+                    <span className="hidden items-center gap-1 sm:inline-flex"><Stethoscope className="h-3.5 w-3.5" />{selectedService?.nombre || "Servicio pendiente"}</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <select
-                  className={
-                    "inline-flex items-center text-[11px] font-medium px-2 py-1 rounded-full border " +
-                    getStatusColorClasses(form.status)
-                  }
-                  value={form.status}
-                  onChange={(e) => handleChange("status", e.target.value)}
-                >
-                  <option value="reservado">Reservado / nuevo</option>
-                  <option value="confirmado">Confirmado</option>
-                  <option value="completado">Sí asistió</option>
-                  <option value="cancelado">No asistió</option>
-                </select>
-
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="h-8 w-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-500 hover:bg-slate-100"
-                  title="Cerrar"
-                >
-                  ✕
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            <form onSubmit={handleSubmit} autoComplete="off" className="px-4 sm:px-6 py-4 space-y-4 overflow-y-auto">
-              {/* Paciente */}
-              <div className="border border-slate-200 rounded-xl p-3 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold text-slate-600">Datos del paciente</p>
-
-                  {form.patientId ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800">
-                      <Check className="h-3.5 w-3.5" />
-                      Existente
+            <nav className="mt-4 flex gap-2 overflow-x-auto pb-1" aria-label="Secciones de la reservación">
+              {sections.map((section, index) => {
+                const Icon = section.icon;
+                const active = activeSection === section.id;
+                const completed = index < activeIndex;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setActiveSection(section.id)}
+                    className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition sm:min-w-0 ${active
+                        ? "border-blue-200 bg-blue-50 text-blue-800 shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                      }`}
+                  >
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? "bg-blue-600 text-white" : completed ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                      {completed ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
                     </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full border border-slate-200 bg-white text-slate-600">
-                      <UserPlus className="h-3.5 w-3.5" />
-                      Nuevo (si no seleccionas)
+                    <span className="min-w-0">
+                      <span className="block text-xs font-bold">{section.label}</span>
+                      <span className="block truncate text-[10px] opacity-70">{section.helper}</span>
                     </span>
-                  )}
-                </div>
+                  </button>
+                );
+              })}
+            </nav>
+          </header>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="md:col-span-2" ref={patientBoxRef}>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-                      Paciente (escribe para buscar)
-                    </label>
-
-                    <div className="relative">
-                      <input
-                        type="text"
-                        name="paciente_no_autofill"
-                        autoComplete="off"
-                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                        value={patientQuery}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setPatientQuery(v);
-                          setPatientDropdownOpen(true);
-                          setForm((prev) => ({ ...prev, patientId: null, patient: v }));
-                        }}
-                        onFocus={() => setPatientDropdownOpen(true)}
-                        placeholder="Ej. Juan Pérez..."
-                      />
-
-                      {patientDropdownOpen && patientQuery.trim() && (
-                        <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg overflow-hidden">
-                          {patientMatches.length > 0 ? (
-                            <>
-                              <div className="max-h-56 overflow-auto">
-                                {patientMatches.map((p) => (
-                                  <button
-                                    key={p.id}
-                                    type="button"
-                                    className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      selectExistingPatient(p);
-                                    }}
-                                  >
-                                    <div className="font-medium text-slate-800">{getPatientLabel(p)}</div>
-                                    <div className="text-[11px] text-slate-500">
-                                      {p.telefono || "Sin teléfono"} · {p.correo || "Sin correo"}
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-
-                              <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
-                                <button
-                                  type="button"
-                                  className="text-[11px] text-slate-700 hover:underline"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    markAsNewPatient();
-                                  }}
-                                >
-                                  Usar como paciente nuevo aunque existan coincidencias
-                                </button>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="px-3 py-3 text-sm text-slate-600">
-                              No hay coincidencias. Se registrará como paciente nuevo.
-                            </div>
-                          )}
-                        </div>
+          <form onSubmit={handleSubmit} autoComplete="off" className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
+              <div className="mx-auto max-w-5xl">
+                {activeSection === "paciente" && (
+                  <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
+                    <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-950">Información del paciente</h3>
+                        <p className="mt-1 text-xs text-slate-500">Busca un registro existente o completa los datos para crear uno nuevo.</p>
+                      </div>
+                      {form.patientId ? (
+                        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700">
+                          <Check className="h-3.5 w-3.5" /> Paciente existente
+                        </span>
+                      ) : (
+                        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-bold text-blue-700">
+                          <UserPlus className="h-3.5 w-3.5" /> Nuevo paciente
+                        </span>
                       )}
                     </div>
 
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Si seleccionas un paciente del desplegable, se usa el existente. Si no, se creará uno nuevo, aunque comparta teléfono con otro paciente.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Teléfono</label>
-
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        name="telefono_no_autofill"
-                        autoComplete="off"
-                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                        value={form.telefono}
-                        onChange={(e) => handleChange("telefono", e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        onClick={openWhatsAppConfirm}
-                        className="shrink-0 h-10 w-10 rounded-md border border-slate-200 hover:bg-slate-50 flex items-center justify-center"
-                        title="Confirmar por WhatsApp"
-                      >
-                        <MessageCircle className="h-5 w-5 text-emerald-600" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Correo</label>
-                    <input
-                      type="email"
-                      name="correo_no_autofill"
-                      autoComplete="off"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.correo}
-                      onChange={(e) => handleChange("correo", e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Género</label>
-                    <input
-                      type="text"
-                      name="genero_no_autofill"
-                      autoComplete="off"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.genero}
-                      onChange={(e) => handleChange("genero", e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {isNewPatient && (
-                  <div className="mt-2 rounded-xl border border-violet-200 bg-violet-50 p-3">
-                    <p className="text-[11px] font-semibold text-violet-800">Datos para paciente nuevo</p>
-
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">Apellido paterno</label>
-                        <input
-                          type="text"
-                          autoComplete="off"
-                          name="ap_pat_no_autofill"
-                          className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                          value={form.apellido_pat}
-                          onChange={(e) => handleChange("apellido_pat", e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">Apellido materno</label>
-                        <input
-                          type="text"
-                          autoComplete="off"
-                          name="ap_mat_no_autofill"
-                          className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                          value={form.apellido_mat}
-                          onChange={(e) => handleChange("apellido_mat", e.target.value)}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-semibold text-slate-600 block mb-1">Fecha de nacimiento</label>
-                        <input
-                          type="date"
-                          autoComplete="off"
-                          name="fecha_nac_no_autofill"
-                          className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                          value={form.fecha_nac}
-                          onChange={(e) => handleChange("fecha_nac", e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Detalles */}
-              <div className="border border-slate-200 rounded-xl p-3 space-y-3">
-                <p className="text-[11px] font-semibold text-slate-600">Detalles de la cita</p>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Servicio</label>
-                    <select
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.serviceId ?? ""}
-                      onChange={(e) => handleServiceChange(e.target.value)}
-                    >
-                      {services.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Profesional</label>
-                    <select
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.professionalId ?? ""}
-                      onChange={(e) => handleChange("professionalId", Number(e.target.value))}
-                    >
-                      {professionals.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {getUserLabel(p) || `Profesional #${p.id}`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Fecha</label>
-                    <input
-                      type="date"
-                      autoComplete="off"
-                      name="fecha_cita_no_autofill"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.date}
-                      onChange={(e) => handleChange("date", e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Hora inicio (por hora)</label>
-                    <select
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.time}
-                      onChange={(e) => handleChange("time", e.target.value)}
-                    >
-                      {timeSlots.map((slot) => (
-                        <option key={slot.time} value={slot.time}>
-                          {slot.time}
-                        </option>
-                      ))}
-                    </select>
-
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Se permiten múltiples citas dentro de la misma hora desde el panel administrativo.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Hora termina</label>
-                    <input
-                      type="time"
-                      autoComplete="off"
-                      name="hora_fin_no_autofill"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 bg-slate-50 text-slate-600 cursor-not-allowed"
-                      value={form.endTime}
-                      readOnly
-                      disabled
-                      title="Se calcula automáticamente por duración del servicio"
-                    />
-                    <p className="text-[10px] text-slate-500 mt-1">
-                      Se calcula automático: inicio + duración del servicio.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Repetición */}
-              <div className="border border-slate-200 rounded-xl p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-semibold text-slate-600">Repetición</p>
-
-                  <label className="flex items-center gap-2 text-xs text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.repeatEnabled)}
-                      onChange={(e) => handleChange("repeatEnabled", e.target.checked)}
-                    />
-                    Repetir cita
-                  </label>
-                </div>
-
-                {form.repeatEnabled && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="md:col-span-2">
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Días (L–S)</label>
-
-                      <div className="flex gap-2 flex-wrap">
-                        {DAYS.map((d) => {
-                          const active = (form.repeatDays || []).includes(d.k);
-                          return (
-                            <button
-                              key={d.k}
-                              type="button"
-                              onClick={() => toggleRepeatDay(d.k)}
-                              className={
-                                "h-9 px-3 rounded-lg border text-xs font-semibold " +
-                                (active
-                                  ? "bg-violet-600 text-white border-violet-600"
-                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50")
-                              }
-                            >
-                              {d.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        ✅ “Sesiones” manda: se crean las siguientes N sesiones según los días elegidos.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Semanas</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                        value={form.repeatWeeks}
-                        onChange={(e) => handleChange("repeatWeeks", e.target.value)}
-                        placeholder="1"
-                      />
-                      <p className="text-[10px] text-slate-500 mt-1">Solo referencia.</p>
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Sesiones (total)</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                        value={form.repeatSessions}
-                        onChange={(e) => handleChange("repeatSessions", e.target.value)}
-                        placeholder="1"
-                      />
-                      <p className="text-[10px] text-slate-500 mt-1">
-                        Ej: si pones 4, se guarda esta cita + 3 siguientes.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Pago */}
-              <div className="border border-slate-200 rounded-xl p-3 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold text-slate-600">Pago</p>
-
-                  {lastPagoId && (
-                    <button
-                      type="button"
-                      onClick={() => downloadTicket(lastPagoId)}
-                      className="h-9 px-3 rounded-md border border-slate-200 hover:bg-slate-50 text-sm flex items-center gap-2"
-                      title="Descargar ticket PDF"
-                    >
-                      <Download className="h-4 w-4" />
-                      Ticket
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Precio</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      name="precio_no_autofill"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.price}
-                      onChange={(e) => handleChange("price", e.target.value)}
-                      placeholder="Ej. 500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Monto a facturar</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.montoFacturado}
-                      onChange={(e) => handleChange("montoFacturado", e.target.value)}
-                      placeholder="Ej. 500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Descuento %</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      name="descuento_no_autofill"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.discountPct}
-                      onChange={(e) => handleChange("discountPct", e.target.value)}
-                      placeholder="Ej. 10"
-                    />
-                  </div>
-
-                  <div className="md:col-span-3">
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Nº comprobante</label>
-                    <input
-                      type="text"
-                      autoComplete="off"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2"
-                      value={form.comprobante}
-                      onChange={(e) => handleChange("comprobante", e.target.value)}
-                      placeholder="Opcional"
-                    />
-                  </div>
-
-                  <div className="md:col-span-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-[11px] font-semibold text-slate-600">
-                        Cantidad que se paga (puede ser múltiple)
-                      </div>
-                      <button
-                        type="button"
-                        onClick={addPaymentLine}
-                        className="h-8 px-3 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-sm flex items-center gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Agregar método
-                      </button>
-                    </div>
-
-                    <div className="mt-3 grid gap-2">
-                      {(form.paymentLines || []).map((line, idx) => (
-                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_140px_44px] gap-2 items-center">
-                          <select
-                            className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 bg-white"
-                            value={line.method}
-                            onChange={(e) => setPaymentLine(idx, { method: e.target.value })}
-                          >
-                            {PAYMENT_METHODS.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.label}
-                              </option>
-                            ))}
-                          </select>
-
+                    <div className="space-y-5 p-4 sm:p-6">
+                      <div ref={patientBoxRef}>
+                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">Nombre o paciente existente <span className="text-rose-500">*</span></label>
+                        <div className="relative">
+                          <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                           <input
                             type="text"
-                            inputMode="numeric"
-                            className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 bg-white"
-                            value={line.amount}
-                            onChange={(e) => setPaymentLine(idx, { amount: e.target.value })}
-                            placeholder="Monto"
+                            name="paciente_no_autofill"
+                            autoComplete="off"
+                            className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                            value={patientQuery}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setPatientQuery(value);
+                              setPatientDropdownOpen(true);
+                              setForm((prev) => ({ ...prev, patientId: null, patient: value }));
+                            }}
+                            onFocus={() => setPatientDropdownOpen(true)}
+                            placeholder="Escribe el nombre completo..."
                           />
 
-                          <button
-                            type="button"
-                            onClick={() => removePaymentLine(idx)}
-                            className="h-10 w-10 rounded-md border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center"
-                            title="Quitar"
-                          >
-                            <Trash2 className="h-4 w-4 text-slate-600" />
-                          </button>
+                          {patientDropdownOpen && patientQuery.trim() && (
+                            <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                              {patientMatches.length ? (
+                                <>
+                                  <div className="max-h-64 overflow-auto p-1.5">
+                                    {patientMatches.map((patient) => (
+                                      <button
+                                        key={patient.id}
+                                        type="button"
+                                        className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-slate-50"
+                                        onMouseDown={(event) => {
+                                          event.preventDefault();
+                                          selectExistingPatient(patient);
+                                        }}
+                                      >
+                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-700">
+                                          {getPatientLabel(patient).slice(0, 1).toUpperCase()}
+                                        </span>
+                                        <span className="min-w-0">
+                                          <span className="block truncate text-sm font-semibold text-slate-800">{getPatientLabel(patient)}</span>
+                                          <span className="block truncate text-[11px] text-slate-500">{patient.telefono || "Sin teléfono"} · {patient.correo || "Sin correo"}</span>
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                  <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
+                                    <button type="button" className="text-xs font-semibold text-blue-700 hover:underline" onMouseDown={(event) => { event.preventDefault(); markAsNewPatient(); }}>
+                                      Registrar “{patientQuery}” como nuevo paciente
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="px-4 py-4 text-sm text-slate-600">No encontramos coincidencias. Se registrará como paciente nuevo.</div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                      </div>
+
+                      {isNewPatient && (
+                        <div className="grid gap-4 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Apellido paterno</label>
+                            <input className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" value={form.apellido_pat} onChange={(e) => handleChange("apellido_pat", e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Apellido materno</label>
+                            <input className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" value={form.apellido_mat} onChange={(e) => handleChange("apellido_mat", e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Fecha de nacimiento</label>
+                            <input type="date" max={todayDate} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" value={form.fecha_nac} onChange={(e) => handleChange("fecha_nac", e.target.value)} />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Teléfono</label>
+                          <div className="flex gap-2">
+                            <div className="relative min-w-0 flex-1">
+                              <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                              <input type="tel" inputMode="tel" autoComplete="tel" maxLength={15} disabled={Boolean(form.patientId)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500" value={form.telefono} onChange={(e) => handleChange("telefono", e.target.value)} placeholder="10 dígitos" />
+                            </div>
+                            <button type="button" onClick={openWhatsAppConfirm} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100" title="Confirmar por WhatsApp">
+                              <MessageCircle className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Correo electrónico</label>
+                          <div className="relative">
+                            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input type="email" autoComplete="email" disabled={Boolean(form.patientId)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500" value={form.correo} onChange={(e) => handleChange("correo", e.target.value)} placeholder="paciente@correo.com" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Género</label>
+                          <select disabled={Boolean(form.patientId)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500" value={normalizeGender(form.genero)} onChange={(e) => handleChange("genero", e.target.value)}>
+                            <option value="">Selecciona una opción</option>
+                            <option value="masculino">Masculino</option>
+                            <option value="femenino">Femenino</option>
+                            <option value="otro">Otro</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {isNewPatient ? (
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Motivo de consulta o molestia</label>
+                          <textarea className="min-h-[90px] w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.molestia || ""} onChange={(e) => handleChange("molestia", e.target.value)} placeholder="Describe brevemente el motivo principal de la consulta..." />
+                        </div>
+                      ) : form.patientId ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+                          Los datos de contacto se muestran como referencia. Para modificarlos utiliza el expediente del paciente; las observaciones específicas de esta cita se capturan en <b>Pago y notas</b>.
+                        </div>
+                      ) : null}
+                    </div>
+                  </section>
+                )}
+
+                {activeSection === "cita" && (
+                  <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
+                    <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
+                      <h3 className="text-base font-bold text-slate-950">Detalles de la cita</h3>
+                      <p className="mt-1 text-xs text-slate-500">Define el tratamiento, profesional, horario y estado operativo.</p>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-slate-600">
-                      <div>
-                        <div className="font-semibold">Total (con descuento)</div>
-                        <div>${totalAfterDiscount.toFixed(2)}</div>
+                    <div className="space-y-6 p-4 sm:p-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Servicio <span className="text-rose-500">*</span></label>
+                          <select className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.serviceId ?? ""} onChange={(e) => handleServiceChange(e.target.value)}>
+                            {services.map((service) => <option key={service.id} value={service.id}>{service.nombre}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Profesional <span className="text-rose-500">*</span></label>
+                          <select className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.professionalId ?? ""} onChange={(e) => handleChange("professionalId", Number(e.target.value))}>
+                            {professionals.map((professional) => <option key={professional.id} value={professional.id}>{getUserLabel(professional) || `Profesional #${professional.id}`}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Fecha <span className="text-rose-500">*</span></label>
+                          <input type="date" className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.date} onChange={(e) => handleChange("date", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Hora de inicio <span className="text-rose-500">*</span></label>
+                          <select className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.time} onChange={(e) => handleChange("time", e.target.value)}>
+                            {timeSlots.map((slot) => <option key={slot.time} value={slot.time}>{slot.time}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">Hora de término</label>
+                          <input type="time" disabled readOnly className="h-12 w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm text-slate-500" value={form.endTime} />
+                        </div>
                       </div>
 
                       <div>
-                        <div className="font-semibold">Cantidad a pagar (hoy)</div>
-                        <div>${Number(amountToPayToday || 0).toFixed(2)}</div>
+                        <label className="mb-2 block text-xs font-semibold text-slate-700">Estado de la cita</label>
+                        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                          {[
+                            ["reservado", "Reservado", "border-blue-200 bg-blue-50 text-blue-700"],
+                            ["confirmado", "Confirmado", "border-amber-200 bg-amber-50 text-amber-700"],
+                            ["completado", "Sí asistió", "border-emerald-200 bg-emerald-50 text-emerald-700"],
+                            ["cancelado", "No asistió", "border-rose-200 bg-rose-50 text-rose-700"],
+                          ].map(([value, label, activeClass]) => (
+                            <button key={value} type="button" onClick={() => handleChange("status", value)} className={`rounded-xl border px-3 py-3 text-xs font-bold transition ${form.status === value ? activeClass + " ring-2 ring-offset-1 ring-current/20" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"}`}>
+                              {label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
-                      <div>
-                        <div className="font-semibold">Descuento</div>
-                        <div>-${discountAmount.toFixed(2)}</div>
-                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-start gap-3">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-700 shadow-sm"><Repeat2 className="h-4 w-4" /></span>
+                            <div><p className="text-sm font-bold text-slate-800">Repetir tratamiento</p><p className="text-[11px] text-slate-500">Crea las siguientes sesiones automáticamente.</p></div>
+                          </div>
+                          <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
+                            <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked={Boolean(form.repeatEnabled)} onChange={(e) => handleChange("repeatEnabled", e.target.checked)} />
+                            Activar repetición
+                          </label>
+                        </div>
 
-                      <div className="sm:col-span-3 text-[10px] text-slate-500">
-                        Si el pago completa el total, el ticket se descargará automáticamente al guardar.
+                        {form.repeatEnabled && (
+                          <div className="mt-4 grid gap-4 border-t border-slate-200 pt-4 lg:grid-cols-[minmax(0,1fr)_180px]">
+                            <div>
+                              <label className="mb-2 block text-xs font-semibold text-slate-700">Días de atención</label>
+                              <div className="flex flex-wrap gap-2">
+                                {DAYS.map((day) => {
+                                  const active = (form.repeatDays || []).includes(day.k);
+                                  return <button key={day.k} type="button" onClick={() => toggleRepeatDay(day.k)} className={`h-10 min-w-12 rounded-xl border px-3 text-xs font-bold transition ${active ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>{day.label}</button>;
+                                })}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Total de sesiones</label>
+                              <input type="text" inputMode="numeric" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" value={form.repeatSessions} onChange={(e) => handleChange("repeatSessions", e.target.value)} placeholder="Ej. 6" />
+                              <p className="mt-1 text-[10px] text-slate-500">Incluye la cita actual.</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  </section>
+                )}
 
-                  <div className="md:col-span-3">
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-1">Notas internas</label>
-                    <textarea
-                      autoComplete="off"
-                      name="notas_no_autofill"
-                      className="w-full text-sm rounded-md border border-slate-300 px-3 py-2 min-h-[80px]"
-                      value={form.notesInternal}
-                      onChange={(e) => handleChange("notesInternal", e.target.value)}
-                    />
-                  </div>
-                </div>
+                {activeSection === "pago" && (
+                  <section className="space-y-4">
+                    <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
+                      <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                        <div>
+                          <h3 className="text-base font-bold text-slate-950">Información de pago</h3>
+                          <p className="mt-1 text-xs text-slate-500">Registra el precio, descuentos y uno o varios métodos de pago.</p>
+                        </div>
+                        {lastPagoId && (
+                          <button type="button" onClick={() => downloadTicket(lastPagoId)} className="inline-flex h-10 w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50">
+                            <Download className="h-4 w-4" /> Descargar ticket
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-6 p-4 sm:p-6">
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Precio del servicio</label>
+                            <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span><input type="text" inputMode="decimal" className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.price} onChange={(e) => handleChange("price", e.target.value)} /></div>
+                          </div>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Monto a facturar</label>
+                            <div className="relative"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span><input type="text" inputMode="decimal" className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-8 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.montoFacturado} onChange={(e) => handleChange("montoFacturado", e.target.value)} /></div>
+                          </div>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Descuento</label>
+                            <div className="relative"><input type="text" inputMode="decimal" className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 pr-9 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.discountPct} onChange={(e) => handleChange("discountPct", e.target.value)} placeholder="0" /><span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span></div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div><p className="text-sm font-bold text-slate-900">Métodos de pago</p><p className="mt-0.5 text-[11px] text-slate-500">Las opciones se muestran completas; puedes combinar varios métodos.</p></div>
+                            <button type="button" onClick={addPaymentLine} className="inline-flex h-10 w-fit items-center gap-2 rounded-xl bg-[#0a2f68] px-4 text-xs font-bold text-white shadow-sm transition hover:bg-[#0d3d82]"><Plus className="h-4 w-4" /> Agregar otro pago</button>
+                          </div>
+
+                          <div className="mt-4 space-y-3">
+                            {(form.paymentLines || []).map((line, index) => (
+                              <article key={`${line.id || "new"}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div>
+                                    <p className="text-xs font-bold text-slate-800">Pago {index + 1}</p>
+                                    <p className="text-[10px] text-slate-500">{line.id ? "Pago registrado anteriormente" : "Nuevo pago"}</p>
+                                  </div>
+                                  <button type="button" onClick={() => removePaymentLine(index)} disabled={Boolean(line.id)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40" title={line.id ? "Los pagos registrados no se eliminan desde este formulario" : "Quitar pago"}><Trash2 className="h-4 w-4" /></button>
+                                </div>
+
+                                <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+                                  {PAYMENT_METHODS.map((method) => {
+                                    const Icon = method.icon;
+                                    const selected = line.method === method.id;
+                                    return (
+                                      <button key={method.id} type="button" onClick={() => setPaymentLine(index, { method: method.id })} className={`flex min-h-12 items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-bold transition ${selected ? "border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/15" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"}`}>
+                                        <Icon className="h-4 w-4 shrink-0" /><span className="truncate">{method.label}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="mt-3">
+                                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">Monto de este pago</label>
+                                  <div className="relative max-w-sm"><span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span><input type="text" inputMode="decimal" className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-sm font-semibold outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" value={line.amount} onChange={(e) => setPaymentLine(index, { amount: e.target.value })} placeholder="0.00" /></div>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Total</p><p className="mt-1 text-lg font-bold text-slate-950">{formatMoney(totalAfterDiscount)}</p></div>
+                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-emerald-600">Pagado</p><p className="mt-1 text-lg font-bold text-emerald-800">{formatMoney(totalPaidInternal)}</p></div>
+                          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Saldo pendiente</p><p className="mt-1 text-lg font-bold text-amber-800">{formatMoney(remainingInternal)}</p></div>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Número de comprobante</label>
+                            <div className="relative"><ReceiptText className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input type="text" className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.comprobante} onChange={(e) => handleChange("comprobante", e.target.value)} placeholder="Opcional" /></div>
+                          </div>
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">Pagado anteriormente</label>
+                            <div className="flex h-12 items-center rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm font-semibold text-slate-600">{formatMoney(paidFromBackend)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
+                      <div className="border-b border-slate-100 px-4 py-4 sm:px-6"><div className="flex items-center gap-2"><NotebookPen className="h-4 w-4 text-blue-600" /><h3 className="text-sm font-bold text-slate-900">Notas internas</h3></div></div>
+                      <div className="p-4 sm:p-6"><textarea className="min-h-[120px] w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100" value={form.notesInternal} onChange={(e) => handleChange("notesInternal", e.target.value)} placeholder="Indicaciones, observaciones o información relevante para el equipo..." /></div>
+                    </div>
+                  </section>
+                )}
               </div>
+            </div>
 
-              <div className="flex items-center justify-between pt-2 gap-2">
-                <div className="flex items-center gap-2">
+            <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
                   {isEditing && (
-                    <button
-                      type="button"
-                      onClick={handleDeleteDirect}
-                      className="h-10 px-4 rounded-md border border-red-200 text-red-700 hover:bg-red-50 text-sm"
-                      disabled={savingRepeat}
-                      title="Eliminar cita"
-                    >
-                      Eliminar
+                    <button type="button" onClick={handleDeleteDirect} disabled={savingRepeat} className="h-11 w-full rounded-xl border border-rose-200 bg-white px-4 text-sm font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 sm:w-auto">
+                      Eliminar cita
                     </button>
                   )}
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={savingRepeat}
-                  className="h-10 px-6 rounded-md bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-60"
-                >
-                  {savingRepeat ? "Guardando..." : isEditing ? "Guardar cambios" : "Crear cita"}
-                </button>
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  {activeIndex > 0 && (
+                    <button type="button" onClick={goPrevious} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                      <ChevronLeft className="h-4 w-4" /> Anterior
+                    </button>
+                  )}
+                  {activeIndex < sections.length - 1 ? (
+                    <button type="button" onClick={goNext} className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0a2f68] px-5 text-sm font-bold text-white shadow-lg shadow-blue-950/15 transition hover:bg-[#0d3d82] sm:col-span-1">
+                      Continuar <ChevronRight className="h-4 w-4" />
+                    </button>
+                  ) : (
+                    <button type="submit" disabled={savingRepeat} className="col-span-2 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1">
+                      {savingRepeat ? "Guardando..." : isEditing ? "Guardar cambios" : "Crear cita"}
+                    </button>
+                  )}
+                </div>
               </div>
-            </form>
-          </div>
+            </footer>
+          </form>
         </div>
       </div>
 
-      <MessageModal
-        open={msg.open}
-        title={msg.title}
-        message={msg.message}
-        onClose={() => setMsg({ open: false, title: "", message: "" })}
-      />
+      <MessageModal open={msg.open} title={msg.title} message={msg.message} onClose={() => setMsg({ open: false, title: "", message: "" })} />
     </>
   );
 }

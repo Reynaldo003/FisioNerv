@@ -1,9 +1,9 @@
 // src/components/layout/agenda/MiniCalendar.jsx
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-// Recibe la fecha seleccionada (currentDate) y una función para cambiarla
 export function MiniCalendar({ currentDate, onChangeDate }) {
   const year = currentDate.getFullYear();
-  const month = currentDate.getMonth(); // 0 - 11
+  const month = currentDate.getMonth();
 
   const now = new Date();
   const todayDay = now.getDate();
@@ -11,18 +11,13 @@ export function MiniCalendar({ currentDate, onChangeDate }) {
   const todayYear = now.getFullYear();
 
   const monthLabel = currentDate
-    .toLocaleDateString("es-MX", {
-      month: "long",
-      year: "numeric",
-    })
+    .toLocaleDateString("es-MX", { month: "long", year: "numeric" })
     .replace(/^\w/, (c) => c.toUpperCase());
 
   const firstDayOfMonth = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  // Semana empieza en Lunes
-  const jsWeekday = firstDayOfMonth.getDay(); // 0=domingo, 1=lunes...
-  const offset = (jsWeekday + 6) % 7; // 0=lunes, 6=domingo
+  const jsWeekday = firstDayOfMonth.getDay();
+  const offset = (jsWeekday + 6) % 7;
 
   const totalCells = offset + daysInMonth;
   const rows = Math.ceil(totalCells / 7);
@@ -30,92 +25,76 @@ export function MiniCalendar({ currentDate, onChangeDate }) {
   const cells = [];
   for (let i = 0; i < rows * 7; i++) {
     const dayNumber = i - offset + 1;
-    if (dayNumber < 1 || dayNumber > daysInMonth) {
-      cells.push(null);
-    } else {
-      cells.push(dayNumber);
-    }
+    if (dayNumber < 1 || dayNumber > daysInMonth) cells.push(null);
+    else cells.push(dayNumber);
   }
 
-  const goPrevMonth = () => {
-    const d = new Date(year, month - 1, 1);
-    onChangeDate?.(d);
-  };
-
-  const goNextMonth = () => {
-    const d = new Date(year, month + 1, 1);
-    onChangeDate?.(d);
-  };
-
-  const handleSelectDay = (day) => {
-    if (!day) return;
-    const d = new Date(year, month, day);
-    onChangeDate?.(d);
-  };
+  const goPrevMonth = () => onChangeDate?.(new Date(year, month - 1, 1));
+  const goNextMonth = () => onChangeDate?.(new Date(year, month + 1, 1));
+  const handleSelectDay = (day) => day && onChangeDate?.(new Date(year, month, day));
 
   return (
-    <div className="border border-slate-200 rounded-lg p-3 text-xs bg-white shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-semibold text-slate-700">{monthLabel}</span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-slate-100"
-            onClick={goPrevMonth}
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            className="h-6 w-6 flex items-center justify-center rounded-full hover:bg-slate-100"
-            onClick={goNextMonth}
-          >
-            ›
-          </button>
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
+      <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-600">Calendario</p>
+            <h4 className="mt-1 text-sm font-bold text-slate-900">{monthLabel}</h4>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+              onClick={goPrevMonth}
+              aria-label="Mes anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+              onClick={goNextMonth}
+              aria-label="Mes siguiente"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-[10px] text-center text-slate-400 mb-1">
-        {["L", "M", "X", "J", "V", "S", "D"].map((d) => (
-          <div key={d}>{d}</div>
-        ))}
-      </div>
+      <div className="p-4">
+        <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          {["L", "M", "X", "J", "V", "S", "D"].map((d) => (
+            <div key={d} className="py-1">{d}</div>
+          ))}
+        </div>
 
-      <div className="grid grid-cols-7 gap-1 text-[10px] text-center">
-        {cells.map((day, idx) => {
-          if (!day) return <div key={idx} className="h-6" />;
+        <div className="grid grid-cols-7 gap-1.5 text-center text-[11px]">
+          {cells.map((day, idx) => {
+            if (!day) return <div key={idx} className="h-9" />;
 
-          // seleccionado = lo que el usuario eligió (currentDate)
-          const isSelected = day === currentDate.getDate();
+            const isSelected = day === currentDate.getDate();
+            const isToday = day === todayDay && month === todayMonth && year === todayYear;
 
-          // hoy real (se mantiene marcado aunque selecciones otro)
-          const isToday =
-            day === todayDay && month === todayMonth && year === todayYear;
-
-          const base =
-            "h-6 w-6 mx-auto flex items-center justify-center rounded-full transition";
-          const selectedCls = isSelected
-            ? "bg-violet-600 text-white font-semibold shadow-sm"
-            : "hover:bg-slate-100 text-slate-600";
-
-          const todayRing = isToday
-            ? isSelected
-              ? "ring-2 ring-violet-600 ring-offset-1 ring-offset-white"
-              : "ring-2 ring-violet-600 ring-offset-1 ring-offset-white"
-            : "";
-
-          return (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleSelectDay(day)}
-              className={[base, selectedCls, todayRing].filter(Boolean).join(" ")}
-              aria-current={isSelected ? "date" : undefined}
-            >
-              {day}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleSelectDay(day)}
+                aria-current={isSelected ? "date" : undefined}
+                className={[
+                  "mx-auto flex h-9 w-9 items-center justify-center rounded-xl border text-[11px] font-semibold transition",
+                  isSelected
+                    ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                    : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50",
+                  isToday && !isSelected ? "border-blue-200 bg-blue-50 text-blue-700" : "",
+                ].filter(Boolean).join(" ")}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

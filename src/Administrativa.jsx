@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import "./index.css";
 
-import { NavTab } from "./components/layout/NavTab";
 import { AgendaView } from "./components/layout/agenda/AgendaView";
 import { PatientsView } from "./components/layout/patients/PatientsView";
 import { SalesView } from "./components/layout/sales/SalesView";
@@ -15,9 +14,74 @@ import { notifySalesRefresh } from "./utils/salesSync";
 import { ServiciosAdminView } from "./components/layout/servicios/ServiciosAdminView";
 import { UserProfileView } from "./components/layout/profile/UserProfileView";
 
-import { Menu, X } from "lucide-react";
+import {
+    Activity,
+    Bell,
+    CalendarDays,
+    ChevronsLeft,
+    ChevronsRight,
+    ChevronRight,
+    CircleUserRound,
+    Globe2,
+    LogOut,
+    Menu,
+    MessageSquareText,
+    Plus,
+    Stethoscope,
+    UserRoundCog,
+    UsersRound,
+    WalletCards,
+    X,
+} from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
+
+
+const TAB_CONFIG = {
+    agenda: {
+        label: "Agenda",
+        description: "Organiza citas, bloqueos y disponibilidad del equipo.",
+        icon: CalendarDays,
+    },
+    pacientes: {
+        label: "Pacientes",
+        description: "Consulta expedientes, seguimiento e historial clínico.",
+        icon: UsersRound,
+    },
+    ventas: {
+        label: "Finanzas",
+        description: "Revisa ventas, pagos e ingresos de la clínica.",
+        icon: WalletCards,
+    },
+    servicios: {
+        label: "Servicios",
+        description: "Administra tratamientos, precios y duración.",
+        icon: Stethoscope,
+    },
+    comentarios: {
+        label: "Comentarios",
+        description: "Modera comentarios y testimonios del sitio.",
+        icon: MessageSquareText,
+    },
+    equipo: {
+        label: "Equipo",
+        description: "Gestiona profesionales, accesos y permisos.",
+        icon: UserRoundCog,
+    },
+    perfil: {
+        label: "Mi perfil",
+        description: "Actualiza tu información y preferencias de cuenta.",
+        icon: CircleUserRound,
+    },
+};
+
+function getTabConfig(tab) {
+    return TAB_CONFIG[tab] || {
+        label: String(tab || "Panel"),
+        description: "Panel administrativo de Fisionerv.",
+        icon: Activity,
+    };
+}
 
 function mapFrontendPaymentMethodToBackend(metodo) {
     if (!metodo) return "";
@@ -36,10 +100,10 @@ function mapCitaToAppointment(cita) {
     const time = horaInicio ? horaInicio.slice(0, 5) : "";
     const endTime = horaTermina ? horaTermina.slice(0, 5) : "";
 
-    let color = "bg-blue-100 text-blue-900 border-blue-300";
-    if (cita.estado === "confirmado") color = "bg-amber-100 text-amber-900 border-amber-300";
-    else if (cita.estado === "completado") color = "bg-emerald-100 text-emerald-900 border-emerald-300";
-    else if (cita.estado === "cancelado") color = "bg-red-100 text-red-900 border-red-300";
+    let color = "bg-[#eaf3ff] text-[#163b73] border-[#b9d6ff]";
+    if (cita.estado === "confirmado") color = "bg-[#fff8df] text-[#8a5a00] border-[#f3d36a]";
+    else if (cita.estado === "completado") color = "bg-[#e8f8ef] text-[#146c43] border-[#9fdfbd]";
+    else if (cita.estado === "cancelado") color = "bg-[#fff0f3] text-[#a11d43] border-[#f2b6c6]";
 
     return {
         id: cita.id,
@@ -84,7 +148,7 @@ function mapBloqueoToAppointment(b) {
         price: 0,
         paid: false,
         type: "bloqueo",
-        color: "bg-slate-200 text-slate-800 border-slate-300",
+        color: "bg-[#f1f3f7] text-[#475569] border-[#cbd5e1]",
         _type: "bloqueo",
         _raw: b, // ✅ aquí está el id real de BD
     };
@@ -222,57 +286,194 @@ function tabLabel(tab) {
     }
 }
 
-function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab }) {
+function MobileMenu({ open, onClose, allowedTabs, activeTab, onSelectTab, me, initialLetter, onLogout }) {
     if (!open) return null;
 
     return (
-        <div className="fixed inset-0 z-[9998] md:hidden">
-            {/* backdrop */}
+        <div className="fixed inset-0 z-[9998] lg:hidden">
             <button
-                className="absolute inset-0 bg-black/40"
+                type="button"
+                className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
                 onClick={onClose}
                 aria-label="Cerrar menú"
-                type="button"
             />
-            {/* sheet */}
-            <div className="absolute right-0 top-0 h-full w-[86%] max-w-sm bg-white shadow-2xl flex flex-col">
-                <div className="h-16 border-b border-slate-200 px-4 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900">Secciones</p>
+
+            <aside className="absolute left-0 top-0 flex h-full w-[86%] max-w-[320px] flex-col bg-[#061a38] text-white shadow-2xl">
+                <div className="flex h-24 items-center justify-between border-b border-white/10 px-5">
+                    <div className="flex items-center gap-3">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-950/30">
+                            <Activity className="h-6 w-6" />
+                        </span>
+                        <div>
+                            <p className="text-lg font-bold tracking-[0.12em]">FISIONERV</p>
+                            <p className="text-[10px] text-blue-200/70">Panel administrativo</p>
+                        </div>
+                    </div>
                     <button
-                        onClick={onClose}
-                        className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white h-10 w-10"
-                        aria-label="Cerrar"
                         type="button"
+                        onClick={onClose}
+                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/100"
+                        aria-label="Cerrar menú"
                     >
-                        <X size={18} />
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <div className="p-3 overflow-auto">
-                    <div className="grid gap-2">
-                        {allowedTabs.map((t) => {
-                            const active = t === activeTab;
+                <nav className="flex-1 overflow-auto px-3 py-5">
+                    <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-200/50">
+                        Navegación
+                    </p>
+                    <div className="space-y-1.5">
+                        {allowedTabs.map((tab) => {
+                            const config = getTabConfig(tab);
+                            const Icon = config.icon;
+                            const active = activeTab === tab;
                             return (
                                 <button
-                                    key={t}
+                                    key={tab}
+                                    type="button"
                                     onClick={() => {
-                                        onSelectTab(t);
+                                        onSelectTab(tab);
                                         onClose();
                                     }}
-                                    className={`w-full text-left rounded-2xl px-4 py-3 text-sm font-semibold border ${active
-                                        ? "bg-slate-900 text-white border-slate-900"
-                                        : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+                                    className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-semibold transition ${active
+                                        ? "bg-blue-600 text-white shadow-lg shadow-blue-950/30"
+                                        : "text-blue-50/75 hover:bg-white/10 hover:text-white"
                                         }`}
-                                    type="button"
                                 >
-                                    {tabLabel(t)}
+                                    <Icon className="h-5 w-5 shrink-0" />
+                                    <span className="flex-1">{config.label}</span>
+                                    {active && <ChevronRight className="h-4 w-4" />}
                                 </button>
                             );
                         })}
                     </div>
+                </nav>
+
+                <div className="border-t border-white/10 p-4">
+                    <div className="mb-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-sm font-bold">
+                            {initialLetter}
+                        </span>
+                        <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">{me?.full_name || me?.username || "Usuario"}</p>
+                            <p className="truncate text-[11px] capitalize text-blue-200/60">{me?.rol || "Usuario"}</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onLogout}
+                        className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-white/10 text-xs font-semibold text-white/100 hover:bg-white/20"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        Cerrar sesión
+                    </button>
                 </div>
-            </div>
+            </aside>
         </div>
+    );
+}
+
+function DesktopSidebar({ allowedTabs, activeTab, onSelectTab, me, initialLetter, onLogout, collapsed, onToggle }) {
+    return (
+        <aside className={`relative hidden min-h-screen shrink-0 flex-col bg-[#061a38] text-white transition-[width] duration-300 lg:flex ${collapsed ? "w-[92px]" : "w-[268px]"}`}>
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-label={collapsed ? "Expandir barra lateral" : "Contraer barra lateral"}
+                title={collapsed ? "Expandir" : "Contraer"}
+                className="absolute -right-[18px] top-24 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0a2f68] shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:scale-[1.03]"
+            >
+                {collapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+            </button>
+
+            <div className={`flex h-[104px] items-center border-b border-white/10 ${collapsed ? "justify-center px-3" : "gap-3 px-6"}`}>
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 shadow-xl shadow-blue-950/40">
+                    <Activity className="h-7 w-7" />
+                </span>
+                {!collapsed && (
+                    <div className="min-w-0">
+                        <p className="truncate text-xl font-bold tracking-[0.12em]">FISIONERV</p>
+                        <p className="mt-1 truncate text-[9px] leading-tight text-blue-200/60">
+                            Evidencia científica<br />transformada en humanismo
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            <nav className={`flex-1 overflow-auto ${collapsed ? "px-2 py-6" : "px-3 py-6"}`}>
+                {!collapsed && (
+                    <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-200/50">
+                        Administración
+                    </p>
+                )}
+                <div className="space-y-1.5">
+                    {allowedTabs.map((tab) => {
+                        const config = getTabConfig(tab);
+                        const Icon = config.icon;
+                        const active = activeTab === tab;
+                        return (
+                            <button
+                                key={tab}
+                                type="button"
+                                onClick={() => onSelectTab(tab)}
+                                title={collapsed ? config.label : undefined}
+                                className={`group flex w-full items-center rounded-2xl text-left text-sm font-semibold transition ${collapsed ? "justify-center px-2 py-3" : "gap-3 px-3 py-3"} ${active
+                                    ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-950/30"
+                                    : "text-blue-50/70 hover:bg-white/10 hover:text-white"
+                                    }`}
+                            >
+                                <Icon className={`h-5 w-5 shrink-0 ${active ? "text-white" : "text-blue-100/70 group-hover:text-white"}`} />
+                                {!collapsed && <span className="flex-1 truncate">{config.label}</span>}
+                                {!collapsed && active && <ChevronRight className="h-4 w-4" />}
+                            </button>
+                        );
+                    })}
+                </div>
+            </nav>
+
+            <div className={`space-y-3 border-t border-white/10 ${collapsed ? "p-3" : "p-4"}`}>
+                <button
+                    type="button"
+                    onClick={() => window.location.href = "/"}
+                    title={collapsed ? "Ver sitio web" : undefined}
+                    className={`flex h-11 w-full items-center rounded-2xl text-xs font-semibold text-blue-50/70 transition hover:bg-white/10 hover:text-white ${collapsed ? "justify-center px-0" : "gap-3 px-3"}`}
+                >
+                    <Globe2 className="h-4 w-4" />
+                    {!collapsed && "Ver sitio web"}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => onSelectTab("perfil")}
+                    title={collapsed ? (me?.full_name || me?.username || "Usuario") : undefined}
+                    className={`flex w-full items-center rounded-2xl border border-white/10 bg-white/5 text-left transition hover:bg-white/10 ${collapsed ? "justify-center p-2.5" : "gap-3 p-3"}`}
+                >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-sm font-bold shadow-lg shadow-blue-950/30">
+                        {initialLetter}
+                    </span>
+                    {!collapsed && (
+                        <>
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-semibold">{me?.full_name || me?.username || "Usuario"}</span>
+                                <span className="block truncate text-[11px] capitalize text-blue-200/60">{me?.rol || "Usuario"}</span>
+                            </span>
+                            <ChevronRight className="h-4 w-4 text-blue-200/50" />
+                        </>
+                    )}
+                </button>
+
+                <button
+                    type="button"
+                    onClick={onLogout}
+                    title={collapsed ? "Cerrar sesión" : undefined}
+                    className={`flex h-11 w-full items-center rounded-2xl bg-[#102b53] text-xs font-semibold text-blue-50/100 transition hover:bg-[#173866] hover:text-white ${collapsed ? "justify-center px-0" : "justify-center gap-2"}`}
+                >
+                    <LogOut className="h-4 w-4" />
+                    {!collapsed && "Cerrar sesión"}
+                </button>
+            </div>
+        </aside>
     );
 }
 
@@ -309,6 +510,7 @@ export default function Administrativa() {
 
     // ✅ menú móvil
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("fisionerv.sidebarCollapsed") === "1");
 
     const userEmail = localStorage.getItem("auth.user");
 
@@ -411,7 +613,7 @@ export default function Administrativa() {
                 ) {
                     setSelectedProfessionalId(meData.id);
                 } else {
-                    setSelectedProfessionalId((prev) => prev ?? (list[0]?.id ?? null));
+                    setSelectedProfessionalId((prev) => prev ?? null);
                 }
             } catch (e) {
                 console.error(e);
@@ -817,146 +1019,147 @@ export default function Administrativa() {
 
     if (loadingMe) {
         return (
-            <div className="min-h-screen bg-slate-100 flex items-center justify-center text-sm text-slate-600">
-                Cargando usuario...
+            <div className="flex min-h-screen items-center justify-center bg-[#061a38] text-sm text-blue-100">
+                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 shadow-2xl">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-300 border-t-transparent" />
+                    Cargando panel administrativo...
+                </div>
             </div>
         );
     }
 
+    const activeConfig = getTabConfig(activeTab);
+    const ActiveIcon = activeConfig.icon;
+
     return (
-        <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col">
-            {/* ✅ Menú móvil overlay */}
+        <div className="min-h-screen bg-[#061a38] text-slate-900">
             <MobileMenu
                 open={mobileMenuOpen}
                 onClose={() => setMobileMenuOpen(false)}
                 allowedTabs={allowedTabs}
                 activeTab={activeTab}
-                onSelectTab={(t) => setActiveTab(t)}
+                onSelectTab={setActiveTab}
+                me={me}
+                initialLetter={initialLetter}
+                onLogout={handleLogout}
             />
 
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6">
-                <div className="flex items-center gap-3 min-w-0">
-                    {/* ✅ Botón hamburguesa SOLO en móvil */}
-                    <button
-                        type="button"
-                        onClick={() => setMobileMenuOpen(true)}
-                        className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white hover:bg-slate-50"
-                        aria-label="Abrir menú"
-                        title="Secciones"
-                    >
-                        <Menu size={18} />
-                    </button>
+            <div className="flex min-h-screen">
+                <DesktopSidebar
+                    allowedTabs={allowedTabs}
+                    activeTab={activeTab}
+                    onSelectTab={setActiveTab}
+                    me={me}
+                    initialLetter={initialLetter}
+                    onLogout={handleLogout}
+                    collapsed={sidebarCollapsed}
+                    onToggle={() => setSidebarCollapsed((v) => !v)}
+                />
 
-                    <div className="h-9 w-9 rounded-full bg-violet-600 flex items-center justify-center text-white font-bold shadow-sm">
-                        FN
-                    </div>
-                    <div className="min-w-0">
-                        <h1 className="text-lg font-semibold text-slate-900 truncate">
-                            Panel administrativo – Fisionerv
-                        </h1>
-                        <p className="text-xs text-slate-500 truncate">
-                            {rol ? `Rol: ${rol}` : "Panel"} • Agenda, pacientes, servicios y ventas en un mismo lugar.
-                        </p>
-                    </div>
-                </div>
+                <div className="flex min-w-0 flex-1 flex-col bg-[#f4f7fb]">
+                    <header className="sticky top-0 z-40 flex min-h-[96px] items-center justify-between gap-4 bg-gradient-to-r from-[#082354] via-[#0a2f68] to-[#073779] px-4 py-4 text-white shadow-[0_10px_30px_rgba(2,12,27,0.18)] sm:px-6 lg:px-8">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setMobileMenuOpen(true)}
+                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white lg:hidden"
+                                aria-label="Abrir menú"
+                            >
+                                <Menu className="h-5 w-5" />
+                            </button>
 
-                <div className="flex items-center gap-4 sm:gap-6">
-                    {/* ✅ Tabs desktop */}
-                    <nav className="hidden md:flex items-center gap-1 rounded-full bg-slate-100 p-1">
-                        {allowedTabs.includes("agenda") && (
-                            <NavTab label="Agenda" active={activeTab === "agenda"} onClick={() => setActiveTab("agenda")} />
-                        )}
-                        {allowedTabs.includes("pacientes") && (
-                            <NavTab label="Pacientes" active={activeTab === "pacientes"} onClick={() => setActiveTab("pacientes")} />
-                        )}
-                        {allowedTabs.includes("ventas") && (
-                            <NavTab label="Ventas" active={activeTab === "ventas"} onClick={() => setActiveTab("ventas")} />
-                        )}
-                        {allowedTabs.includes("servicios") && (
-                            <NavTab label="Servicios" active={activeTab === "servicios"} onClick={() => setActiveTab("servicios")} />
-                        )}
-                        {allowedTabs.includes("comentarios") && (
-                            <NavTab
-                                label="Comentarios"
-                                active={activeTab === "comentarios"}
-                                onClick={() => setActiveTab("comentarios")}
-                            />
-                        )}
-                        {allowedTabs.includes("equipo") && (
-                            <NavTab label="Equipo" active={activeTab === "equipo"} onClick={() => setActiveTab("equipo")} />
-                        )}
-                        {allowedTabs.includes("perfil") && (
-                            <NavTab label="Mi perfil" active={activeTab === "perfil"} onClick={() => setActiveTab("perfil")} />
-                        )}
-                    </nav>
-
-                    <div className="flex items-center gap-3">
-                        <button
-                            className="hidden sm:inline-flex text-xs px-3 py-1 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
-                            onClick={() => (window.location.href = "/")}
-                        >
-                            Sitio web
-                        </button>
-
-                        {/* ✅ Botón de usuario -> abre perfil */}
-                        <button
-                            onClick={() => setActiveTab("perfil")}
-                            className="flex items-center gap-2 rounded-2xl px-2 py-1 hover:bg-slate-50"
-                            title="Mi perfil"
-                            type="button"
-                        >
-                            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-semibold text-slate-700 overflow-hidden">
-                                {initialLetter}
-                            </div>
-                            <span className="hidden sm:inline text-xs text-slate-600 max-w-[200px] truncate">
-                                {me?.username || userEmail || "Usuario"}
+                            <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-blue-100 sm:flex">
+                                <ActiveIcon className="h-5 w-5" />
                             </span>
-                        </button>
 
-                        <button onClick={handleLogout} className="ml-1 text-[11px] text-red-500 hover:underline" type="button">
-                            Cerrar sesión
-                        </button>
-                    </div>
+                            <div className="min-w-0">
+                                <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">{activeConfig.label}</h1>
+                                <p className="mt-1 hidden truncate text-xs text-blue-100/60 sm:block">{activeConfig.description}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                            {activeTab === "agenda" && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleNewReservation({ professionalId: selectedProfessionalId || null })}
+                                    className="hidden h-11 items-center gap-2 rounded-2xl bg-blue-500 px-4 text-xs font-semibold text-white shadow-lg shadow-blue-950/25 transition hover:bg-blue-400 sm:inline-flex"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Nueva cita
+                                </button>
+                            )}
+
+                            <button
+                                type="button"
+                                className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-blue-50 transition hover:bg-white/20"
+                                title="Notificaciones"
+                            >
+                                <Bell className="h-5 w-5" />
+                                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-cyan-300 ring-2 ring-[#0a2f68]" />
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("perfil")}
+                                className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 p-1.5 pr-2 text-left transition hover:bg-white/20"
+                                title="Mi perfil"
+                            >
+                                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-xs font-bold text-blue-800">{initialLetter}</span>
+                                <span className="hidden max-w-[140px] truncate text-xs font-semibold text-white/105 md:block">{me?.username || userEmail || "Usuario"}</span>
+                            </button>
+                        </div>
+                    </header>
+
+                    <main className={`min-h-0 flex-1 ${activeTab === "agenda" ? "overflow-hidden" : "overflow-auto p-3 sm:p-5"}`}>
+                        {activeTab === "agenda" && (
+                            loadingAppointments ? (
+                                <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                                    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                                        Cargando citas desde el servidor...
+                                    </div>
+                                </div>
+                            ) : (
+                                <AgendaView
+                                    branch={branch}
+                                    setBranch={setBranch}
+                                    appointments={appointments}
+                                    professionals={professionals}
+                                    selectedProfessionalId={selectedProfessionalId}
+                                    setSelectedProfessionalId={setSelectedProfessionalId}
+                                    role={rol}
+                                    myUserId={me?.id}
+                                    onNewReservation={handleNewReservation}
+                                    onOpenAppointment={handleOpenAppointment}
+                                    onMoveAppointment={handleMoveAppointment}
+                                    onOpenBlockModal={handleOpenBlockModal}
+                                    onDeleteBlock={handleDeleteBlock}
+                                />
+                            )
+                        )}
+
+                        {activeTab !== "agenda" && (
+                            <div className="min-h-full overflow-hidden rounded-3xl border border-slate-200/100 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)]">
+                                {activeTab === "pacientes" && <PatientsView role={rol} myUserId={me?.id} />}
+                                {activeTab === "ventas" && <SalesView />}
+                                {activeTab === "servicios" && <ServiciosAdminView role={rol} />}
+                                {activeTab === "comentarios" && <CommentsModerationView />}
+                                {activeTab === "equipo" && <Equipo />}
+                                {activeTab === "perfil" && (
+                                    <UserProfileView
+                                        me={me}
+                                        onUpdated={(nextMe) => {
+                                            setMe(nextMe);
+                                            if (nextMe?.email) localStorage.setItem("auth.user", nextMe.email);
+                                        }}
+                                        onShowInfo={(msg, title) => showInfo(msg, title)}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </main>
                 </div>
-            </header>
-
-            <div className="flex-1 flex overflow-hidden">
-                {activeTab === "agenda" &&
-                    (loadingAppointments ? (
-                        <div className="p-6 text-sm text-slate-500">Cargando citas desde el servidor...</div>
-                    ) : (
-                        <AgendaView
-                            branch={branch}
-                            setBranch={setBranch}
-                            appointments={appointments}
-                            professionals={professionals}
-                            selectedProfessionalId={selectedProfessionalId}
-                            setSelectedProfessionalId={setSelectedProfessionalId}
-                            role={rol}
-                            myUserId={me?.id}
-                            onNewReservation={handleNewReservation}
-                            onOpenAppointment={handleOpenAppointment}
-                            onMoveAppointment={handleMoveAppointment}
-                            onOpenBlockModal={handleOpenBlockModal}
-                            onDeleteBlock={handleDeleteBlock} // ✅ NUEVO
-                        />
-                    ))}
-
-                {activeTab === "pacientes" && <PatientsView role={rol} myUserId={me?.id} />}
-                {activeTab === "ventas" && <SalesView />}
-                {activeTab === "servicios" && <ServiciosAdminView role={rol} />}
-                {activeTab === "comentarios" && <CommentsModerationView />}
-                {activeTab === "equipo" && <Equipo />}
-                {activeTab === "perfil" && (
-                    <UserProfileView
-                        me={me}
-                        onUpdated={(nextMe) => {
-                            setMe(nextMe);
-                            if (nextMe?.email) localStorage.setItem("auth.user", nextMe.email);
-                        }}
-                        onShowInfo={(msg, title) => showInfo(msg, title)}
-                    />
-                )}
             </div>
 
             {modalOpen && (
@@ -1003,7 +1206,7 @@ export default function Administrativa() {
                 title={confirmModal.title}
                 message={confirmModal.message}
                 danger={confirmModal.danger}
-                onCancel={() => setConfirmModal((s) => ({ ...s, open: false }))}
+                onCancel={() => setConfirmModal((state) => ({ ...state, open: false }))}
                 onConfirm={() => {
                     if (typeof confirmModal.onConfirm === "function") confirmModal.onConfirm();
                 }}
