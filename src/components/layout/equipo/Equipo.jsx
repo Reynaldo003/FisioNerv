@@ -1,592 +1,70 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-    UserPlus,
-    Trash2,
-    RotateCcw,
-    Users,
-    Shield,
-    Mail,
-    Phone,
-    Image as ImgIcon,
-    AlignLeft,
-    X,
-} from "lucide-react";
+import { BadgeCheck, ChevronRight, Edit3, KeyRound, Layers3, Mail, Phone, Plus, RefreshCw, Save, Search, ShieldCheck, Trash2, Upload, UserRoundCog, UsersRound, X } from "lucide-react";
+import { apiFetch } from "../../../services/apiFetch";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
-
-function normalize(str) {
-    return String(str || "").trim();
-}
-function isEmailValid(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalize(email).toLowerCase());
-}
-function isPhoneValid(phone) {
-    const digits = normalize(phone).replace(/\D/g, "");
-    return digits.length >= 8;
-}
-
-const ROLES = [
-    { value: "fisioterapeuta", label: "Fisioterapeuta" },
-    { value: "nutriologo", label: "Nutriólogo" },
-    { value: "dentista", label: "Dentista" },
-    { value: "recepcion", label: "Recepción" },
-    { value: "admin", label: "Administrador" },
+const BASE_ROLES = [
+    { value: "fisioterapeuta", label: "Fisioterapeuta" }, { value: "terapeuta", label: "Terapeuta" }, { value: "nutriologo", label: "Nutriólogo" },
+    { value: "dentista", label: "Dentista" }, { value: "recepcion", label: "Recepción" }, { value: "practicante", label: "Practicante" },
+    { value: "admin", label: "Administrador" }, { value: "personalizado", label: "Rol personalizado" },
 ];
+const INTERFACES = [
+    { id: "agenda", label: "Agenda" }, { id: "pacientes", label: "Pacientes" }, { id: "ventas", label: "Finanzas" }, { id: "servicios", label: "Servicios" },
+    { id: "comentarios", label: "Comentarios" }, { id: "equipo", label: "Equipo" }, { id: "insumos", label: "Insumos" }, { id: "perfil", label: "Mi perfil" },
+];
+const PERMISSION_FIELDS = [
+    ["puede_ver_agenda", "Ver agenda"], ["puede_ver_pacientes", "Ver pacientes"], ["puede_ver_contacto_paciente", "Ver contacto de pacientes"],
+    ["puede_ver_montos", "Ver montos"], ["puede_modificar_montos", "Modificar montos"], ["puede_ver_finanzas", "Ver finanzas"],
+    ["puede_ver_servicios", "Ver servicios"], ["puede_ver_comentarios", "Ver comentarios"], ["puede_ver_equipo", "Ver equipo"], ["puede_editar_equipo", "Editar equipo"],
+    ["puede_ver_insumos", "Ver insumos"], ["puede_editar_insumos", "Editar insumos"], ["puede_ver_perfil", "Ver perfil"],
+];
+function emptyUser() { return { username: "", first_name: "", last_name: "", email: "", password: "", rol: "fisioterapeuta", rol_personalizado: "", telefono: "", descripcion: "", foto: null, is_active: true, usar_interfaces_override: false, interfaces_override: [] }; }
+function emptyRole() { return { slug: "", nombre: "", descripcion: "", interfaces: ["agenda", "perfil"], activo: true, puede_ver_agenda: true, puede_ver_pacientes: false, puede_ver_contacto_paciente: false, puede_ver_montos: false, puede_modificar_montos: false, puede_ver_finanzas: false, puede_ver_servicios: false, puede_ver_comentarios: false, puede_ver_equipo: false, puede_editar_equipo: false, puede_ver_insumos: false, puede_editar_insumos: false, puede_ver_perfil: true }; }
+async function readJson(response) { try { return await response.json(); } catch { return null; } }
+function errorText(data, fallback) { if (!data) return fallback; if (typeof data.detail === "string") return data.detail; const first = Object.entries(data).find(([, value]) => value); if (!first) return fallback; const value = Array.isArray(first[1]) ? first[1][0] : first[1]; return `${first[0]}: ${String(value)}`; }
+function roleLabel(user) { return user?.rol_personalizado_out?.nombre || BASE_ROLES.find(item => item.value === user?.rol_base_out)?.label || user?.rol_out || "Sin rol"; }
+function Avatar({ user, size = "h-10 w-10" }) { const initial = String(user?.first_name || user?.username || "U").trim()[0]?.toUpperCase() || "U"; return <span className={`${size} grid shrink-0 place-items-center overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50 to-indigo-100 text-sm font-black text-blue-700`}>{user?.foto_url ? <img src={user.foto_url} alt="" className="h-full w-full object-cover" /> : initial}</span>; }
+function Modal({ open, title, subtitle, onClose, children, wide = false }) { if (!open) return null; return <div className="fixed inset-0 z-[170] flex items-center justify-center p-4"><button type="button" className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]" onClick={onClose} aria-label="Cerrar" /><div className={`relative z-10 max-h-[92vh] w-full overflow-auto rounded-3xl border border-slate-200 bg-white shadow-2xl ${wide ? "max-w-4xl" : "max-w-xl"}`}><div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur"><div><h3 className="font-black text-slate-950">{title}</h3>{subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}</div><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><X className="h-4 w-4" /></button></div>{children}</div></div>; }
+function Message({ data, onClose }) { return <Modal open={data.open} title={data.title || "Aviso"} onClose={onClose}><div className="p-5 text-sm text-slate-600">{data.message}</div><div className="flex justify-end border-t border-slate-100 p-4"><button type="button" onClick={onClose} className="rounded-xl bg-[#0a2f68] px-4 py-2 text-xs font-bold text-white">Entendido</button></div></Modal>; }
+function Field({ label, children, full = false }) { return <label className={full ? "sm:col-span-2" : ""}><span className="mb-1.5 block text-[11px] font-bold text-slate-600">{label}</span>{children}</label>; }
+const inputClass = "h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100";
 
-async function apiFetch(path, options = {}) {
-    const access = localStorage.getItem("auth.access");
-    const refresh = localStorage.getItem("auth.refresh");
-
-    const headers = { ...(options.headers || {}) };
-    if (access) headers.Authorization = `Bearer ${access}`;
-
-    let resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
-
-    if (resp.status === 401 && refresh) {
-        const r = await fetch(`${API_BASE}/api/auth/token/refresh/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refresh }),
-        });
-
-        if (r.ok) {
-            const data = await r.json();
-            localStorage.setItem("auth.access", data.access);
-            headers.Authorization = `Bearer ${data.access}`;
-            resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
-        } else {
-            localStorage.removeItem("auth.access");
-            localStorage.removeItem("auth.refresh");
-            localStorage.removeItem("auth.user");
-            window.location.href = "/login";
-            return resp;
-        }
-    }
-    return resp;
-}
-
-/* =========================
-   Modales simples (sin alert/confirm)
-   ========================= */
-function ModalShell({ title, children, onClose, actions }) {
-    return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
-                <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                    <p className="text-sm font-semibold text-slate-900">{title}</p>
-                    <button
-                        onClick={onClose}
-                        className="rounded-lg px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
-                    >
-                        Cerrar
-                    </button>
-                </div>
-                <div className="px-5 py-4 text-sm text-slate-700">{children}</div>
-                <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-3">
-                    {actions}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function InfoModal({ open, title = "Aviso", message, onClose }) {
+function UserModal({ open, user, roles, onClose, onSaved }) {
+    const editing = Boolean(user?.id); const [form, setForm] = useState(emptyUser()); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+    useEffect(() => { if (!open) return; setError(""); setForm(user ? { ...emptyUser(), username: user.username || "", first_name: user.first_name || "", last_name: user.last_name || "", email: user.email || "", rol: user.rol_base_out || "fisioterapeuta", rol_personalizado: user.rol_personalizado_out?.id || "", telefono: user.telefono_out || "", descripcion: user.descripcion_out || "", is_active: user.is_active !== false, usar_interfaces_override: user.usar_interfaces_override_out || false, interfaces_override: user.interfaces_override_out || [] } : emptyUser()); }, [open, user]);
     if (!open) return null;
-    return (
-        <ModalShell
-            title={title}
-            onClose={onClose}
-            actions={
-                <button
-                    onClick={onClose}
-                    className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:brightness-110"
-                >
-                    Entendido
-                </button>
-            }
-        >
-            {message}
-        </ModalShell>
-    );
+    const set = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+    async function submit(event) { event.preventDefault(); setSaving(true); setError(""); const fd = new FormData();["username", "first_name", "last_name", "email", "rol", "telefono", "descripcion"].forEach(key => fd.append(key, form[key] ?? "")); fd.append("is_active", form.is_active ? "true" : "false"); if (form.password) fd.append("password", form.password); if (form.rol === "personalizado" && form.rol_personalizado) fd.append("rol_personalizado", form.rol_personalizado); if (form.foto) fd.append("foto", form.foto); try { const response = await apiFetch(editing ? `/api/staff/${user.id}/` : "/api/staff/", { method: editing ? "PATCH" : "POST", body: fd }); const data = await readJson(response); if (!response.ok) return setError(errorText(data, "No se pudo guardar el usuario.")); onSaved?.(data); } catch { setError("No se pudo conectar con el servidor."); } finally { setSaving(false); } }
+    return <Modal open={open} title={editing ? "Editar usuario" : "Nuevo usuario"} subtitle="Datos de acceso, rol y perfil público." onClose={onClose} wide><form onSubmit={submit}><div className="grid gap-4 p-5 sm:grid-cols-2"><Field label="Nombre"><input className={inputClass} value={form.first_name} onChange={e => set("first_name", e.target.value)} /></Field><Field label="Apellidos"><input className={inputClass} value={form.last_name} onChange={e => set("last_name", e.target.value)} /></Field><Field label="Usuario"><input className={inputClass} value={form.username} onChange={e => set("username", e.target.value)} required /></Field><Field label="Correo"><input type="email" className={inputClass} value={form.email} onChange={e => set("email", e.target.value)} required /></Field><Field label="Teléfono"><input className={inputClass} value={form.telefono} onChange={e => set("telefono", e.target.value)} /></Field><Field label={editing ? "Nueva contraseña (opcional)" : "Contraseña"}><input type="password" className={inputClass} value={form.password} onChange={e => set("password", e.target.value)} required={!editing} /></Field><Field label="Rol"><select className={inputClass} value={form.rol} onChange={e => set("rol", e.target.value)}>{BASE_ROLES.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></Field>{form.rol === "personalizado" && <Field label="Rol personalizado"><select className={inputClass} value={form.rol_personalizado} onChange={e => set("rol_personalizado", e.target.value)} required><option value="">Selecciona...</option>{roles.map(role => <option key={role.id} value={role.id}>{role.nombre}</option>)}</select></Field>}<Field label="Descripción" full><textarea className={`${inputClass} min-h-24 py-3`} value={form.descripcion} onChange={e => set("descripcion", e.target.value)} /></Field><Field label="Foto" full><label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-blue-200 bg-blue-50 px-4 py-4 text-xs font-bold text-blue-700 hover:bg-blue-100"><Upload className="h-4 w-4" />{form.foto?.name || "Seleccionar imagen"}<input type="file" accept="image/*" className="hidden" onChange={e => set("foto", e.target.files?.[0] || null)} /></label></Field><label className="sm:col-span-2 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3"><input type="checkbox" checked={form.is_active} onChange={e => set("is_active", e.target.checked)} className="h-4 w-4" /><span><b className="block text-xs text-slate-800">Usuario activo</b><small className="text-[10px] text-slate-500">Desactívalo para impedir acceso sin eliminar su historial.</small></span></label>{error && <div className="sm:col-span-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{error}</div>}</div><div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600">Cancelar</button><button disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-[#0a2f68] px-5 py-2 text-xs font-bold text-white disabled:opacity-50"><Save className="h-4 w-4" />{saving ? "Guardando..." : "Guardar"}</button></div></form></Modal>;
 }
 
-function ConfirmModal({ open, title, message, danger, onCancel, onConfirm }) {
-    if (!open) return null;
-    return (
-        <ModalShell
-            title={title}
-            onClose={onCancel}
-            actions={
-                <>
-                    <button
-                        onClick={onCancel}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        className={`rounded-xl px-4 py-2 text-xs font-semibold text-white hover:brightness-110 ${danger ? "bg-red-600" : "bg-slate-900"
-                            }`}
-                    >
-                        Confirmar
-                    </button>
-                </>
-            }
-        >
-            {message}
-        </ModalShell>
-    );
+function AccessModal({ open, user, onClose, onSaved }) {
+    const [enabled, setEnabled] = useState(false); const [selected, setSelected] = useState([]); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+    useEffect(() => { if (!open || !user) return; setEnabled(Boolean(user.usar_interfaces_override_out)); setSelected(user.usar_interfaces_override_out?.length ? user.interfaces_override_out : user.interfaces_out || []); setError(""); }, [open, user]);
+    if (!open || !user) return null;
+    const toggle = id => setSelected(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+    async function save() { setSaving(true); setError(""); try { const response = await apiFetch(`/api/staff/${user.id}/interfaces/`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ usar_interfaces_override: enabled, interfaces: selected }) }); const data = await readJson(response); if (!response.ok) return setError(errorText(data, "No se pudieron guardar los accesos.")); onSaved?.(data); } catch { setError("No se pudo conectar con el servidor."); } finally { setSaving(false); } }
+    return <Modal open={open} title="Interfaces visibles" subtitle={`${user.first_name || user.username} · ${roleLabel(user)}`} onClose={onClose}><div className="space-y-4 p-5"><label className="flex items-center justify-between gap-4 rounded-2xl border border-blue-100 bg-blue-50 p-4"><div><p className="text-xs font-black text-blue-900">Personalizar accesos de este usuario</p><p className="mt-1 text-[10px] text-blue-700/70">Si está desactivado, hereda las interfaces de su rol.</p></div><input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="h-5 w-5" /></label><div className="grid grid-cols-2 gap-2">{INTERFACES.map(item => { const active = selected.includes(item.id); return <button key={item.id} type="button" disabled={!enabled} onClick={() => toggle(item.id)} className={`rounded-xl border px-3 py-3 text-left text-xs font-bold transition disabled:opacity-45 ${active ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600"}`}>{item.label}</button>; })}</div>{error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{error}</div>}</div><div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600">Cancelar</button><button type="button" onClick={save} disabled={saving} className="rounded-xl bg-[#0a2f68] px-5 py-2 text-xs font-bold text-white disabled:opacity-50">{saving ? "Guardando..." : "Guardar accesos"}</button></div></Modal>;
+}
+
+function RoleModal({ open, role, onClose, onSaved }) {
+    const editing = Boolean(role?.id); const [form, setForm] = useState(emptyRole()); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+    useEffect(() => { if (open) { setForm(role ? { ...emptyRole(), ...role, interfaces: role.interfaces || [] } : emptyRole()); setError(""); } }, [open, role]);
+    if (!open) return null; const set = (key, value) => setForm(prev => ({ ...prev, [key]: value })); const toggleInterface = id => set("interfaces", form.interfaces.includes(id) ? form.interfaces.filter(item => item !== id) : [...form.interfaces, id]);
+    async function submit(event) { event.preventDefault(); setSaving(true); setError(""); try { const response = await apiFetch(editing ? `/api/roles/${role.id}/` : "/api/roles/", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); const data = await readJson(response); if (!response.ok) return setError(errorText(data, "No se pudo guardar el rol.")); onSaved?.(data); } catch { setError("No se pudo conectar con el servidor."); } finally { setSaving(false); } }
+    return <Modal open={open} title={editing ? "Editar rol personalizado" : "Nuevo rol personalizado"} subtitle="Define permisos de datos e interfaces visibles." onClose={onClose} wide><form onSubmit={submit}><div className="grid gap-4 p-5 sm:grid-cols-2"><Field label="Nombre"><input className={inputClass} value={form.nombre} onChange={e => set("nombre", e.target.value)} required /></Field><Field label="Slug"><input className={inputClass} value={form.slug} onChange={e => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "-"))} required /></Field><Field label="Descripción" full><textarea className={`${inputClass} min-h-20 py-3`} value={form.descripcion} onChange={e => set("descripcion", e.target.value)} /></Field><div className="sm:col-span-2"><p className="mb-2 text-[11px] font-black uppercase tracking-[0.13em] text-slate-500">Permisos</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{PERMISSION_FIELDS.map(([key, label]) => <label key={key} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700"><input type="checkbox" checked={Boolean(form[key])} onChange={e => set(key, e.target.checked)} />{label}</label>)}</div></div><div className="sm:col-span-2"><p className="mb-2 text-[11px] font-black uppercase tracking-[0.13em] text-slate-500">Interfaces por defecto</p><div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{INTERFACES.map(item => <button key={item.id} type="button" onClick={() => toggleInterface(item.id)} className={`rounded-xl border px-3 py-3 text-xs font-bold ${form.interfaces.includes(item.id) ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600"}`}>{item.label}</button>)}</div></div>{error && <div className="sm:col-span-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{error}</div>}</div><div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4"><button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-600">Cancelar</button><button disabled={saving} className="rounded-xl bg-[#0a2f68] px-5 py-2 text-xs font-bold text-white disabled:opacity-50">{saving ? "Guardando..." : "Guardar rol"}</button></div></form></Modal>;
 }
 
 export function Equipo() {
-    const [form, setForm] = useState({
-        nombres: "",
-        apellidos: "",
-        usuario: "",
-        correo: "",
-        telefono: "",
-        rol: "fisioterapeuta",
-        password: "",
-        descripcion: "",
-        foto: null,
-    });
-
-    const [users, setUsers] = useState([]);
-    const [query, setQuery] = useState("");
-    const [loading, setLoading] = useState(false);
-
-    const [info, setInfo] = useState({ open: false, title: "", message: "" });
-    const [confirm, setConfirm] = useState({ open: false, userId: null });
-
-    const handleChange = (field, value) => setForm((p) => ({ ...p, [field]: value }));
-
-    const limpiar = () => {
-        setForm({
-            nombres: "",
-            apellidos: "",
-            usuario: "",
-            correo: "",
-            telefono: "",
-            rol: "fisioterapeuta",
-            password: "",
-            descripcion: "",
-            foto: null,
-        });
-    };
-
-    const roleLabel = (value) => ROLES.find((r) => r.value === value)?.label || value;
-
-    const validar = () => {
-        const nombres = normalize(form.nombres);
-        const apellidos = normalize(form.apellidos);
-        const usuario = normalize(form.usuario);
-        const correo = normalize(form.correo);
-        const telefono = normalize(form.telefono);
-        const password = String(form.password || "");
-        const descripcion = normalize(form.descripcion);
-
-        if (!nombres) return "Ingresa nombres.";
-        if (!apellidos) return "Ingresa apellidos.";
-        if (!usuario) return "Ingresa usuario.";
-        if (!correo) return "Ingresa correo.";
-        if (!isEmailValid(correo)) return "El correo no parece válido.";
-        if (!telefono) return "Ingresa teléfono.";
-        if (!isPhoneValid(telefono)) return "El teléfono no parece válido.";
-        if (!form.rol) return "Selecciona un rol.";
-        if (password.length < 6) return "La contraseña debe tener al menos 6 caracteres.";
-        if (descripcion.length > 500) return "La descripción es muy larga (máx 500 chars).";
-
-        return null;
-    };
-
-    async function cargar() {
-        setLoading(true);
-        try {
-            const resp = await apiFetch("/api/staff/");
-            if (!resp.ok) {
-                const t = await resp.text();
-                console.error("STAFF LIST ERROR:", resp.status, t);
-                setUsers([]);
-                return;
-            }
-            const data = await resp.json();
-            const mapped = (Array.isArray(data) ? data : []).map((u) => ({
-                ...u,
-                rol: u.rol_out ?? u.rol,
-                telefono: u.telefono_out ?? u.telefono,
-                descripcion: u.descripcion_out ?? u.descripcion,
-            }));
-            setUsers(mapped);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        cargar();
-    }, []);
-
-    const darAlta = async () => {
-        const err = validar();
-        if (err) return setInfo({ open: true, title: "Validación", message: err });
-
-        const fd = new FormData();
-        fd.append("username", normalize(form.usuario));
-        fd.append("first_name", normalize(form.nombres));
-        fd.append("last_name", normalize(form.apellidos));
-        fd.append("email", normalize(form.correo).toLowerCase());
-        fd.append("password", String(form.password));
-        fd.append("rol", form.rol);
-        fd.append("telefono", normalize(form.telefono));
-        fd.append("descripcion", normalize(form.descripcion));
-        if (form.foto) fd.append("foto", form.foto);
-
-        setLoading(true);
-        try {
-            const resp = await apiFetch("/api/staff/", {
-                method: "POST",
-                body: fd,
-                headers: {}, // importante: no Content-Type
-            });
-
-            if (!resp.ok) {
-                const txt = await resp.text();
-                console.error("STAFF CREATE ERROR:", resp.status, txt);
-                setInfo({
-                    open: true,
-                    title: "Error",
-                    message: `No se pudo crear. HTTP ${resp.status}. Revisa consola.`,
-                });
-                return;
-            }
-
-            await cargar();
-            limpiar();
-            setInfo({ open: true, title: "Listo", message: "Usuario creado." });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const pedirEliminar = (id) => setConfirm({ open: true, userId: id });
-
-    const eliminar = async () => {
-        const id = confirm.userId;
-        setConfirm({ open: false, userId: null });
-
-        if (!id) return;
-
-        setLoading(true);
-        try {
-            const resp = await apiFetch(`/api/staff/${id}/`, { method: "DELETE" });
-            if (!resp.ok) {
-                setInfo({ open: true, title: "Error", message: "No se pudo eliminar." });
-                return;
-            }
-            setUsers((prev) => prev.filter((u) => u.id !== id));
-            setInfo({ open: true, title: "Listo", message: "Usuario eliminado." });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const filteredUsers = useMemo(() => {
-        const q = normalize(query).toLowerCase();
-        if (!q) return users;
-        return users.filter((u) => {
-            const nombre = `${u.first_name || ""} ${u.last_name || ""}`.toLowerCase();
-            return (
-                nombre.includes(q) ||
-                String(u.username || "").toLowerCase().includes(q) ||
-                String(u.email || "").toLowerCase().includes(q) ||
-                roleLabel(u.rol).toLowerCase().includes(q)
-            );
-        });
-    }, [users, query]);
-
-    return (
-        <div className="w-full overflow-auto">
-            <div className="mx-auto w-full max-w-6xl p-4 sm:p-6 space-y-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h2 className="text-base sm:text-lg font-semibold text-slate-900 flex items-center gap-2">
-                            <Users className="h-5 w-5 text-violet-600" />
-                            Equipo de la clínica
-                        </h2>
-                        <p className="text-xs text-slate-500">
-                            Da de alta miembros del equipo (esta info también se mostrará en la página “Nuestro equipo”).
-                        </p>
-                    </div>
-                    {loading ? <span className="text-xs text-slate-500">Procesando…</span> : null}
-                </div>
-
-                {/* Formulario */}
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-                        <p className="text-xs font-semibold text-slate-700 flex items-center gap-2">
-                            <UserPlus className="h-4 w-4 text-violet-600" />
-                            Alta de usuario
-                        </p>
-                    </div>
-
-                    <div className="p-4 space-y-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                            <Field label="Nombres">
-                                <input
-                                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-slate-400"
-                                    value={form.nombres}
-                                    onChange={(e) => handleChange("nombres", e.target.value)}
-                                    placeholder="Ej. Juan Carlos"
-                                />
-                            </Field>
-
-                            <Field label="Apellidos">
-                                <input
-                                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-slate-400"
-                                    value={form.apellidos}
-                                    onChange={(e) => handleChange("apellidos", e.target.value)}
-                                    placeholder="Ej. Pérez López"
-                                />
-                            </Field>
-
-                            <Field label="Usuario">
-                                <input
-                                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-slate-400"
-                                    value={form.usuario}
-                                    onChange={(e) => handleChange("usuario", e.target.value)}
-                                    placeholder="Ej. jperez"
-                                />
-                            </Field>
-
-                            <div className="lg:col-span-2">
-                                <Field label="Correo">
-                                    <div className="relative">
-                                        <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                                        <input
-                                            className="w-full pl-9 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-slate-400"
-                                            value={form.correo}
-                                            onChange={(e) => handleChange("correo", e.target.value)}
-                                            placeholder="Ej. usuario@gmail.com"
-                                        />
-                                    </div>
-                                </Field>
-                            </div>
-
-                            <Field label="Teléfono">
-                                <div className="relative">
-                                    <Phone className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                                    <input
-                                        className="w-full pl-9 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-slate-400"
-                                        value={form.telefono}
-                                        onChange={(e) => handleChange("telefono", e.target.value)}
-                                        placeholder="Ej. 55 1234 5678"
-                                    />
-                                </div>
-                            </Field>
-
-                            <Field label="Rol">
-                                <div className="relative">
-                                    <Shield className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                                    <select
-                                        className="w-full pl-9 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:border-slate-400"
-                                        value={form.rol}
-                                        onChange={(e) => handleChange("rol", e.target.value)}
-                                    >
-                                        {ROLES.map((r) => (
-                                            <option key={r.value} value={r.value}>
-                                                {r.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </Field>
-
-                            <Field label="Contraseña">
-                                <input
-                                    type="password"
-                                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-slate-400"
-                                    value={form.password}
-                                    onChange={(e) => handleChange("password", e.target.value)}
-                                    placeholder="Mínimo 6 caracteres"
-                                />
-                            </Field>
-
-                            <div className="lg:col-span-2">
-                                <Field label="Descripción">
-                                    <div className="relative">
-                                        <AlignLeft className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                                        <textarea
-                                            className="w-full pl-9 min-h-[44px] rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-slate-400"
-                                            value={form.descripcion}
-                                            onChange={(e) => handleChange("descripcion", e.target.value)}
-                                            placeholder="Breve presentación (se mostrará en la sección pública)."
-                                        />
-                                    </div>
-                                </Field>
-                            </div>
-
-                            <Field label="Foto">
-                                <div className="relative">
-                                    <ImgIcon className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="w-full pl-9 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:border-slate-400"
-                                        onChange={(e) => handleChange("foto", e.target.files?.[0] || null)}
-                                    />
-                                </div>
-                                {form.foto ? (
-                                    <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                        <p className="min-w-0 truncate text-xs text-slate-600">
-                                            <b>Seleccionado:</b> {form.foto.name}
-                                        </p>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleChange("foto", null)}
-                                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
-                                        >
-                                            <X size={14} />
-                                            Quitar
-                                        </button>
-                                    </div>
-                                ) : null}
-                            </Field>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
-                            <button
-                                type="button"
-                                onClick={limpiar}
-                                className="h-10 px-4 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 inline-flex items-center justify-center gap-2 text-sm"
-                            >
-                                <RotateCcw className="h-4 w-4" />
-                                Limpiar
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={darAlta}
-                                disabled={loading}
-                                className="h-10 px-5 rounded-xl bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60 inline-flex items-center justify-center gap-2 text-sm font-semibold"
-                            >
-                                <UserPlus className="h-4 w-4" />
-                                Dar alta
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Tabla usuarios */}
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <p className="text-xs font-semibold text-slate-700">Usuarios dados de alta</p>
-                            <p className="text-[11px] text-slate-500">Total: {users.length} usuario(s)</p>
-                        </div>
-                        <input
-                            className="w-full sm:w-72 rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-slate-400"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Buscar por nombre, usuario, correo o rol…"
-                        />
-                    </div>
-
-                    {/* ✅ clave: overflow-x-auto para móvil */}
-                    <div className="p-4 overflow-x-auto">
-                        <table className="min-w-[980px] w-full text-left border-separate border-spacing-y-1">
-                            <thead>
-                                <tr className="text-[11px] text-slate-500">
-                                    <th className="px-3 py-2">Foto</th>
-                                    <th className="px-3 py-2">Nombre</th>
-                                    <th className="px-3 py-2">Usuario</th>
-                                    <th className="px-3 py-2">Correo</th>
-                                    <th className="px-3 py-2">Teléfono</th>
-                                    <th className="px-3 py-2">Rol</th>
-                                    <th className="px-3 py-2">Descripción</th>
-                                    <th className="px-3 py-2 text-right">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredUsers.map((u) => (
-                                    <tr key={u.id} className="bg-slate-50/70 hover:bg-slate-100/80">
-                                        <td className="px-3 py-2">
-                                            <div className="h-9 w-9 rounded-full overflow-hidden border border-slate-200 bg-white">
-                                                {u.foto_url ? (
-                                                    <img src={u.foto_url} alt="foto" className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <div className="h-full w-full grid place-items-center text-[10px] text-slate-400">N/A</div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2 text-sm text-slate-800 font-semibold">
-                                            {u.first_name} {u.last_name}
-                                        </td>
-                                        <td className="px-3 py-2 text-sm text-slate-700">{u.username}</td>
-                                        <td className="px-3 py-2 text-sm text-slate-700">{u.email}</td>
-                                        <td className="px-3 py-2 text-sm text-slate-700">{u.telefono || "-"}</td>
-                                        <td className="px-3 py-2">
-                                            <span className="text-[11px] px-2 py-1 rounded-full border border-violet-200 bg-violet-50 text-violet-700">
-                                                {roleLabel(u.rol)}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2 text-sm text-slate-700 max-w-[320px]">
-                                            <span className="line-clamp-2">{u.descripcion || "-"}</span>
-                                        </td>
-                                        <td className="px-3 py-2 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => pedirEliminar(u.id)}
-                                                className="inline-flex items-center gap-2 text-[11px] px-3 py-1.5 rounded-xl border border-red-200 text-red-700 hover:bg-red-50"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                                Eliminar
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-
-                                {!filteredUsers.length && (
-                                    <tr>
-                                        <td colSpan={8} className="px-3 py-8 text-center text-slate-400 text-sm">
-                                            No hay usuarios que coincidan con la búsqueda.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        <p className="mt-3 text-[11px] text-slate-500">
-                            * La foto, rol y descripción se usarán para la sección pública “Nuestro equipo”.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <InfoModal
-                open={info.open}
-                title={info.title}
-                message={info.message}
-                onClose={() => setInfo({ open: false, title: "", message: "" })}
-            />
-
-            <ConfirmModal
-                open={confirm.open}
-                title="Eliminar usuario"
-                message="¿Seguro que quieres eliminar este usuario del equipo? Esta acción no se puede deshacer."
-                danger
-                onCancel={() => setConfirm({ open: false, userId: null })}
-                onConfirm={eliminar}
-            />
-        </div>
-    );
-}
-
-function Field({ label, children }) {
-    return (
-        <div className="grid gap-1">
-            <label className="block text-[11px] font-semibold text-slate-600">{label}</label>
-            {children}
-        </div>
-    );
+    const [users, setUsers] = useState([]); const [roles, setRoles] = useState([]); const [query, setQuery] = useState(""); const [tab, setTab] = useState("usuarios"); const [loading, setLoading] = useState(true); const [userModal, setUserModal] = useState({ open: false, user: null }); const [roleModal, setRoleModal] = useState({ open: false, role: null }); const [accessUser, setAccessUser] = useState(null); const [confirmUser, setConfirmUser] = useState(null); const [confirmRole, setConfirmRole] = useState(null); const [message, setMessage] = useState({ open: false, title: "", message: "" });
+    async function load() { setLoading(true); try { const [u, r] = await Promise.all([apiFetch("/api/staff/"), apiFetch("/api/roles/")]); const [ud, rd] = await Promise.all([readJson(u), readJson(r)]); if (!u.ok || !r.ok) throw new Error(errorText(!u.ok ? ud : rd, "No se pudo cargar la configuración del equipo.")); setUsers(Array.isArray(ud) ? ud : ud?.results || []); setRoles(Array.isArray(rd) ? rd : rd?.results || []); } catch (error) { setMessage({ open: true, title: "Equipo", message: error.message || "No se pudo cargar el equipo." }); } finally { setLoading(false); } }
+    useEffect(() => { load(); }, []);
+    const filtered = useMemo(() => { const q = query.trim().toLowerCase(); if (!q) return users; return users.filter(user => `${user.first_name || ""} ${user.last_name || ""} ${user.username || ""} ${user.email || ""} ${roleLabel(user)}`.toLowerCase().includes(q)); }, [users, query]);
+    async function removeUser() { const user = confirmUser; setConfirmUser(null); if (!user) return; try { const response = await apiFetch(`/api/staff/${user.id}/`, { method: "DELETE" }); if (!response.ok && response.status !== 204) throw new Error("No se pudo eliminar el usuario."); setUsers(prev => prev.filter(item => item.id !== user.id)); } catch (error) { setMessage({ open: true, title: "Eliminar usuario", message: error.message }); } }
+    async function removeRole() { const role = confirmRole; setConfirmRole(null); if (!role) return; try { const response = await apiFetch(`/api/roles/${role.id}/`, { method: "DELETE" }); const data = await readJson(response); if (!response.ok && response.status !== 204) throw new Error(errorText(data, "No se pudo eliminar el rol.")); setRoles(prev => prev.filter(item => item.id !== role.id)); } catch (error) { setMessage({ open: true, title: "Eliminar rol", message: error.message }); } }
+    return <div className="min-h-full bg-[#f6f8fc] p-4 sm:p-6"><div className="mx-auto max-w-full px-8 space-y-4"><section className="overflow-hidden rounded-3xl bg-gradient-to-r from-[#071d44] via-[#0a2f68] to-[#1746D1] p-5 text-white shadow-[0_18px_50px_rgba(7,29,68,.2)] sm:p-6"><div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[.16em] text-blue-100"><UserRoundCog className="h-3.5 w-3.5" />Administración</span><h2 className="mt-3 text-2xl font-black tracking-tight">Equipo y accesos</h2></div><div className="grid grid-cols-3 gap-2 text-center"><div className="rounded-2xl bg-white/10 px-4 py-3"><b className="block text-xl">{users.length}</b><span className="text-[10px] text-blue-100/60">usuarios</span></div><div className="rounded-2xl bg-white/10 px-4 py-3"><b className="block text-xl">{roles.length}</b><span className="text-[10px] text-blue-100/60">roles propios</span></div><div className="rounded-2xl bg-white/10 px-4 py-3"><b className="block text-xl">{users.filter(u => u.is_active !== false).length}</b><span className="text-[10px] text-blue-100/60">activos</span></div></div></div></section>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm"><div className="flex gap-1">{[["usuarios", "Usuarios", UsersRound], ["roles", "Roles", ShieldCheck]].map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setTab(id)} className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold ${tab === id ? "bg-[#0a2f68] text-white" : "text-slate-600 hover:bg-slate-50"}`}><Icon className="h-4 w-4" />{label}</button>)}</div><button type="button" onClick={load} disabled={loading} className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button></div>
+        {tab === "usuarios" ? <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="relative min-w-0 flex-1 sm:max-w-md"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={e => setQuery(e.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-300 focus:bg-white" placeholder="Buscar usuario, correo o rol..." /></div><button type="button" onClick={() => setUserModal({ open: true, user: null })} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1746D1] px-4 text-xs font-bold text-white shadow-lg shadow-blue-600/15"><Plus className="h-4 w-4" />Nuevo usuario</button></div><div className="divide-y divide-slate-100">{filtered.map(user => <article key={user.id} className="grid gap-3 p-4 transition hover:bg-slate-50/70 lg:grid-cols-[minmax(240px,1.4fr)_minmax(180px,.9fr)_minmax(220px,1fr)_auto] lg:items-center"><div className="flex min-w-0 items-center gap-3"><Avatar user={user} /><div className="min-w-0"><p className="truncate text-sm font-black text-slate-900">{`${user.first_name || ""} ${user.last_name || ""}`.trim() || user.username}</p><p className="mt-0.5 truncate text-[11px] text-slate-500">@{user.username} · {user.email}</p></div></div><div><span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">{roleLabel(user)}</span><p className="mt-1 text-[10px] text-slate-400">{user.is_active === false ? "Acceso desactivado" : "Cuenta activa"}</p></div><div><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Interfaces</p><div className="mt-1 flex flex-wrap gap-1">{(user.interfaces_out || []).slice(0, 4).map(item => <span key={item} className="rounded-md bg-slate-100 px-1.5 py-1 text-[9px] font-bold text-slate-600">{INTERFACES.find(x => x.id === item)?.label || item}</span>)}{(user.interfaces_out || []).length > 4 && <span className="rounded-md bg-slate-100 px-1.5 py-1 text-[9px] font-bold text-slate-500">+{user.interfaces_out.length - 4}</span>}</div></div><div className="flex flex-wrap justify-end gap-2"><button type="button" onClick={() => setAccessUser(user)} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" title="Interfaces"><Layers3 className="h-4 w-4" /></button><button type="button" onClick={() => setUserModal({ open: true, user })} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700" title="Editar"><Edit3 className="h-4 w-4" /></button><button type="button" onClick={() => setConfirmUser(user)} className="grid h-9 w-9 place-items-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50" title="Eliminar"><Trash2 className="h-4 w-4" /></button></div></article>)}{!filtered.length && <div className="p-10 text-center text-sm text-slate-400">No hay usuarios para mostrar.</div>}</div></section> : <section className="grid gap-4 lg:grid-cols-2">{roles.map(role => <article key={role.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-violet-700"><ShieldCheck className="h-5 w-5" /></span><div className="flex gap-2"><button type="button" onClick={() => setRoleModal({ open: true, role })} className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 text-slate-600"><Edit3 className="h-4 w-4" /></button><button type="button" onClick={() => setConfirmRole(role)} className="grid h-9 w-9 place-items-center rounded-xl border border-rose-200 text-rose-600"><Trash2 className="h-4 w-4" /></button></div></div><h3 className="mt-4 font-black text-slate-900">{role.nombre}</h3><p className="mt-1 text-[10px] font-bold text-violet-600">{role.slug}</p><p className="mt-2 min-h-9 text-xs leading-relaxed text-slate-500">{role.descripcion || "Sin descripción."}</p><div className="mt-4 flex flex-wrap gap-1.5">{(role.interfaces || []).map(item => <span key={item} className="rounded-lg bg-slate-100 px-2 py-1 text-[9px] font-bold text-slate-600">{INTERFACES.find(x => x.id === item)?.label || item}</span>)}</div></article>)}<button type="button" onClick={() => setRoleModal({ open: true, role: null })} className="min-h-52 rounded-3xl border-2 border-dashed border-blue-200 bg-blue-50/40 p-5 text-blue-700 hover:bg-blue-50"><Plus className="mx-auto h-7 w-7" /><span className="mt-2 block text-sm font-black">Crear rol personalizado</span><span className="mt-1 block text-[11px] text-blue-600/70">Combina permisos e interfaces según el puesto.</span></button></section>}
+    </div><UserModal open={userModal.open} user={userModal.user} roles={roles} onClose={() => setUserModal({ open: false, user: null })} onSaved={() => { setUserModal({ open: false, user: null }); load(); }} /><RoleModal open={roleModal.open} role={roleModal.role} onClose={() => setRoleModal({ open: false, role: null })} onSaved={() => { setRoleModal({ open: false, role: null }); load(); }} /><AccessModal open={Boolean(accessUser)} user={accessUser} onClose={() => setAccessUser(null)} onSaved={() => { setAccessUser(null); load(); }} />
+        <Modal open={Boolean(confirmUser)} title="Eliminar usuario" subtitle="Esta acción no se puede deshacer." onClose={() => setConfirmUser(null)}><div className="p-5 text-sm text-slate-600">¿Eliminar a <b>{confirmUser?.username}</b> del equipo?</div><div className="flex justify-end gap-2 border-t border-slate-100 p-4"><button type="button" onClick={() => setConfirmUser(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600">Cancelar</button><button type="button" onClick={removeUser} className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white">Eliminar</button></div></Modal>
+        <Modal open={Boolean(confirmRole)} title="Eliminar rol" subtitle="No podrás eliminarlo si está siendo utilizado." onClose={() => setConfirmRole(null)}><div className="p-5 text-sm text-slate-600">¿Eliminar el rol <b>{confirmRole?.nombre}</b>?</div><div className="flex justify-end gap-2 border-t border-slate-100 p-4"><button type="button" onClick={() => setConfirmRole(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600">Cancelar</button><button type="button" onClick={removeRole} className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white">Eliminar</button></div></Modal><Message data={message} onClose={() => setMessage({ open: false, title: "", message: "" })} /></div>;
 }

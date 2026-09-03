@@ -1,4 +1,3 @@
-// src/components/layout/agenda/MiniCalendar.jsx
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export function MiniCalendar({ currentDate, onChangeDate }) {
@@ -31,16 +30,22 @@ export function MiniCalendar({ currentDate, onChangeDate }) {
 
   const goPrevMonth = () => onChangeDate?.(new Date(year, month - 1, 1));
   const goNextMonth = () => onChangeDate?.(new Date(year, month + 1, 1));
-  const handleSelectDay = (day) => day && onChangeDate?.(new Date(year, month, day));
+  const handleSelectDay = (day) =>
+    day && onChangeDate?.(new Date(year, month, day));
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)]">
       <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-4 py-3">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-600">Calendario</p>
-            <h4 className="mt-1 text-sm font-bold text-slate-900">{monthLabel}</h4>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-600">
+              Calendario
+            </p>
+            <h4 className="mt-1 text-sm font-bold text-slate-900">
+              {monthLabel}
+            </h4>
           </div>
+
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -50,6 +55,7 @@ export function MiniCalendar({ currentDate, onChangeDate }) {
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
+
             <button
               type="button"
               className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
@@ -64,21 +70,26 @@ export function MiniCalendar({ currentDate, onChangeDate }) {
 
       <div className="p-4">
         <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-          {["L", "M", "X", "J", "V", "S", "D"].map((d) => (
-            <div key={d} className="py-1">{d}</div>
+          {["L", "M", "X", "J", "V", "S", "D"].map((day) => (
+            <div key={day} className="py-1">
+              {day}
+            </div>
           ))}
         </div>
 
         <div className="grid grid-cols-7 gap-1.5 text-center text-[11px]">
-          {cells.map((day, idx) => {
-            if (!day) return <div key={idx} className="h-9" />;
+          {cells.map((day, index) => {
+            if (!day) return <div key={index} className="h-9" />;
 
             const isSelected = day === currentDate.getDate();
-            const isToday = day === todayDay && month === todayMonth && year === todayYear;
+            const isToday =
+              day === todayDay &&
+              month === todayMonth &&
+              year === todayYear;
 
             return (
               <button
-                key={idx}
+                key={index}
                 type="button"
                 onClick={() => handleSelectDay(day)}
                 aria-current={isSelected ? "date" : undefined}
@@ -87,8 +98,12 @@ export function MiniCalendar({ currentDate, onChangeDate }) {
                   isSelected
                     ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/20"
                     : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50",
-                  isToday && !isSelected ? "border-blue-200 bg-blue-50 text-blue-700" : "",
-                ].filter(Boolean).join(" ")}
+                  isToday && !isSelected
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 {day}
               </button>

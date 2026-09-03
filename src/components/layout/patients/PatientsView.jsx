@@ -1445,8 +1445,8 @@ export function PatientsView() {
                           <tr
                             key={patient.id}
                             className={`border-b border-slate-100 transition hover:bg-slate-50/80 ${birthday.isToday
-                                ? "bg-amber-50/40"
-                                : ""
+                              ? "bg-amber-50/40"
+                              : ""
                               }`}
                           >
                             <Td>
@@ -1521,9 +1521,9 @@ export function PatientsView() {
                             <Td>
                               <span
                                 className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${patient.estado_tratamiento ===
-                                    "alta"
-                                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                                    : "bg-amber-50 text-amber-700 ring-amber-200"
+                                  "alta"
+                                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                                  : "bg-amber-50 text-amber-700 ring-amber-200"
                                   }`}
                               >
                                 {estadoTratamientoLabel(
@@ -1925,29 +1925,9 @@ const PROFILE_SECTIONS = [
     icon: CalendarDays,
   },
   {
-    key: "evaluations",
-    label: "Evaluaciones",
-    icon: ClipboardList,
-  },
-  {
     key: "documents",
     label: "Documentos",
     icon: FolderOpen,
-  },
-  {
-    key: "billing",
-    label: "Facturación",
-    icon: FileText,
-  },
-  {
-    key: "notes",
-    label: "Notas",
-    icon: Pencil,
-  },
-  {
-    key: "reminders",
-    label: "Recordatorios",
-    icon: CalendarDays,
   },
 ];
 
@@ -2030,8 +2010,8 @@ function PatientProfileModal({
 
                 <label
                   className={`absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-full border-4 border-white bg-indigo-600 text-white shadow-md transition hover:bg-indigo-700 ${actionLoading
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
                     }`}
                   title="Cambiar fotografía"
                 >
@@ -2064,9 +2044,9 @@ function PatientProfileModal({
                 <div className="mt-2 flex flex-wrap items-center gap-2 lg:justify-center">
                   <span
                     className={`rounded-full px-2.5 py-1 text-[10px] font-black ring-1 ${patient.estado_tratamiento ===
-                        "alta"
-                        ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                        : "bg-amber-50 text-amber-700 ring-amber-200"
+                      "alta"
+                      ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                      : "bg-amber-50 text-amber-700 ring-amber-200"
                       }`}
                   >
                     {estadoTratamientoLabel(
@@ -2095,7 +2075,7 @@ function PatientProfileModal({
               <button
                 onClick={onEdit}
                 disabled={actionLoading}
-                className="flex h-9 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white text-[11px] font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                className="flex h-9 flex-1 items-center justify-center py-1 gap-2 rounded-xl border border-slate-200 bg-white text-[11px] font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 <Pencil size={13} />
                 Editar
@@ -2105,7 +2085,7 @@ function PatientProfileModal({
                 <button
                   onClick={onRemovePhoto}
                   disabled={actionLoading}
-                  className="flex h-9 flex-1 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 text-[11px] font-black text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
+                  className="flex h-9 flex-1 items-center justify-center py-1 gap-2 rounded-xl border border-rose-200 bg-rose-50 text-[11px] font-black text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
                 >
                   <Trash2 size={13} />
                   Quitar foto
@@ -2126,8 +2106,8 @@ function PatientProfileModal({
                       setSection(key)
                     }
                     className={`flex h-10 w-full items-center gap-3 rounded-xl px-3 text-left text-[11px] font-bold transition ${section === key
-                        ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                      ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200"
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
                       }`}
                   >
                     <Icon size={15} />
@@ -2229,44 +2209,6 @@ function PatientProfileModal({
                       }
                       onRemove={
                         onRemoveDocument
-                      }
-                    />
-                  )}
-
-                {section ===
-                  "evaluations" && (
-                    <EmptySection
-                      title="Evaluaciones"
-                      description="La interfaz está preparada para conectar evaluaciones clínicas posteriormente."
-                      icon={
-                        ClipboardList
-                      }
-                    />
-                  )}
-
-                {section ===
-                  "billing" && (
-                    <EmptySection
-                      title="Facturación"
-                      description="Este apartado requiere definir el endpoint de pagos/facturas por paciente."
-                      icon={FileText}
-                    />
-                  )}
-
-                {section ===
-                  "notes" && (
-                    <NotesSection
-                      patient={patient}
-                    />
-                  )}
-
-                {section ===
-                  "reminders" && (
-                    <EmptySection
-                      title="Recordatorios"
-                      description="Aquí podremos agregar seguimientos, recordatorios de cita y tareas pendientes cuando exista su modelo de backend."
-                      icon={
-                        CalendarDays
                       }
                     />
                   )}
@@ -2823,8 +2765,8 @@ function DocumentsSection({
 
         <label
           className={`flex min-h-[150px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-indigo-200 bg-indigo-50/40 p-6 text-center transition hover:bg-indigo-50 ${disabled
-              ? "pointer-events-none opacity-50"
-              : "cursor-pointer"
+            ? "pointer-events-none opacity-50"
+            : "cursor-pointer"
             }`}
         >
           <UploadCloud
@@ -3144,8 +3086,8 @@ function PatientFormModal({
               <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
                 <label
                   className={`inline-flex h-9 items-center gap-2 rounded-xl bg-indigo-600 px-3 text-[11px] font-black text-white hover:bg-indigo-700 ${loading
-                      ? "pointer-events-none opacity-50"
-                      : "cursor-pointer"
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
                     }`}
                 >
                   <Camera size={14} />
@@ -3528,8 +3470,8 @@ function DeleteConfirmModal({
           {!!appointmentCount && (
             <label
               className={`mt-3 flex cursor-pointer gap-3 rounded-xl border p-4 transition ${deleteAppointments
-                  ? "border-rose-300 bg-rose-50"
-                  : "border-slate-200 bg-white hover:bg-slate-50"
+                ? "border-rose-300 bg-rose-50"
+                : "border-slate-200 bg-white hover:bg-slate-50"
                 }`}
             >
               <input
@@ -3703,8 +3645,8 @@ function TableButton({
     <button
       onClick={onClick}
       className={`h-7 rounded-md border px-2.5 text-[10px] font-black transition ${danger
-          ? "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
-          : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"
+        ? "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
+        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600"
         }`}
     >
       {children}
@@ -3724,8 +3666,8 @@ function PaginationButton({
       disabled={disabled}
       onClick={onClick}
       className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-[11px] font-black transition disabled:cursor-not-allowed disabled:opacity-30 ${active
-          ? "bg-indigo-600 text-white shadow-sm"
-          : "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+        ? "bg-indigo-600 text-white shadow-sm"
+        : "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
         }`}
     >
       {children}

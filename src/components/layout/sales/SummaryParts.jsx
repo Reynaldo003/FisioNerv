@@ -1,210 +1,35 @@
-//src/components/layout/SummaryParts.jsx
-// Bloque de filtros superiores
-export function FilterField({ label, children }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm/5">
-      <p className="text-[11px] font-semibold text-slate-600 mb-2">{label}</p>
-      {children}
-    </div>
-  );
+export function FilterField({ label, helper, children }) {
+  return <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.04)]"><div className="mb-2"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">{label}</p>{helper && <p className="mt-0.5 text-[10px] text-slate-400">{helper}</p>}</div>{children}</div>;
 }
 
-// Tarjetas KPI
-export function KpiCard({ label, value, helper, pill }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col gap-2 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-lg font-semibold text-slate-600">{label}</p>
-        {pill && (
-          <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 text-[10px] px-2 py-0.5 border border-emerald-100">
-            {pill}
-          </span>
-        )}
-      </div>
-      <p className="text-xl font-semibold text-slate-900">{value}</p>
-      {helper && <p className="text-base text-slate-500 leading-snug">{helper}</p>}
-    </div>
-  );
+export function KpiCard({ label, value, helper, pill, icon: Icon, tone = "blue" }) {
+  const tones = { blue: "bg-blue-50 text-blue-700", emerald: "bg-emerald-50 text-emerald-700", violet: "bg-violet-50 text-violet-700", amber: "bg-amber-50 text-amber-700", rose: "bg-rose-50 text-rose-700", slate: "bg-slate-100 text-slate-700" };
+  const cls = tones[tone] || tones.blue;
+  return <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.05)]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">{label}</p><p className="mt-1 truncate text-2xl font-black tracking-tight text-slate-950">{value}</p></div>{Icon && <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${cls}`}><Icon className="h-5 w-5" /></span>}</div><div className="mt-3 flex flex-wrap items-center gap-2">{helper && <span className="text-[11px] font-medium text-slate-500">{helper}</span>}{pill && <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">{pill}</span>}</div></article>;
 }
 
-// Card contenedora
-export function SummaryCard({ title, subtitle, children }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
-      <div>
-        <h3 className="text-xs font-semibold text-slate-700">{title}</h3>
-        {subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>}
-      </div>
-      {children}
-    </div>
-  );
+export function SummaryCard({ title, subtitle, children, action }) {
+  return <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.05)]"><div className="mb-4 flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold text-slate-900">{title}</h3>{subtitle && <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{subtitle}</p>}</div>{action}</div>{children}</section>;
 }
 
-// Pill simple para estados
 export function BadgePill({ label, tone = "slate" }) {
-  const cls =
-    tone === "emerald"
-      ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-      : tone === "amber"
-        ? "bg-amber-50 text-amber-800 border-amber-100"
-        : "bg-slate-100 text-slate-700 border-slate-200";
-
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cls}`}>
-      {label}
-    </span>
-  );
+  const tones = { emerald: "border-emerald-100 bg-emerald-50 text-emerald-700", amber: "border-amber-100 bg-amber-50 text-amber-800", rose: "border-rose-100 bg-rose-50 text-rose-700", blue: "border-blue-100 bg-blue-50 text-blue-700", violet: "border-violet-100 bg-violet-50 text-violet-700", slate: "border-slate-200 bg-slate-100 text-slate-700" };
+  return <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-bold ${tones[tone] || tones.slate}`}>{label}</span>;
 }
 
-// ============================
-// PIE CHART (SVG) - simple y ligero
-// ============================
+const PIE_COLORS = ["#1746D1", "#10b981", "#7c3aed", "#f59e0b", "#ef4444", "#06b6d4", "#64748b", "#e11d48"];
+function normalizeItems(items) { const clean = (items || []).map(item => ({ label: String(item.label || "Sin etiqueta"), value: Number(item.value || 0) })).filter(item => item.value > 0); const total = clean.reduce((sum, item) => sum + item.value, 0); return { total, items: total ? clean.map(item => ({ ...item, pct: item.value / total })) : [] }; }
+function polar(cx, cy, r, angle) { const rad = ((angle - 90) * Math.PI) / 180; return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }; }
+function arcPath(cx, cy, r, startAngle, endAngle) { const start = polar(cx, cy, r, endAngle); const end = polar(cx, cy, r, startAngle); const large = endAngle - startAngle <= 180 ? 0 : 1; return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${large} 0 ${end.x} ${end.y} Z`; }
 
-const PIE_COLORS = [
-  "#7c3aed", // violeta
-  "#10b981", // emerald
-  "#0ea5e9", // sky
-  "#f59e0b", // amber
-  "#ef4444", // red
-  "#14b8a6", // teal
-  "#a855f7", // purple
-  "#22c55e", // green
-  "#64748b", // slate
-  "#e11d48", // rose
-];
-
-function clamp01(x) {
-  const v = Number(x || 0);
-  if (v < 0) return 0;
-  if (v > 1) return 1;
-  return v;
+export function PieChart({ items, size = 150 }) {
+  const { total, items: normalized } = normalizeItems(items); const cx = size / 2; const cy = size / 2; const r = size / 2 - 3;
+  if (!total) return <div className="grid place-items-center"><div className="grid h-[150px] w-[150px] place-items-center rounded-full border border-slate-200 bg-slate-50 text-[11px] text-slate-400">Sin datos</div></div>;
+  let angle = 0;
+  return <div className="grid place-items-center"><svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>{normalized.map((segment, index) => { const end = angle + segment.pct * 360; const path = <path key={`${segment.label}-${index}`} d={arcPath(cx, cy, r, angle, end)} fill={PIE_COLORS[index % PIE_COLORS.length]} stroke="#fff" strokeWidth="2" />; angle = end; return path; })}<circle cx={cx} cy={cy} r={r * .48} fill="white" /><text x={cx} y={cy - 2} textAnchor="middle" style={{ fontSize: 13, fontWeight: 800, fill: "#0f172a" }}>{normalized.length}</text><text x={cx} y={cy + 14} textAnchor="middle" style={{ fontSize: 9, fill: "#64748b" }}>categorías</text></svg></div>;
 }
 
-function polarToCartesian(cx, cy, r, angleDeg) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180.0;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
-
-function arcPath(cx, cy, r, startAngle, endAngle) {
-  const start = polarToCartesian(cx, cy, r, endAngle);
-  const end = polarToCartesian(cx, cy, r, startAngle);
-  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
-  return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y} Z`;
-}
-
-function normalizeItems(items) {
-  const clean = (items || [])
-    .map((i) => ({ label: String(i.label || "Sin etiqueta"), value: Number(i.value || 0) }))
-    .filter((i) => i.value > 0);
-
-  const total = clean.reduce((acc, i) => acc + i.value, 0);
-  if (!total) return { total: 0, items: [] };
-
-  const out = clean.map((i) => ({ ...i, pct: i.value / total }));
-  return { total, items: out };
-}
-
-export function PieChart({ items, size = 140, stroke = 0 }) {
-  const { total, items: norm } = normalizeItems(items);
-
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = size / 2 - 2;
-
-  if (!total) {
-    return (
-      <div className="flex items-center justify-center">
-        <div className="h-[140px] w-[140px] rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center">
-          <span className="text-[11px] text-slate-400">Sin datos</span>
-        </div>
-      </div>
-    );
-  }
-
-  let startAngle = 0;
-
-  return (
-    <div className="flex items-center justify-center">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
-        {norm.map((seg, idx) => {
-          const pct = clamp01(seg.pct);
-          const angle = pct * 360;
-          const endAngle = startAngle + angle;
-          const d = arcPath(cx, cy, r, startAngle, endAngle);
-          const fill = PIE_COLORS[idx % PIE_COLORS.length];
-          const path = (
-            <path
-              key={`${seg.label}-${idx}`}
-              d={d}
-              fill={fill}
-              stroke={stroke ? "#ffffff" : "none"}
-              strokeWidth={stroke}
-            />
-          );
-          startAngle = endAngle;
-          return path;
-        })}
-
-        {/* donut hole sutil */}
-        <circle cx={cx} cy={cy} r={Math.max(r * 0.45, 26)} fill="white" opacity="0.92" />
-        <text
-          x={cx}
-          y={cy - 2}
-          textAnchor="middle"
-          className="fill-slate-800"
-          style={{ fontSize: 12, fontWeight: 700 }}
-        >
-          {norm.length}
-        </text>
-        <text
-          x={cx}
-          y={cy + 14}
-          textAnchor="middle"
-          className="fill-slate-500"
-          style={{ fontSize: 10 }}
-        >
-          categorías
-        </text>
-      </svg>
-    </div>
-  );
-}
-
-// Leyenda compacta (útil para pie)
-export function LegendList({ items, max = 12 }) {
-  const { total, items: norm } = normalizeItems(items);
-
-  if (!total) return <p className="text-[11px] text-slate-400">Sin datos para mostrar.</p>;
-
-  const sliced = norm.slice(0, max);
-  const rest = norm.slice(max);
-
-  return (
-    <div className="space-y-2 text-[11px]">
-      {sliced.map((i, idx) => {
-        const pct = Math.round(i.pct * 100);
-        const color = PIE_COLORS[idx % PIE_COLORS.length];
-        return (
-          <div key={i.label} className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <span
-                className="h-2.5 w-2.5 rounded-full shrink-0"
-                style={{ background: color }}
-              />
-              <span className="text-slate-700 truncate">{i.label}</span>
-            </div>
-            <span className="text-slate-500 shrink-0">
-              {pct}% <span className="text-slate-400">({i.value.toFixed(0)})</span>
-            </span>
-          </div>
-        );
-      })}
-
-      {rest.length > 0 && (
-        <p className="text-[11px] text-slate-400">
-          + {rest.length} categorías más (ocultas en la leyenda para no saturar).
-        </p>
-      )}
-    </div>
-  );
+export function LegendList({ items, max = 10, formatter }) {
+  const { total, items: normalized } = normalizeItems(items); if (!total) return <p className="text-[11px] text-slate-400">Sin datos para mostrar.</p>;
+  return <div className="space-y-2">{normalized.slice(0, max).map((item, index) => <div key={`${item.label}-${index}`} className="flex items-center justify-between gap-3 text-[11px]"><div className="flex min-w-0 items-center gap-2"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} /><span className="truncate font-medium text-slate-700">{item.label}</span></div><span className="shrink-0 text-slate-500">{Math.round(item.pct * 100)}% · {formatter ? formatter(item.value) : item.value.toFixed(0)}</span></div>)}{normalized.length > max && <p className="text-[10px] text-slate-400">+ {normalized.length - max} categorías adicionales</p>}</div>;
 }
