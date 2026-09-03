@@ -43,8 +43,8 @@ import { MiniCalendar } from "./MiniCalendar";
 
 installFetchWithRefresh();
 
-//const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
-const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
+//const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
 
 const HOURS = [
   "08:00",
