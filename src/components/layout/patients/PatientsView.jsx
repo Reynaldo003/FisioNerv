@@ -225,7 +225,88 @@ function showError(error, fallback) {
 }
 
 
-export function PatientsView() {
+function AltaFutureAppointmentsModal({
+  data,
+  loading,
+  onClose,
+  onKeep,
+  onDelete,
+}) {
+  if (!data?.open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+      <button
+        type="button"
+        className="absolute inset-0"
+        onClick={() => !loading && onClose()}
+        aria-label="Cerrar"
+      />
+
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="border-b border-slate-100 p-5">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <AlertTriangle size={19} />
+            </span>
+
+            <div>
+              <h3 className="text-sm font-black text-slate-900">
+                Citas posteriores al alta
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {data.patientName || "El paciente"} tiene{" "}
+                <strong>
+                  {data.count} cita{data.count === 1 ? "" : "s"}
+                </strong>{" "}
+                programada{data.count === 1 ? "" : "s"} después de la fecha de alta.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5">
+          <p className="text-xs leading-5 text-slate-600">
+            ¿Deseas eliminar esas citas o conservarlas en la agenda?
+          </p>
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 p-4">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onClose}
+            className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-600 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onKeep}
+            className="h-10 rounded-xl border border-indigo-200 bg-indigo-50 px-4 text-xs font-bold text-indigo-700 disabled:opacity-50"
+          >
+            Conservar citas
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onDelete}
+            className="h-10 rounded-xl bg-rose-600 px-4 text-xs font-bold text-white disabled:opacity-50"
+          >
+            Dar de alta y eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+export function PatientsView({ role, permissions }) {
+  const canSeePatientContact =
+    role !== "practicante" &&
+    (permissions?.puede_ver_contacto_paciente ?? true);
   const [patients, setPatients] = useState([]);
   const [citas, setCitas] = useState([]);
   const [professionals, setProfessionals] = useState([]);
@@ -260,6 +341,12 @@ export function PatientsView() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [altaConfirm, setAltaConfirm] = useState({
+    open: false,
+    patientName: "",
+    count: 0,
+    formData: null,
+  });
 
 
   const loadMainData = useCallback(async () => {
@@ -449,18 +536,19 @@ export function PatientsView() {
     return enhancedPatients
       .filter((paciente) => {
         if (term) {
-          const matches =
-            paciente.fullName
+          const matchesName = paciente.fullName
+            .toLowerCase()
+            .includes(term);
+          const matchesContact =
+            canSeePatientContact &&
+            ((paciente.correo || "")
               .toLowerCase()
               .includes(term) ||
-            (paciente.correo || "")
-              .toLowerCase()
-              .includes(term) ||
-            (paciente.telefono || "")
-              .toLowerCase()
-              .includes(term);
+              (paciente.telefono || "")
+                .toLowerCase()
+                .includes(term));
 
-          if (!matches) return false;
+          if (!matchesName && !matchesContact) return false;
         }
 
         if (
@@ -533,6 +621,7 @@ export function PatientsView() {
     filterStatus,
     filterStartDate,
     filterEndDate,
+    canSeePatientContact,
   ]);
 
 
@@ -949,81 +1038,104 @@ export function PatientsView() {
   };
 
 
-  const handleSavePatient = async (formData) => {
+  const handleSavePatient = async (
+    formData,
+    eliminarCitasPosteriores = null,
+  ) => {
     const isEdit =
       formMode === "edit" &&
       selectedPatientResolved;
 
     const payload = {
       nombres: formData.nombres.trim(),
-      apellido_pat:
-        formData.apellido_pat.trim(),
-      apellido_mat:
-        formData.apellido_mat.trim(),
+      apellido_pat: formData.apellido_pat.trim(),
+      apellido_mat: formData.apellido_mat.trim(),
       fecha_nac: formData.fecha_nac || null,
       genero: formData.genero || "",
-      telefono: formData.telefono.trim(),
-      correo: formData.correo.trim(),
       molestia: formData.molestia.trim(),
       notas: formData.notas.trim(),
       estado_tratamiento:
-        formData.estado_tratamiento ||
-        "en_tratamiento",
+        formData.estado_tratamiento || "en_tratamiento",
       fecha_alta:
-        formData.estado_tratamiento ===
-          "alta"
+        formData.estado_tratamiento === "alta"
           ? formData.fecha_alta || null
           : null,
     };
 
-    if (
-      !isEdit &&
-      patients[0]?.clinica
-    ) {
-      payload.clinica =
-        patients[0].clinica;
+    if (canSeePatientContact) {
+      payload.telefono = (formData.telefono || "").trim();
+      payload.correo = (formData.correo || "").trim();
+    }
+
+    if (!isEdit && patients[0]?.clinica) {
+      payload.clinica = patients[0].clinica;
     }
 
     try {
       setActionLoading(true);
 
-      let saved = isEdit
-        ? await pacientesApi.actualizar(
-          selectedPatientResolved.id,
-          payload,
-        )
-        : await pacientesApi.crear(payload);
+      let saved;
+      if (isEdit) {
+        if (eliminarCitasPosteriores === null) {
+          saved = await pacientesApi.actualizar(
+            selectedPatientResolved.id,
+            payload,
+          );
+        } else {
+          saved = await apiRequest(
+            `/api/pacientes/${selectedPatientResolved.id}/?eliminar_citas_posteriores=${eliminarCitasPosteriores ? "true" : "false"
+            }`,
+            { method: "PATCH", body: payload },
+          );
+        }
+      } else {
+        saved = await pacientesApi.crear(payload);
+      }
 
       if (formData._photoFile) {
-        saved =
-          await pacientesApi.subirFoto(
-            saved.id,
-            formData._photoFile,
-          );
-      } else if (
-        isEdit &&
-        formData._removePhoto
-      ) {
-        saved =
-          await pacientesApi.eliminarFoto(
-            saved.id,
-          );
+        saved = await pacientesApi.subirFoto(
+          saved.id,
+          formData._photoFile,
+        );
+      } else if (isEdit && formData._removePhoto) {
+        saved = await pacientesApi.eliminarFoto(saved.id);
       }
 
-      if (isEdit) {
+      if (isEdit && eliminarCitasPosteriores === true) {
+        await loadMainData();
+      } else if (isEdit) {
         syncPatient(saved);
+        await refreshSummaryAndBirthdays();
       } else {
-        setPatients((current) => [
-          ...current,
-          saved,
-        ]);
+        setPatients((current) => [...current, saved]);
+        await refreshSummaryAndBirthdays();
       }
 
-      await refreshSummaryAndBirthdays();
-
+      setAltaConfirm({
+        open: false,
+        patientName: "",
+        count: 0,
+        formData: null,
+      });
       setFormOpen(false);
       setSelectedPatient(null);
     } catch (error) {
+      if (
+        isEdit &&
+        error?.status === 409 &&
+        error?.data?.requiere_confirmar_citas_posteriores
+      ) {
+        setAltaConfirm({
+          open: true,
+          patientName: getFullName(selectedPatientResolved),
+          count: Number(
+            error.data.total_citas_posteriores || 0,
+          ),
+          formData,
+        });
+        return;
+      }
+
       showError(
         error,
         "No fue posible guardar el paciente.",
@@ -1412,7 +1524,11 @@ export function PatientsView() {
                         event.target.value,
                       )
                     }
-                    placeholder="Buscar por nombre, apellido, email o teléfono..."
+                    placeholder={
+                      canSeePatientContact
+                        ? "Buscar por nombre, apellido, email o teléfono..."
+                        : "Buscar por nombre o apellido..."
+                    }
                     className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10"
                   />
                 </div>
@@ -1423,8 +1539,12 @@ export function PatientsView() {
                   <thead className="border-b border-slate-200 bg-[#fafbfc]">
                     <tr>
                       <Th>Paciente</Th>
-                      <Th>Correo</Th>
-                      <Th>Teléfono</Th>
+                      {canSeePatientContact && (
+                        <>
+                          <Th>Correo</Th>
+                          <Th>Teléfono</Th>
+                        </>
+                      )}
                       <Th>Servicio</Th>
                       <Th>Estado</Th>
                       <Th className="text-center">
@@ -1503,15 +1623,16 @@ export function PatientsView() {
                               </div>
                             </Td>
 
-                            <Td>
-                              {patient.correo ||
-                                "—"}
-                            </Td>
-
-                            <Td>
-                              {patient.telefono ||
-                                "—"}
-                            </Td>
+                            {canSeePatientContact && (
+                              <>
+                                <Td>
+                                  {patient.correo || "—"}
+                                </Td>
+                                <Td>
+                                  {patient.telefono || "—"}
+                                </Td>
+                              </>
+                            )}
 
                             <Td>
                               {patient.lastServiceName ||
@@ -1574,7 +1695,7 @@ export function PatientsView() {
                     {!paginatedPatients.length && (
                       <tr>
                         <td
-                          colSpan={6}
+                          colSpan={canSeePatientContact ? 6 : 4}
                           className="py-14 text-center"
                         >
                           <Users
@@ -1734,6 +1855,7 @@ export function PatientsView() {
             actionLoading={
               actionLoading
             }
+            canSeePatientContact={canSeePatientContact}
             onClose={() =>
               setProfileOpen(false)
             }
@@ -1798,6 +1920,7 @@ export function PatientsView() {
               : null
           }
           loading={actionLoading}
+          canSeePatientContact={canSeePatientContact}
           onClose={() => {
             setFormOpen(false);
             setSelectedPatient(null);
@@ -1805,6 +1928,39 @@ export function PatientsView() {
           onSave={handleSavePatient}
         />
       )}
+
+      <AltaFutureAppointmentsModal
+        data={altaConfirm}
+        loading={actionLoading}
+        onClose={() =>
+          setAltaConfirm({
+            open: false,
+            patientName: "",
+            count: 0,
+            formData: null,
+          })
+        }
+        onKeep={() => {
+          const formData = altaConfirm.formData;
+          setAltaConfirm({
+            open: false,
+            patientName: "",
+            count: 0,
+            formData: null,
+          });
+          if (formData) handleSavePatient(formData, false);
+        }}
+        onDelete={() => {
+          const formData = altaConfirm.formData;
+          setAltaConfirm({
+            open: false,
+            patientName: "",
+            count: 0,
+            formData: null,
+          });
+          if (formData) handleSavePatient(formData, true);
+        }}
+      />
 
       {deleteOpen &&
         deleteTarget && (
@@ -1937,6 +2093,7 @@ function PatientProfileModal({
   data,
   loading,
   actionLoading,
+  canSeePatientContact,
   onClose,
   onEdit,
   onChangePhoto,
@@ -2164,6 +2321,7 @@ function PatientProfileModal({
                       lastAppointment={
                         lastAppointment
                       }
+                      canSeePatientContact={canSeePatientContact}
                     />
                   )}
 
@@ -2226,6 +2384,7 @@ function GeneralSection({
   patient,
   citasPaciente,
   lastAppointment,
+  canSeePatientContact,
 }) {
   return (
     <div>
@@ -2248,19 +2407,16 @@ function GeneralSection({
               {getFullName(patient)}
             </InfoRow>
 
-            <InfoRow
-              icon={Mail}
-              label="Correo"
-            >
-              {patient.correo || "—"}
-            </InfoRow>
-
-            <InfoRow
-              icon={Phone}
-              label="Teléfono"
-            >
-              {patient.telefono || "—"}
-            </InfoRow>
+            {canSeePatientContact && (
+              <>
+                <InfoRow icon={Mail} label="Correo">
+                  {patient.correo || "—"}
+                </InfoRow>
+                <InfoRow icon={Phone} label="Teléfono">
+                  {patient.telefono || "—"}
+                </InfoRow>
+              </>
+            )}
 
             <InfoRow
               icon={Cake}
@@ -2937,6 +3093,7 @@ function PatientFormModal({
   mode,
   patient,
   loading,
+  canSeePatientContact,
   onClose,
   onSave,
 }) {
@@ -3150,20 +3307,19 @@ function PatientFormModal({
               />
             </Field>
 
-            <Field label="Teléfono">
-              <input
-                className="form-control"
-                value={form.telefono}
-                disabled={loading}
-                onChange={(event) =>
-                  change(
-                    "telefono",
-                    event.target.value,
-                  )
-                }
-                required
-              />
-            </Field>
+            {canSeePatientContact && (
+              <Field label="Teléfono">
+                <input
+                  className="form-control"
+                  value={form.telefono}
+                  disabled={loading}
+                  onChange={(event) =>
+                    change("telefono", event.target.value)
+                  }
+                  required
+                />
+              </Field>
+            )}
 
             <Field label="Apellido paterno">
               <input
@@ -3198,20 +3354,19 @@ function PatientFormModal({
               />
             </Field>
 
-            <Field label="Correo electrónico">
-              <input
-                type="email"
-                className="form-control"
-                value={form.correo}
-                disabled={loading}
-                onChange={(event) =>
-                  change(
-                    "correo",
-                    event.target.value,
-                  )
-                }
-              />
-            </Field>
+            {canSeePatientContact && (
+              <Field label="Correo electrónico">
+                <input
+                  type="email"
+                  className="form-control"
+                  value={form.correo}
+                  disabled={loading}
+                  onChange={(event) =>
+                    change("correo", event.target.value)
+                  }
+                />
+              </Field>
+            )}
 
             <Field label="Fecha de nacimiento">
               <input

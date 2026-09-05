@@ -48,6 +48,8 @@ const PAYMENT_METHODS = [
   { id: "otro", label: "Otro", icon: CreditCard },
 ];
 
+const MONEY_ROLES = ["admin", "fisioterapeuta", "recepcion"];
+
 const DAYS = [
   { key: "L", label: "Lun" },
   { key: "M", label: "Mar" },
@@ -457,18 +459,14 @@ export function ReservationModal({
   const patientBoxRef = useRef(null);
   const originalPaymentsRef = useRef([]);
 
-  const canSeeMoney =
-    me?.permisos?.puede_ver_montos ??
-    me?.puede_ver_dinero ??
-    ["admin", "fisioterapeuta", "terapeuta"].includes(me?.rol);
-  const canEditMoney =
-    me?.permisos?.puede_modificar_montos ??
-    me?.puede_modificar_dinero ??
-    me?.rol === "admin";
+  const isMoneyRole = MONEY_ROLES.includes(me?.rol);
+  const canSeeMoney = isMoneyRole;
+  const canEditMoney = isMoneyRole;
   const canSeePatientContact =
-    me?.permisos?.puede_ver_contacto_paciente ??
-    me?.puede_ver_contacto_paciente ??
-    me?.rol !== "practicante";
+    me?.rol !== "practicante" &&
+    (me?.permisos?.puede_ver_contacto_paciente ??
+      me?.puede_ver_contacto_paciente ??
+      true);
 
   useEffect(() => {
     setForm(
@@ -658,10 +656,7 @@ export function ReservationModal({
   useEffect(() => {
     if (!isEditing || !me) return;
 
-    const allowed =
-      me?.permisos?.puede_ver_montos ??
-      me?.puede_ver_dinero ??
-      ["admin", "fisioterapeuta", "terapeuta"].includes(me?.rol);
+    const allowed = canSeeMoney;
 
     if (!allowed) {
       originalPaymentsRef.current = [];
@@ -744,7 +739,7 @@ export function ReservationModal({
     };
 
     loadPayments();
-  }, [appointment?.id, isEditing, me]);
+  }, [appointment?.id, isEditing, me, canSeeMoney]);
 
   const selectedService = useMemo(
     () =>
@@ -1421,7 +1416,7 @@ export function ReservationModal({
         lastId: null,
       };
 
-      if (canSeeMoney) {
+      if (canEditMoney) {
         paymentResult = await syncPayments(citaId);
       }
 
@@ -1429,7 +1424,7 @@ export function ReservationModal({
         await onRefreshAppointment?.(citaId);
 
       if (
-        canSeeMoney &&
+        canEditMoney &&
         paymentResult.changed &&
         paymentResult.lastId &&
         (refreshed?.pagado || refreshed?.paid)
@@ -1740,13 +1735,13 @@ export function ReservationModal({
                                                 patient
                                               )}
                                             </span>
-                                            <span className="block truncate text-[11px] text-slate-500">
-                                              {patient.telefono ||
-                                                "Sin teléfono"}{" "}
-                                              ·{" "}
-                                              {patient.correo ||
-                                                "Sin correo"}
-                                            </span>
+                                            {canSeePatientContact && (
+                                              <span className="block truncate text-[11px] text-slate-500">
+                                                {patient.telefono || "Sin teléfono"}{" "}
+                                                ·{" "}
+                                                {patient.correo || "Sin correo"}
+                                              </span>
+                                            )}
                                           </span>
                                         </button>
                                       )
@@ -1823,66 +1818,54 @@ export function ReservationModal({
                       )}
 
                       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                            Teléfono
-                          </label>
-                          <div className="flex gap-2">
-                            <div className="relative min-w-0 flex-1">
-                              <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                              <input
-                                type="tel"
-                                disabled={!canSeePatientContact || Boolean(
-                                  form.patientId
-                                )}
-                                value={canSeePatientContact ? form.telefono : ""}
-                                onChange={(
-                                  event
-                                ) =>
-                                  handleChange(
-                                    "telefono",
-                                    event.target
-                                      .value
-                                  )
-                                }
-                                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
-                              />
+                        {canSeePatientContact && (
+                          <>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                                Teléfono
+                              </label>
+                              <div className="flex gap-2">
+                                <div className="relative min-w-0 flex-1">
+                                  <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                  <input
+                                    type="tel"
+                                    disabled={Boolean(form.patientId)}
+                                    value={form.telefono}
+                                    onChange={(event) =>
+                                      handleChange("telefono", event.target.value)
+                                    }
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={openWhatsApp}
+                                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                >
+                                  <MessageCircle className="h-5 w-5" />
+                                </button>
+                              </div>
                             </div>
 
-                            {canSeePatientContact && (
-                              <button
-                                type="button"
-                                onClick={openWhatsApp}
-                                className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              >
-                                <MessageCircle className="h-5 w-5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                            Correo
-                          </label>
-                          <div className="relative">
-                            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type="email"
-                              disabled={!canSeePatientContact || Boolean(
-                                form.patientId
-                              )}
-                              value={canSeePatientContact ? form.correo : ""}
-                              onChange={(event) =>
-                                handleChange(
-                                  "correo",
-                                  event.target.value
-                                )
-                              }
-                              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
-                            />
-                          </div>
-                        </div>
+                            <div>
+                              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                                Correo
+                              </label>
+                              <div className="relative">
+                                <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                <input
+                                  type="email"
+                                  disabled={Boolean(form.patientId)}
+                                  value={form.correo}
+                                  onChange={(event) =>
+                                    handleChange("correo", event.target.value)
+                                  }
+                                  className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
 
                         <div>
                           <label className="mb-1.5 block text-xs font-semibold text-slate-700">
@@ -2274,8 +2257,8 @@ export function ReservationModal({
                             <p className="mt-1 text-xs text-slate-500">
                               Estos campos solo
                               están disponibles
-                              para administrador
-                              y fisioterapeuta.
+                              para administrador,
+                              fisioterapeuta y recepción.
                             </p>
                           </div>
 

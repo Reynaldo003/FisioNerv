@@ -745,44 +745,45 @@ function AlertSection({ panel, canSeeMoney }) {
         </div>
       </article>
 
-      <article className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
-            <WalletCards className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="text-xs font-bold text-slate-900">
-              Cobros pendientes
-            </p>
-            <p className="text-[10px] text-slate-500">
-              Citas vencidas o del día sin liquidar
-            </p>
+      {canSeeMoney && (
+        <article className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+              <WalletCards className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-xs font-bold text-slate-900">
+                Cobros pendientes
+              </p>
+              <p className="text-[10px] text-slate-500">
+                Citas vencidas o del día sin liquidar
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="mt-3 space-y-2">
-          {pendingPayments.length ? (
-            pendingPayments.slice(0, 5).map((item) => (
-              <div
-                key={item.cita_id}
-                className="rounded-xl bg-slate-50 px-3 py-2"
-              >
-                <p className="truncate text-[11px] font-semibold text-slate-700">
-                  {item.paciente}
-                </p>
-                <p className="mt-0.5 truncate text-[10px] text-slate-500">
-                  {item.fecha} · {String(item.hora || "").slice(0, 5)}
-                  {canSeeMoney ? " · pendiente de liquidación" : ""}
-                </p>
-              </div>
-            ))
-          ) : (
-            <p className="text-[11px] text-slate-400">
-              No hay cobros pendientes.
-            </p>
-          )}
-        </div>
-      </article>
+          <div className="mt-3 space-y-2">
+            {pendingPayments.length ? (
+              pendingPayments.slice(0, 5).map((item) => (
+                <div
+                  key={item.cita_id}
+                  className="rounded-xl bg-slate-50 px-3 py-2"
+                >
+                  <p className="truncate text-[11px] font-semibold text-slate-700">
+                    {item.paciente}
+                  </p>
+                  <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                    {item.fecha} · {String(item.hora || "").slice(0, 5)} · pendiente de liquidación
+                  </p>
+                </div>
+              ))
+            ) : (
+              <p className="text-[11px] text-slate-400">
+                No hay cobros pendientes.
+              </p>
+            )}
+          </div>
+        </article>
+      )}
     </div>
   );
 }
@@ -812,7 +813,8 @@ export function AgendaView({
     "dentista",
   ].includes(role);
   const canSeeAll = permissions?.puede_ver_todas_agendas ?? ["admin", "recepcion"].includes(role);
-  const canSeeMoney = permissions?.puede_ver_montos ?? ["admin", "fisioterapeuta", "terapeuta"].includes(role);
+  const isMoneyRole = ["admin", "fisioterapeuta", "recepcion"].includes(role);
+  const canSeeMoney = isMoneyRole;
   const canConfigureGoals = role === "admin";
 
   const [quickSearch, setQuickSearch] = useState("");
@@ -1760,10 +1762,10 @@ export function AgendaView({
                             hasBlock: false,
                           });
                         }}
-                        className="absolute right-2 top-2 z-[6] flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white opacity-0 shadow-sm transition hover:bg-slate-50 group-hover:opacity-100"
-                        title="Opciones"
+                        className="absolute right-2 top-2 z-[80] flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white/95 text-blue-600 opacity-100 shadow-md transition hover:scale-105 hover:bg-blue-50"
+                        title="Agendar otra cita"
                       >
-                        <Plus className="h-4 w-4 text-slate-600" />
+                        <Plus className="h-4 w-4" />
                       </button>
                     )}
                   </div>

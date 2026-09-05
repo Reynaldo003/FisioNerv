@@ -47,7 +47,13 @@ function MobileMenu({ open, tabs, activeTab, onSelect, onClose, me, initialLette
 export default function Administrativa() {
     const [activeTab, setActiveTab] = useState("agenda"); const [branch, setBranch] = useState("Fisionerv Centro"); const [selectedProfessionalId, setSelectedProfessionalId] = useState(null); const [appointments, setAppointments] = useState([]); const [loadingAppointments, setLoadingAppointments] = useState(true); const [selectedAppointment, setSelectedAppointment] = useState(null); const [modalOpen, setModalOpen] = useState(false); const [reservationPreset, setReservationPreset] = useState(null); const [me, setMe] = useState(null); const [professionals, setProfessionals] = useState([]); const [loadingMe, setLoadingMe] = useState(true); const [blockOpen, setBlockOpen] = useState(false); const [blockPreset, setBlockPreset] = useState(null); const [info, setInfo] = useState({ open: false, title: "", message: "" }); const [mobileMenuOpen, setMobileMenuOpen] = useState(false); const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("fisionerv.sidebarCollapsed") === "1"); const savingLockRef = useRef(false);
     const role = me?.rol || null; const permissions = me?.permisos || {};
-    const allowedTabs = useMemo(() => { const source = Array.isArray(me?.interfaces) && me.interfaces.length ? me.interfaces : DEFAULT_INTERFACES; const valid = source.filter(tab => TAB_CONFIG[tab]); return valid.includes("perfil") ? valid : [...valid, "perfil"]; }, [me]);
+    const allowedTabs = useMemo(() => {
+        const source = Array.isArray(me?.interfaces) && me.interfaces.length ? me.interfaces : DEFAULT_INTERFACES;
+        const moneyRole = ["admin", "fisioterapeuta", "recepcion"].includes(role);
+        let valid = source.filter(tab => TAB_CONFIG[tab]);
+        if (!moneyRole) valid = valid.filter(tab => tab !== "ventas");
+        return valid.includes("perfil") ? valid : [...valid, "perfil"];
+    }, [me, role]);
     useEffect(() => { if (allowedTabs.length && !allowedTabs.includes(activeTab)) setActiveTab(allowedTabs[0]); }, [allowedTabs, activeTab]);
     useEffect(() => { localStorage.setItem("fisionerv.sidebarCollapsed", sidebarCollapsed ? "1" : "0"); }, [sidebarCollapsed]);
     useEffect(() => { const onResize = () => { if (window.innerWidth >= 1024) setMobileMenuOpen(false); }; window.addEventListener("resize", onResize); return () => window.removeEventListener("resize", onResize); }, []);
@@ -60,7 +66,83 @@ export default function Administrativa() {
     async function handleMoveAppointment(oldAppt, patch) { if (oldAppt?._type === "bloqueo") return; setAppointments(prev => prev.map(item => item.id === oldAppt.id ? { ...item, ...patch } : item).sort(sortAppointments)); const payload = { fecha: patch.date, hora_inicio: `${patch.time || oldAppt.time}:00`, hora_termina: `${patch.endTime || oldAppt.endTime || patch.time}:00` }; if (patch.professionalId != null) payload.profesional = patch.professionalId; try { const response = await apiFetch(`/api/citas/${oldAppt.id}/`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const data = await readJson(response); if (!response.ok) throw new Error(data?.detail || "No se pudo mover la cita."); const appt = mapCitaToAppointment(data); setAppointments(prev => prev.map(item => String(item.id) === String(appt.id) ? appt : item).sort(sortAppointments)); } catch (error) { setAppointments(prev => prev.map(item => item.id === oldAppt.id ? oldAppt : item).sort(sortAppointments)); showInfo(error.message || "No se pudo mover la cita.", "Agenda"); } }
     function handleNewReservation(preset = null) { setSelectedAppointment(null); setReservationPreset(preset); setModalOpen(true); } function handleOpenAppointment(appt) { if (appt?._type === "bloqueo") return; setSelectedAppointment(appt); setReservationPreset(null); setModalOpen(true); } function handleOpenBlockModal(preset) { setBlockPreset(preset || null); setBlockOpen(true); }
     async function handleSaveBlockTime(form) { if (!form.professionalId) return showInfo("Selecciona un profesional para bloquear.", "Validación"); const dates = form.repeatEnabled ? buildRepeatDatesCount({ startDateIso: form.date, repeatDays: form.repeatDays, repeatCount: form.repeatCount }) : [form.date]; try { for (const date of dates) { const response = await apiFetch("/api/bloqueos/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ profesional: form.professionalId, fecha: date, hora_inicio: `${String(form.startTime || "08:00").slice(0, 5)}:00`, hora_termina: `${String(form.endTime || "09:00").slice(0, 5)}:00`, motivo: String(form.motivo || "").trim() }) }); const data = await readJson(response); if (!response.ok) throw new Error(data?.detail || "No se pudo crear el bloqueo."); } setBlockOpen(false); setBlockPreset(null); await loadAgendaData(); } catch (error) { showInfo(error.message || "No se pudo crear el bloqueo.", "Bloqueo"); } }
-    async function handleSaveReservation(form) { if (savingLockRef.current) return null; savingLockRef.current = true; const existing = form.id ? appointments.find(item => String(item.id) === String(form.id)) : null; const price = Number(form.price ?? existing?.price ?? 0); const discount = Number(form.discountPct ?? existing?.discountPct ?? 0); const base = { servicio: form.serviceId, profesional: form.professionalId, fecha: form.date, hora_inicio: `${String(form.time || "").slice(0, 5)}:00`, hora_termina: `${String(form.endTime || form.time || "").slice(0, 5)}:00`, estado: form.status || "reservado", notas: form.notesInternal || "", precio: price, pagado: Boolean(form.paid ?? existing?.paid ?? false), metodo_pago: mapFrontendPaymentMethodToBackend(form.metodo_pago ?? existing?.metodo_pago ?? ""), descuento_porcentaje: discount, anticipo: Number(form.deposit ?? existing?.deposit ?? 0), monto_final: price - (price * discount) / 100 }; const isExistingPatient = Boolean(form.patientId); const payload = isExistingPatient ? { ...base, paciente: form.patientId } : { ...base, paciente: { nombres: form.patient, apellido_pat: form.apellido_pat || "", apellido_mat: form.apellido_mat || "", fecha_nac: form.fecha_nac || null, genero: form.genero || "", telefono: normalizePhoneMX(form.telefono), correo: form.correo || "", molestia: form.molestia || "", notas: form.notesInternal || "" } }; const editing = Boolean(form.id); try { const response = await apiFetch(editing ? `/api/citas/${form.id}/` : "/api/citas/", { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); const data = await readJson(response); if (!response.ok) { const first = data && Object.values(data)[0]; throw new Error(data?.detail || (Array.isArray(first) ? first[0] : first) || "No se pudo guardar la cita."); } if (data?.id) { const appt = mapCitaToAppointment(data); setAppointments(prev => (editing ? prev.map(item => String(item.id) === String(appt.id) ? appt : item) : [...prev, appt]).sort(sortAppointments)); } else await loadAgendaData(); return data; } catch (error) { showInfo(error.message || "No se pudo guardar la cita.", "Cita"); return null; } finally { savingLockRef.current = false; } }
+    async function handleSaveReservation(form) {
+        if (savingLockRef.current) return null;
+        savingLockRef.current = true;
+
+        const existing = form.id ? appointments.find(item => String(item.id) === String(form.id)) : null;
+        const canEditMoney = ["admin", "fisioterapeuta", "recepcion"].includes(role);
+        const canSeeContact = role !== "practicante" && (permissions?.puede_ver_contacto_paciente ?? true);
+
+        const base = {
+            servicio: form.serviceId,
+            profesional: form.professionalId,
+            fecha: form.date,
+            hora_inicio: `${String(form.time || "").slice(0, 5)}:00`,
+            hora_termina: `${String(form.endTime || form.time || "").slice(0, 5)}:00`,
+            estado: form.status || "reservado",
+            notas: form.notesInternal || "",
+        };
+
+        if (canEditMoney) {
+            const price = Number(form.price ?? existing?.price ?? 0);
+            const discount = Number(form.discountPct ?? existing?.discountPct ?? 0);
+            Object.assign(base, {
+                precio: price,
+                pagado: Boolean(form.paid ?? existing?.paid ?? false),
+                metodo_pago: mapFrontendPaymentMethodToBackend(form.metodo_pago ?? existing?.metodo_pago ?? ""),
+                descuento_porcentaje: discount,
+                anticipo: Number(form.deposit ?? existing?.deposit ?? 0),
+                monto_final: price - (price * discount) / 100,
+            });
+        }
+
+        const isExistingPatient = Boolean(form.patientId);
+        const patientData = {
+            nombres: form.patient,
+            apellido_pat: form.apellido_pat || "",
+            apellido_mat: form.apellido_mat || "",
+            fecha_nac: form.fecha_nac || null,
+            genero: form.genero || "",
+            molestia: form.molestia || "",
+            notas: form.notesInternal || "",
+        };
+
+        if (canSeeContact) {
+            patientData.telefono = normalizePhoneMX(form.telefono);
+            patientData.correo = form.correo || "";
+        }
+
+        const payload = isExistingPatient
+            ? { ...base, paciente: form.patientId }
+            : { ...base, paciente: patientData };
+        const editing = Boolean(form.id);
+
+        try {
+            const response = await apiFetch(editing ? `/api/citas/${form.id}/` : "/api/citas/", {
+                method: editing ? "PATCH" : "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await readJson(response);
+            if (!response.ok) {
+                const first = data && Object.values(data)[0];
+                throw new Error(data?.detail || (Array.isArray(first) ? first[0] : first) || "No se pudo guardar la cita.");
+            }
+            if (data?.id) {
+                const appt = mapCitaToAppointment(data);
+                setAppointments(prev => (editing ? prev.map(item => String(item.id) === String(appt.id) ? appt : item) : [...prev, appt]).sort(sortAppointments));
+            } else {
+                await loadAgendaData();
+            }
+            return data;
+        } catch (error) {
+            showInfo(error.message || "No se pudo guardar la cita.", "Cita");
+            return null;
+        } finally {
+            savingLockRef.current = false;
+        }
+    }
     async function handleDeleteReservation(id) { if (!id) return; try { const response = await apiFetch(`/api/citas/${id}/`, { method: "DELETE" }); if (!response.ok && response.status !== 204) throw new Error("No se pudo eliminar la cita."); setAppointments(prev => prev.filter(item => String(item.id) !== String(id))); setModalOpen(false); setSelectedAppointment(null); setReservationPreset(null); notifySalesRefresh(); } catch (error) { showInfo(error.message, "Eliminar cita"); } }
     const handleDeleteBlock = useCallback(async block => { const rawId = block?._raw?.id ?? (String(block?.id || "").startsWith("blk-") ? Number(String(block.id).slice(4)) : Number(block?.id)); if (!rawId) return showInfo("No se pudo identificar el bloqueo.", "Bloqueo"); try { const response = await apiFetch(`/api/bloqueos/${rawId}/`, { method: "DELETE" }); if (!response.ok && response.status !== 204) throw new Error("No se pudo eliminar el bloqueo."); setAppointments(prev => prev.filter(item => String(item.id) !== String(block.id))); } catch (error) { showInfo(error.message, "Bloqueo"); } }, []);
     const initialLetter = String(me?.full_name || me?.username || localStorage.getItem("auth.user") || "U").trim()[0]?.toUpperCase() || "U";

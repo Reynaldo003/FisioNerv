@@ -91,11 +91,20 @@ export const pacientesApi = {
       body: payload,
     }),
 
-  actualizar: (pacienteId, payload) =>
-    apiRequest(`/api/pacientes/${pacienteId}/`, {
+  actualizar: (pacienteId, payload, eliminarCitasPosteriores = null) => {
+    let path = `/api/pacientes/${pacienteId}/`;
+
+    if (eliminarCitasPosteriores !== null) {
+      path += `?eliminar_citas_posteriores=${
+        eliminarCitasPosteriores ? "true" : "false"
+      }`;
+    }
+
+    return apiRequest(path, {
       method: "PATCH",
       body: payload,
-    }),
+    });
+  },
 
   eliminar: (pacienteId, eliminarCitas = false) =>
     apiRequest(
