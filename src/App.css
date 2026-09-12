@@ -3,9 +3,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
-
 @theme inline {
-  --animate-orbit: orbit calc(var(--duration)*1s) linear infinite;
+  --font-sans: "Codec Pro", Arial, Helvetica, sans-serif;
+  --animate-orbit: orbit calc(var(--duration) * 1s) linear infinite;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -42,23 +42,31 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   @keyframes orbit {
-  0% {
-    transform: rotate(calc(var(--angle) * 1deg)) translateY(calc(var(--radius) * 1px)) rotate(calc(var(--angle) * -1deg));
+    0% {
+      transform: rotate(calc(var(--angle) * 1deg))
+        translateY(calc(var(--radius) * 1px)) rotate(calc(var(--angle) * -1deg));
     }
-  100% {
-    transform: rotate(calc(var(--angle) * 1deg + 360deg)) translateY(calc(var(--radius) * 1px)) rotate(calc((var(--angle) * -1deg) - 360deg));
+    100% {
+      transform: rotate(calc(var(--angle) * 1deg + 360deg))
+        translateY(calc(var(--radius) * 1px))
+        rotate(calc((var(--angle) * -1deg) - 360deg));
     }
   }
-  --animate-rippling: rippling var(--duration) ease-out
-;
+  --animate-rippling: rippling var(--duration) ease-out;
   @keyframes rippling {
-  0% {
-    opacity: 1;}
-  100% {
-    transform: scale(2);
-    opacity: 0;}}}
+    0% {
+      opacity: 1;
+    }
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+}
 
-    html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+}
 
 :root {
   --radius: 0.625rem;
@@ -130,6 +138,11 @@
 }
 
 @layer base {
+  .fisionerv-modal {
+    background-color: transparent;
+    padding: 0;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -140,7 +153,9 @@
 
 @font-face {
   font-family: "Codec Pro";
-  src: url("/fonts/CodecPro-Regular.ttf") format("truetype");
+  src:
+    url("/fonts/CodecPro-Regular.woff2") format("woff2"),
+    url("/fonts/CodecPro-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -148,7 +163,9 @@
 
 @font-face {
   font-family: "Codec Pro";
-  src: url("/fonts/CodecPro-Italic.ttf") format("truetype");
+  src:
+    url("/fonts/CodecPro-Italic.woff2") format("woff2"),
+    url("/fonts/CodecPro-Italic.ttf") format("truetype");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
@@ -156,7 +173,9 @@
 
 @font-face {
   font-family: "Codec Pro";
-  src: url("/fonts/CodecPro-Bold.ttf") format("truetype");
+  src:
+    url("/fonts/CodecPro-Bold.woff2") format("woff2"),
+    url("/fonts/CodecPro-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -164,14 +183,188 @@
 
 @font-face {
   font-family: "Codec Pro";
-  src: url("/fonts/CodecPro-BoldItalic.ttf") format("truetype");
+  src:
+    url("/fonts/CodecPro-BoldItalic.woff2") format("woff2"),
+    url("/fonts/CodecPro-BoldItalic.ttf") format("truetype");
   font-weight: 700;
   font-style: italic;
   font-display: swap;
 }
 
-body { font-family: "Codec Pro"; }
+/* Misma familia en la página, las utilidades de Tailwind y los portales. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  --default-font-family: "Codec Pro", Arial, Helvetica, sans-serif;
+}
 
-::view-transition-old(root), ::view-transition-new(root) {
-    animation: none;
-    mix-blend-mode: normal;}
+html,
+body,
+#root {
+  font-family: "Codec Pro", Arial, Helvetica, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea,
+optgroup,
+option,
+dialog {
+  font-family: inherit;
+}
+
+.fisionerv-administrativa {
+  height: 100vh;
+  height: 100dvh;
+  color-scheme: light;
+}
+
+/* Una celda recibe el hover; el signo es decorativo y no intercepta clics. */
+.agenda-agregar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .agenda-celda:not(:disabled):hover .agenda-agregar {
+    opacity: 1;
+  }
+}
+
+.agenda-celda:not(:disabled):focus-visible .agenda-agregar {
+  opacity: 1;
+}
+
+.agenda-celda:focus-visible,
+.agenda-cita:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.agenda-vista[data-arrastrando="true"] .agenda-celda .agenda-agregar,
+.fisionerv-con-modal .agenda-vista .agenda-celda .agenda-agregar {
+  opacity: 0;
+}
+
+.agenda-rejilla-scroll {
+  max-height: 75vh;
+  max-height: 75dvh;
+  overscroll-behavior: contain;
+  isolation: isolate;
+}
+
+/* La capa superior del diálogo no depende de los z-index de la agenda. */
+.fisionerv-modal {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  color: #0f172a;
+  color-scheme: light;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  font-family: "Codec Pro", Arial, Helvetica, sans-serif;
+}
+
+.fisionerv-modal:not([open]) {
+  display: none;
+}
+
+.fisionerv-modal::backdrop {
+  background: transparent;
+}
+
+.fisionerv-modal-tarjeta {
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overscroll-behavior: contain;
+}
+
+.fisionerv-reserva-panel {
+  height: 100%;
+  max-height: 100%;
+}
+
+.fisionerv-bloqueo-panel {
+  max-height: min(88vh, 100%);
+  max-height: min(88dvh, 100%);
+}
+
+.fisionerv-modal-contenido {
+  -webkit-overflow-scrolling: touch;
+}
+
+.fisionerv-modal input,
+.fisionerv-modal select,
+.fisionerv-modal textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Safari aporta tamaños y alineación propios a fecha y hora. */
+.fisionerv-modal input[type="date"],
+.fisionerv-modal input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 2.75rem;
+}
+
+.fisionerv-modal input::-webkit-date-and-time-value {
+  min-height: 1.25em;
+  text-align: left;
+}
+
+.fisionerv-modal input:disabled,
+.fisionerv-modal textarea:disabled {
+  -webkit-text-fill-color: currentColor;
+}
+
+.fisionerv-modal-pie {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+  .fisionerv-reserva-panel {
+    width: min(96vw, 1120px);
+    height: auto;
+    max-height: min(94vh, 100%);
+    max-height: min(94dvh, 100%);
+  }
+}
+
+/* Evita el zoom automático de Safari al escribir en pantallas táctiles. */
+@media (hover: none) and (pointer: coarse) {
+  .fisionerv-modal input,
+  .fisionerv-modal select,
+  .fisionerv-modal textarea {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .agenda-agregar,
+  .agenda-cita {
+    transition: none;
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}

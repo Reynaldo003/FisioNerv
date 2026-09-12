@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -40,6 +41,8 @@ import {
 
 import { installFetchWithRefresh } from "../../../services/apiFetch";
 import { MiniCalendar } from "./MiniCalendar";
+import { createPortal } from "react-dom";
+import { PortalModal } from "../../ui/PortalModal";
 
 installFetchWithRefresh();
 
@@ -64,9 +67,15 @@ const HOURS = [
 
 const HOUR_ROW_HEIGHT = 76;
 const DEFAULT_GOAL = 60;
+const DAY_START_MIN = toMinutes(HOURS[0]);
+const DAY_END_MIN = toMinutes(HOURS[HOURS.length - 1]) + 60;
+const GRID_TOTAL_HEIGHT = HOURS.length * HOUR_ROW_HEIGHT;
+const ANCHO_ACCION_CELDA = 44;
 
 function useMediaQuery(query) {
-  const [matches, setMatches] = useState(false);
+  const [matches, setMatches] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches,
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -75,9 +84,13 @@ function useMediaQuery(query) {
     const onChange = () => setMatches(Boolean(media.matches));
 
     onChange();
-    media.addEventListener?.("change", onChange);
+    if (media.addEventListener) {
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    }
 
-    return () => media.removeEventListener?.("change", onChange);
+    media.addListener(onChange);
+    return () => media.removeListener(onChange);
   }, [query]);
 
   return matches;
@@ -100,9 +113,7 @@ function startOfWeekMonday(date) {
 }
 
 function weekdayShortEs(date) {
-  return ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][
-    date.getDay()
-  ];
+  return ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][date.getDay()];
 }
 
 function formatLongDate(date) {
@@ -135,8 +146,7 @@ function addMinutesToTime(time, minutesToAdd) {
   if (!time) return "08:00";
 
   const [hours = "0", minutes = "0"] = String(time).split(":");
-  let total =
-    Number(hours) * 60 + Number(minutes) + Number(minutesToAdd || 0);
+  let total = Number(hours) * 60 + Number(minutes) + Number(minutesToAdd || 0);
 
   total = Math.max(0, total);
 
@@ -160,13 +170,9 @@ function normalizeAppointmentStatus(status) {
     .toLowerCase();
 
   if (
-    [
-      "completado",
-      "si_asistio",
-      "si asistio",
-      "asistio",
-      "asistió",
-    ].includes(value)
+    ["completado", "si_asistio", "si asistio", "asistio", "asistió"].includes(
+      value,
+    )
   ) {
     return "si_asistio";
   }
@@ -193,7 +199,7 @@ function isBlockItem(item) {
   if (!item) return false;
 
   const type = String(
-    item.type || item.kind || item.__type || item.tipo || item._type || ""
+    item.type || item.kind || item.__type || item.tipo || item._type || "",
   ).toLowerCase();
 
   return (
@@ -232,8 +238,7 @@ function getProfessionalLabel(professional) {
   return (
     professional.label ||
     professional.full_name ||
-    `${professional.first_name || ""} ${professional.last_name || ""
-      }`.trim() ||
+    `${professional.first_name || ""} ${professional.last_name || ""}`.trim() ||
     professional.username ||
     `Profesional #${professional.id}`
   );
@@ -251,8 +256,13 @@ function durationLabel(minutes) {
 }
 
 function getClientPoint(event) {
-  const touch =
-    event?.touches?.[0] || event?.changedTouches?.[0];
+  // Enter y Espacio generan un clic sin coordenadas de ratón.
+  if (event?.detail === 0 && event.currentTarget) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return { x: rect.right - 40, y: rect.top + rect.height / 2 };
+  }
+
+  const touch = event?.touches?.[0] || event?.changedTouches?.[0];
 
   return {
     x: touch?.clientX ?? event?.clientX ?? 0,
@@ -271,13 +281,7 @@ function rectFromPoint(x, y) {
   };
 }
 
-function MetricCard({
-  title,
-  value,
-  helper,
-  icon: Icon,
-  accent = "blue",
-}) {
+function MetricCard({ title, value, helper, icon: Icon, accent = "blue" }) {
   const tones = {
     blue: "bg-blue-50 text-blue-700",
     emerald: "bg-emerald-50 text-emerald-700",
@@ -292,21 +296,20 @@ function MetricCard({
   return (
     <article className="min-w-0 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-[11px] font-medium text-slate-500">
-            {title}
-          </p>
-          <p className="mt-1 truncate text-2xl font-bold tracking-tight text-slate-950">
-            {value}
-          </p>
-        </div>
+        <p className="min-w-0 text-[11px] font-medium text-slate-500">
+          {title}
+        </p>
 
         <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tone}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone}`}
         >
           <Icon className="h-5 w-5" />
         </span>
       </div>
+
+      <p className="mt-1 break-words text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
+        {value}
+      </p>
 
       <p
         className={`mt-3 w-fit rounded-full px-2 py-1 text-[11px] font-semibold ${tone}`}
@@ -321,19 +324,22 @@ function MessageModal({ open, title, message, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+    <PortalModal
+      onClose={onClose}
+      etiqueta={title || "Aviso"}
+      className="flex items-center justify-center p-4"
+    >
       <button
         type="button"
+        tabIndex={-1}
         className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]"
         onClick={onClose}
         aria-label="Cerrar"
       />
 
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div className="fisionerv-modal-tarjeta relative z-10 w-full max-w-md overflow-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <h3 className="text-sm font-bold text-slate-900">
-            {title}
-          </h3>
+          <h3 className="text-sm font-bold text-slate-900">{title}</h3>
 
           <button
             type="button"
@@ -348,7 +354,7 @@ function MessageModal({ open, title, message, onClose }) {
           {message}
         </p>
       </div>
-    </div>
+    </PortalModal>
   );
 }
 
@@ -360,10 +366,10 @@ function GoalModal({
   onSaved,
 }) {
   const [scope, setScope] = useState(
-    initialProfessionalId ? "professional" : "general"
+    initialProfessionalId ? "professional" : "general",
   );
   const [professionalId, setProfessionalId] = useState(
-    initialProfessionalId || professionals?.[0]?.id || ""
+    initialProfessionalId || professionals?.[0]?.id || "",
   );
   const [quantity, setQuantity] = useState(String(DEFAULT_GOAL));
   const [loading, setLoading] = useState(false);
@@ -374,9 +380,7 @@ function GoalModal({
     if (!open) return;
 
     setScope(initialProfessionalId ? "professional" : "general");
-    setProfessionalId(
-      initialProfessionalId || professionals?.[0]?.id || ""
-    );
+    setProfessionalId(initialProfessionalId || professionals?.[0]?.id || "");
     setError("");
 
     const params = new URLSearchParams();
@@ -395,26 +399,22 @@ function GoalModal({
               Authorization: `Bearer ${localStorage.getItem("auth.access") || ""
                 }`,
             },
-          }
+          },
         );
 
         const data = await response.json().catch(() => null);
 
         if (!response.ok) {
-          setError(
-            data?.detail || "No se pudo cargar la meta actual."
-          );
+          setError(data?.detail || "No se pudo cargar la meta actual.");
           return;
         }
 
         setQuantity(
           String(
             initialProfessionalId
-              ? data?.meta_personal ??
-              data?.meta_general ??
-              DEFAULT_GOAL
-              : data?.meta_general ?? DEFAULT_GOAL
-          )
+              ? (data?.meta_personal ?? data?.meta_general ?? DEFAULT_GOAL)
+              : (data?.meta_general ?? DEFAULT_GOAL),
+          ),
         );
       } catch {
         setError("No se pudo cargar la meta actual.");
@@ -441,24 +441,18 @@ function GoalModal({
               Authorization: `Bearer ${localStorage.getItem("auth.access") || ""
                 }`,
             },
-          }
+          },
         );
 
         const data = await response.json().catch(() => null);
 
         if (!response.ok) {
-          setError(
-            data?.detail || "No se pudo cargar la meta del usuario."
-          );
+          setError(data?.detail || "No se pudo cargar la meta del usuario.");
           return;
         }
 
         setQuantity(
-          String(
-            data?.meta_personal ??
-            data?.meta_general ??
-            DEFAULT_GOAL
-          )
+          String(data?.meta_personal ?? data?.meta_general ?? DEFAULT_GOAL),
         );
       } catch {
         setError("No se pudo cargar la meta del usuario.");
@@ -490,30 +484,23 @@ function GoalModal({
     setError("");
 
     try {
-      const response = await fetch(
-        `${API_BASE}/api/citas/meta-diaria/`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("auth.access") || ""
-              }`,
-          },
-          body: JSON.stringify({
-            cantidad: parsed,
-            profesional:
-              scope === "professional" ? Number(professionalId) : null,
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/citas/meta-diaria/`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("auth.access") || ""}`,
+        },
+        body: JSON.stringify({
+          cantidad: parsed,
+          profesional: scope === "professional" ? Number(professionalId) : null,
+        }),
+      });
 
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         setError(
-          data?.detail ||
-          data?.cantidad ||
-          "No se pudo guardar la meta."
+          data?.detail || data?.cantidad || "No se pudo guardar la meta.",
         );
         return;
       }
@@ -527,9 +514,15 @@ function GoalModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[145] flex items-center justify-center p-4">
+    <PortalModal
+      onClose={onClose}
+      etiqueta="Meta diaria de consultas"
+      ocupado={saving}
+      className="flex items-center justify-center p-4"
+    >
       <button
         type="button"
+        tabIndex={-1}
         className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
         onClick={onClose}
         aria-label="Cerrar"
@@ -537,7 +530,7 @@ function GoalModal({
 
       <form
         onSubmit={save}
-        className="relative z-10 w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+        className="fisionerv-modal-tarjeta relative z-10 w-full max-w-lg overflow-auto rounded-3xl border border-slate-200 bg-white shadow-2xl"
       >
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
           <div>
@@ -572,8 +565,8 @@ function GoalModal({
                 type="button"
                 onClick={() => setScope("general")}
                 className={`rounded-xl border px-3 py-3 text-xs font-bold transition ${scope === "general"
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 Clínica completa
@@ -583,8 +576,8 @@ function GoalModal({
                 type="button"
                 onClick={() => setScope("professional")}
                 className={`rounded-xl border px-3 py-3 text-xs font-bold transition ${scope === "professional"
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 Usuario específico
@@ -599,16 +592,11 @@ function GoalModal({
               </label>
               <select
                 value={professionalId}
-                onChange={(event) =>
-                  setProfessionalId(event.target.value)
-                }
+                onChange={(event) => setProfessionalId(event.target.value)}
                 className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
               >
                 {(professionals || []).map((professional) => (
-                  <option
-                    key={professional.id}
-                    value={professional.id}
-                  >
+                  <option key={professional.id} value={professional.id}>
                     {getProfessionalLabel(professional)}
                   </option>
                 ))}
@@ -656,7 +644,7 @@ function GoalModal({
           </button>
         </div>
       </form>
-    </div>
+    </PortalModal>
   );
 }
 
@@ -711,12 +699,8 @@ function AlertSection({ panel, canSeeMoney }) {
             <Cake className="h-4 w-4" />
           </span>
           <div>
-            <p className="text-xs font-bold text-slate-900">
-              Cumpleaños
-            </p>
-            <p className="text-[10px] text-slate-500">
-              Hoy y próximos 5 días
-            </p>
+            <p className="text-xs font-bold text-slate-900">Cumpleaños</p>
+            <p className="text-[10px] text-slate-500">Hoy y próximos 5 días</p>
           </div>
         </div>
 
@@ -772,7 +756,8 @@ function AlertSection({ panel, canSeeMoney }) {
                     {item.paciente}
                   </p>
                   <p className="mt-0.5 truncate text-[10px] text-slate-500">
-                    {item.fecha} · {String(item.hora || "").slice(0, 5)} · pendiente de liquidación
+                    {item.fecha} · {String(item.hora || "").slice(0, 5)} ·
+                    pendiente de liquidación
                   </p>
                 </div>
               ))
@@ -785,6 +770,593 @@ function AlertSection({ panel, canSeeMoney }) {
         </article>
       )}
     </div>
+  );
+}
+
+function computeLayouts(items) {
+  const appointmentsOnly = (items || [])
+    .filter((item) => !isBlockItem(item))
+    .map((appointment) => {
+      const start = clamp(
+        toMinutes(appointment.time),
+        DAY_START_MIN,
+        DAY_END_MIN,
+      );
+      const rawEnd = toMinutes(
+        appointment.endTime || addMinutesToTime(appointment.time, 60),
+      );
+      const end = clamp(rawEnd, DAY_START_MIN, DAY_END_MIN);
+
+      return {
+        ...appointment,
+        __start: start,
+        __end: end,
+      };
+    })
+    .filter((appointment) => appointment.__end > appointment.__start)
+    .sort(
+      (a, b) =>
+        a.__start - b.__start || b.__end - b.__start - (a.__end - a.__start),
+    );
+
+  const columnById = new Map();
+  const active = [];
+  const usedColumns = new Set();
+
+  const release = (start) => {
+    for (let index = active.length - 1; index >= 0; index--) {
+      if (active[index].end <= start) {
+        usedColumns.delete(active[index].column);
+        active.splice(index, 1);
+      }
+    }
+  };
+
+  const nextColumn = () => {
+    let column = 0;
+    while (usedColumns.has(column)) column += 1;
+    return column;
+  };
+
+  for (const appointment of appointmentsOnly) {
+    release(appointment.__start);
+
+    const column = nextColumn();
+    usedColumns.add(column);
+    active.push({
+      id: appointment.id,
+      end: appointment.__end,
+      column,
+    });
+    columnById.set(appointment.id, column);
+  }
+
+  const adjacency = new Map(
+    appointmentsOnly.map((appointment) => [appointment.id, new Set()]),
+  );
+
+  for (let first = 0; first < appointmentsOnly.length; first++) {
+    for (let second = first + 1; second < appointmentsOnly.length; second++) {
+      const a = appointmentsOnly[first];
+      const b = appointmentsOnly[second];
+
+      if (overlapsMinutes(a.__start, a.__end, b.__start, b.__end)) {
+        adjacency.get(a.id).add(b.id);
+        adjacency.get(b.id).add(a.id);
+      }
+    }
+  }
+
+  const visited = new Set();
+  const columnsById = new Map();
+
+  for (const appointment of appointmentsOnly) {
+    if (visited.has(appointment.id)) continue;
+
+    const stack = [appointment.id];
+    const component = [];
+    visited.add(appointment.id);
+
+    while (stack.length) {
+      const current = stack.pop();
+      component.push(current);
+
+      for (const neighbor of adjacency.get(current) || []) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          stack.push(neighbor);
+        }
+      }
+    }
+
+    let maxColumn = 0;
+
+    component.forEach((id) => {
+      maxColumn = Math.max(maxColumn, columnById.get(id) || 0);
+    });
+
+    component.forEach((id) => {
+      columnsById.set(id, maxColumn + 1);
+    });
+  }
+
+  const layouts = new Map();
+
+  for (const appointment of appointmentsOnly) {
+    const column = columnById.get(appointment.id) || 0;
+    const totalColumns = columnsById.get(appointment.id) || 1;
+
+    const top = ((appointment.__start - DAY_START_MIN) / 60) * HOUR_ROW_HEIGHT;
+    const height =
+      ((appointment.__end - appointment.__start) / 60) * HOUR_ROW_HEIGHT;
+
+    const widthPercent = 100 / totalColumns;
+    const leftPercent = column * widthPercent;
+    const gap = totalColumns > 1 ? 1.5 : 3;
+
+    layouts.set(appointment.id, {
+      top: top + 2,
+      height: Math.max(1, height - 4),
+      // Conserva un espacio libre para agendar sin tapar ninguna cita.
+      left: `calc(${leftPercent}% - ${(ANCHO_ACCION_CELDA * leftPercent) / 100}px + ${gap}px)`,
+      width: `calc(${widthPercent}% - ${ANCHO_ACCION_CELDA / totalColumns + gap * 2}px)`,
+      columns: totalColumns,
+      column,
+    });
+  }
+
+  return layouts;
+}
+
+function computeBlockLayouts(items) {
+  const layouts = new Map();
+
+  (items || []).filter(isBlockItem).forEach((block) => {
+    const start = clamp(toMinutes(block.time), DAY_START_MIN, DAY_END_MIN);
+    const rawEnd = toMinutes(block.endTime || addMinutesToTime(block.time, 60));
+    const end = clamp(rawEnd, DAY_START_MIN, DAY_END_MIN);
+
+    if (end <= start) return;
+
+    const top = ((start - DAY_START_MIN) / 60) * HOUR_ROW_HEIGHT;
+    const height = ((end - start) / 60) * HOUR_ROW_HEIGHT;
+
+    layouts.set(block.id, {
+      top: top + 2,
+      height: Math.max(1, height - 4),
+      left: "3px",
+      width: "calc(100% - 6px)",
+      columns: 1,
+      column: 0,
+    });
+  });
+
+  return layouts;
+}
+
+function DroppableHourSlot({
+  id,
+  disabled,
+  bloquearInteraccion,
+  etiqueta,
+  children,
+  onClick,
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id,
+    disabled: disabled || bloquearInteraccion,
+  });
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      disabled={bloquearInteraccion}
+      onClick={onClick}
+      aria-label={etiqueta}
+      className={`agenda-celda relative h-full w-full rounded-lg text-left transition-colors ${!disabled && isOver ? "ring-2 ring-inset ring-blue-300" : ""
+        } ${disabled ? "bg-slate-100/80" : "bg-white/50"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function AppointmentBlock({
+  appointment,
+  layout,
+  matchesFilter,
+  activeFilters,
+  isMobile,
+  canSeeMoney,
+  setSlotMenu,
+  onOpenAppointment,
+  bloquearInteraccion,
+}) {
+  const isBlock = isBlockItem(appointment);
+  const paid = Boolean(appointment.paid || appointment.pagado);
+  const compact = !isBlock && Number(layout?.columns || 1) > 1;
+  const veryCompact = !isBlock && Number(layout?.columns || 1) > 3;
+  const citaCorta = layout.height < 58;
+  const citaMuyCorta = layout.height < 34;
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: appointment.id,
+    disabled: isBlock || isMobile || bloquearInteraccion,
+  });
+
+  const filteredClass = activeFilters
+    ? matchesFilter
+      ? "opacity-100 ring-2 ring-blue-300/70 shadow-lg"
+      : "opacity-25 saturate-50 grayscale-[30%]"
+    : "opacity-100";
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      data-appt="1"
+      disabled={bloquearInteraccion}
+      title={[
+        isBlock ? "Horario bloqueado" : appointment.patient || "Paciente",
+        isBlock ? appointment.motivo : appointment.service,
+        `${appointment.time || ""} – ${appointment.endTime || ""}`,
+        !isBlock ? statusLabel(appointment.status) : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      style={{
+        top: layout.top,
+        height: layout.height,
+        left: layout.left,
+        width: layout.width,
+        opacity: isDragging ? 0 : undefined,
+        pointerEvents: isDragging ? "none" : undefined,
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+
+        if (isBlock) {
+          const point = getClientPoint(event);
+
+          setSlotMenu({
+            anchorRect: rectFromPoint(point.x, point.y),
+            date: appointment.date,
+            hour: appointment.time || "08:00",
+            professionalId: appointment.professionalId,
+            blockItem: appointment,
+            hasBlock: true,
+          });
+          return;
+        }
+
+        onOpenAppointment?.(appointment);
+      }}
+      className={[
+        "agenda-cita absolute z-10 overflow-hidden border text-left transition-shadow duration-200",
+        "hover:z-20 hover:shadow-[0_6px_16px_rgba(15,23,42,0.16)] focus-visible:z-20",
+        compact || citaCorta
+          ? "rounded-lg px-1.5 py-1"
+          : "rounded-xl px-3 py-2.5",
+        appointment.color ||
+        (isBlock
+          ? "border-slate-300 bg-slate-100 text-slate-700"
+          : "border-blue-200 bg-blue-50 text-blue-900"),
+        filteredClass,
+        !isBlock && !isMobile ? "touch-none" : "",
+      ].join(" ")}
+      {...(!isBlock ? listeners : {})}
+      {...(!isBlock ? attributes : {})}
+    >
+      {paid && !isBlock && canSeeMoney && (
+        <span
+          className={`absolute bottom-0 left-0 top-0 bg-emerald-500 ${compact ? "w-1" : "w-1.5"
+            }`}
+          title="Pagada"
+        />
+      )}
+
+      <div
+        className={paid && !isBlock && canSeeMoney ? "min-w-0 pl-1" : "min-w-0"}
+      >
+        <div className="flex min-w-0 items-start gap-1">
+          <div className="min-w-0 flex-1">
+            <p
+              className={`truncate font-bold leading-tight ${compact ? "text-[10px]" : "text-[11px]"
+                }`}
+              title={
+                isBlock
+                  ? "Horario bloqueado"
+                  : appointment.patient || "Paciente"
+              }
+            >
+              {isBlock
+                ? "Horario bloqueado"
+                : appointment.patient || "Paciente"}
+            </p>
+
+            {!veryCompact && !citaCorta && (
+              <p
+                className={`mt-1 truncate opacity-75 ${compact ? "text-[9px]" : "text-[10px]"
+                  }`}
+              >
+                {isBlock
+                  ? appointment.motivo || "No disponible"
+                  : appointment.service || "Servicio"}
+              </p>
+            )}
+          </div>
+
+          {!isBlock && (
+            <span
+              className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ring-2 ring-white/70 ${statusDot(
+                appointment.status,
+              )}`}
+              title={statusLabel(appointment.status)}
+            />
+          )}
+        </div>
+
+        {!citaMuyCorta && (
+          <div
+            className={`flex items-end justify-between gap-1 font-semibold leading-none opacity-80 ${compact || citaCorta ? "mt-1 text-[9px]" : "mt-2 text-[10px]"
+              }`}
+          >
+            <span className="truncate">
+              {String(appointment.time || "").slice(0, 5)}
+              {!veryCompact && appointment.endTime
+                ? ` – ${String(appointment.endTime).slice(0, 5)}`
+                : ""}
+            </span>
+
+            {!isBlock && !compact && !citaCorta && canSeeMoney && (
+              <span className="shrink-0">{paid ? "Pagada" : "Pendiente"}</span>
+            )}
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function DayColumn({
+  dateIso,
+  professionalId,
+  sourceAppointments,
+  now,
+  todayIso,
+  activeFilters,
+  isMobile,
+  canSeeMoney,
+  setSlotMenu,
+  onOpenAppointment,
+  matchesCurrentFilter,
+  bloquearInteraccion,
+}) {
+  const items = useMemo(
+    () =>
+      sourceAppointments.filter(
+        (appointment) =>
+          appointment.date === dateIso &&
+          Number(appointment.professionalId) === Number(professionalId),
+      ),
+    [dateIso, professionalId, sourceAppointments],
+  );
+
+  const blockLayouts = useMemo(() => computeBlockLayouts(items), [items]);
+
+  // Importante: NO se agrupan las citas simultáneas.
+  // Cada cita recibe su propia columna dentro de la misma celda.
+  const appointmentLayouts = useMemo(() => computeLayouts(items), [items]);
+
+  const blockedByHour = useMemo(() => {
+    const map = new Map();
+    const blocks = items.filter(isBlockItem);
+
+    HOURS.forEach((hour) => {
+      const hourStart = toMinutes(hour);
+      const hourEnd = hourStart + 60;
+
+      const found =
+        blocks.find((block) => {
+          const start = toMinutes(block.time);
+          const end = toMinutes(
+            block.endTime || addMinutesToTime(block.time, 60),
+          );
+
+          return overlapsMinutes(hourStart, hourEnd, start, end);
+        }) || null;
+
+      map.set(hour, found);
+    });
+
+    return map;
+  }, [items]);
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowY = ((nowMinutes - DAY_START_MIN) / 60) * HOUR_ROW_HEIGHT;
+  const showNow =
+    nowMinutes >= DAY_START_MIN &&
+    nowMinutes <= DAY_END_MIN &&
+    dateIso === todayIso;
+
+  return (
+    <div className="agenda-columna relative isolate">
+      <div className="pointer-events-none absolute inset-0 z-[5]">
+        {HOURS.map((hour) => (
+          <div
+            key={hour}
+            style={{ height: HOUR_ROW_HEIGHT }}
+            className="border-b border-dashed border-slate-300"
+          />
+        ))}
+
+        {showNow && (
+          <div
+            className="absolute left-0 right-0 z-[8]"
+            style={{
+              top: clamp(nowY, 0, GRID_TOTAL_HEIGHT),
+            }}
+          >
+            <div className="h-[2px] bg-rose-500/90" />
+            <div className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-rose-500" />
+          </div>
+        )}
+      </div>
+
+      <div className="relative" style={{ height: GRID_TOTAL_HEIGHT }}>
+        {HOURS.map((hour, index) => {
+          const top = index * HOUR_ROW_HEIGHT;
+          const slotId = `slot:${dateIso}:${professionalId}:${hour.slice(
+            0,
+            2,
+          )}:00`;
+          const block = blockedByHour.get(hour);
+          const blocked = Boolean(block);
+
+          return (
+            <div
+              key={slotId}
+              className="absolute left-0 right-0 px-1"
+              style={{
+                top,
+                height: HOUR_ROW_HEIGHT,
+              }}
+            >
+              <DroppableHourSlot
+                id={slotId}
+                disabled={blocked}
+                bloquearInteraccion={bloquearInteraccion}
+                etiqueta={`${blocked ? "Ver bloqueo" : "Opciones de horario"}: ${dateIso}, ${hour}`}
+                onClick={(event) => {
+                  if (event.target.closest?.("[data-appt='1']")) {
+                    return;
+                  }
+
+                  const point = getClientPoint(event);
+
+                  setSlotMenu({
+                    anchorRect: rectFromPoint(point.x, point.y),
+                    date: dateIso,
+                    hour,
+                    professionalId,
+                    blockItem: block,
+                    hasBlock: blocked,
+                  });
+                }}
+              >
+                {!blocked && (
+                  <span
+                    aria-hidden="true"
+                    className="agenda-agregar absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-600 shadow-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </span>
+                )}
+              </DroppableHourSlot>
+            </div>
+          );
+        })}
+
+        {items.filter(isBlockItem).map((block) => {
+          const layout = blockLayouts.get(block.id);
+          if (!layout) return null;
+
+          return (
+            <AppointmentBlock
+              key={block.id}
+              activeFilters={activeFilters}
+              isMobile={isMobile}
+              canSeeMoney={canSeeMoney}
+              setSlotMenu={setSlotMenu}
+              onOpenAppointment={onOpenAppointment}
+              bloquearInteraccion={bloquearInteraccion}
+              appointment={block}
+              layout={layout}
+              matchesFilter
+            />
+          );
+        })}
+
+        {items
+          .filter((item) => !isBlockItem(item))
+          .map((appointment) => {
+            const layout = appointmentLayouts.get(appointment.id);
+            if (!layout) return null;
+
+            return (
+              <AppointmentBlock
+                key={appointment.id}
+                activeFilters={activeFilters}
+                isMobile={isMobile}
+                canSeeMoney={canSeeMoney}
+                setSlotMenu={setSlotMenu}
+                onOpenAppointment={onOpenAppointment}
+                bloquearInteraccion={bloquearInteraccion}
+                appointment={appointment}
+                layout={layout}
+                matchesFilter={matchesCurrentFilter(appointment)}
+              />
+            );
+          })}
+      </div>
+    </div>
+  );
+}
+
+function MenuHorario({ anchorRect, onClose, children }) {
+  const menuRef = useRef(null);
+  const [posicion, setPosicion] = useState({ left: 8, top: 8 });
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+
+    const rect = menu.getBoundingClientRect();
+    setPosicion({
+      left: Math.max(
+        8,
+        Math.min(anchorRect.left, window.innerWidth - rect.width - 8),
+      ),
+      top: Math.max(
+        8,
+        Math.min(anchorRect.top + 8, window.innerHeight - rect.height - 8),
+      ),
+    });
+    menu.querySelector("button")?.focus({ preventScroll: true });
+
+    const cerrarFuera = (evento) => {
+      if (!menu.contains(evento.target)) onClose();
+    };
+    const cerrarConEscape = (evento) => {
+      if (evento.key === "Escape") {
+        evento.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("pointerdown", cerrarFuera);
+    document.addEventListener("scroll", cerrarFuera, true);
+    document.addEventListener("keydown", cerrarConEscape);
+    window.addEventListener("resize", onClose);
+    return () => {
+      document.removeEventListener("pointerdown", cerrarFuera);
+      document.removeEventListener("scroll", cerrarFuera, true);
+      document.removeEventListener("keydown", cerrarConEscape);
+      window.removeEventListener("resize", onClose);
+    };
+  }, [anchorRect, onClose]);
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      role="group"
+      aria-label="Opciones del horario"
+      className="agenda-menu fixed z-[120] w-[230px] max-w-[calc(100vw-16px)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
+      style={{ ...posicion, maxHeight: "calc(100dvh - 16px)" }}
+    >
+      {children}
+    </div>,
+    document.body,
   );
 }
 
@@ -803,6 +1375,7 @@ export function AgendaView({
   onMoveAppointment,
   onOpenBlockModal,
   onDeleteBlock,
+  modalAbierto = false,
 }) {
   const isMobile = useMediaQuery("(max-width: 768px)");
   const isProfessional = [
@@ -812,7 +1385,9 @@ export function AgendaView({
     "nutriologo",
     "dentista",
   ].includes(role);
-  const canSeeAll = permissions?.puede_ver_todas_agendas ?? ["admin", "recepcion"].includes(role);
+  const canSeeAll =
+    permissions?.puede_ver_todas_agendas ??
+    ["admin", "recepcion"].includes(role);
   const isMoneyRole = ["admin", "fisioterapeuta", "recepcion"].includes(role);
   const canSeeMoney = isMoneyRole;
   const canConfigureGoals = role === "admin";
@@ -823,7 +1398,7 @@ export function AgendaView({
   const [viewMode, setViewMode] = useState("day");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [includeSunday, setIncludeSunday] = useState(
-    () => localStorage.getItem("agenda.includeSunday") === "1"
+    () => localStorage.getItem("agenda.includeSunday") === "1",
   );
   const [activeApptId, setActiveApptId] = useState(null);
   const [slotMenu, setSlotMenu] = useState(null);
@@ -837,13 +1412,21 @@ export function AgendaView({
   });
   const [now, setNow] = useState(() => new Date());
 
-  const todayIso = useMemo(() => dateKey(new Date()), []);
-  const keyDate = dateKey(currentDate);
+  const todayIso = dateKey(now);
+  const bloquearInteraccion = modalAbierto || goalOpen || uiMessage.open;
+  const cerrarMenu = useCallback(() => setSlotMenu(null), []);
 
-  const DAY_START_MIN = toMinutes(HOURS[0]);
-  const DAY_END_MIN =
-    toMinutes(HOURS[HOURS.length - 1]) + 60;
-  const GRID_TOTAL_HEIGHT = HOURS.length * HOUR_ROW_HEIGHT;
+  useEffect(() => {
+    setSlotMenu(null);
+  }, [
+    modalAbierto,
+    goalOpen,
+    uiMessage.open,
+    currentDate,
+    viewMode,
+    selectedProfessionalId,
+  ]);
+  const keyDate = dateKey(currentDate);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -851,14 +1434,11 @@ export function AgendaView({
     }),
     useSensor(TouchSensor, {
       activationConstraint: { delay: 180, tolerance: 8 },
-    })
+    }),
   );
 
   useEffect(() => {
-    localStorage.setItem(
-      "agenda.includeSunday",
-      includeSunday ? "1" : "0"
-    );
+    localStorage.setItem("agenda.includeSunday", includeSunday ? "1" : "0");
   }, [includeSunday]);
 
   useEffect(() => {
@@ -880,11 +1460,7 @@ export function AgendaView({
     if (isProfessional && myUserId) {
       setSelectedProfessionalId?.(myUserId);
     }
-  }, [
-    isProfessional,
-    myUserId,
-    setSelectedProfessionalId,
-  ]);
+  }, [isProfessional, myUserId, setSelectedProfessionalId]);
 
   const proMap = useMemo(() => {
     const map = new Map();
@@ -899,8 +1475,7 @@ export function AgendaView({
 
     if (isProfessional && myUserId) {
       return list.filter(
-        (item) =>
-          Number(item.professionalId) === Number(myUserId)
+        (item) => Number(item.professionalId) === Number(myUserId),
       );
     }
 
@@ -912,48 +1487,28 @@ export function AgendaView({
 
     if (isProfessional && myUserId) {
       return list.filter(
-        (professional) =>
-          Number(professional.id) === Number(myUserId)
+        (professional) => Number(professional.id) === Number(myUserId),
       );
     }
 
     if (selectedProfessionalId) {
       return list.filter(
         (professional) =>
-          Number(professional.id) ===
-          Number(selectedProfessionalId)
+          Number(professional.id) === Number(selectedProfessionalId),
       );
     }
 
     return list;
-  }, [
-    professionals,
-    isProfessional,
-    myUserId,
-    selectedProfessionalId,
-  ]);
+  }, [professionals, isProfessional, myUserId, selectedProfessionalId]);
 
-  const weekProfessionals = useMemo(() => {
-    if (isProfessional && myUserId) {
-      return (professionals || []).filter(
-        (professional) =>
-          Number(professional.id) === Number(myUserId)
-      );
-    }
-
-    // Requisito: en semana siempre se ve una agenda completa por profesional.
-    return professionals || [];
-  }, [professionals, isProfessional, myUserId]);
+  // El selector de profesional se aplica también a la vista semanal.
+  const weekProfessionals = dayProfessionals;
 
   const selectedForPanel = useMemo(() => {
     if (isProfessional && myUserId) return Number(myUserId);
     if (selectedProfessionalId) return Number(selectedProfessionalId);
     return null;
-  }, [
-    isProfessional,
-    myUserId,
-    selectedProfessionalId,
-  ]);
+  }, [isProfessional, myUserId, selectedProfessionalId]);
 
   const loadPanel = useCallback(async () => {
     const token = localStorage.getItem("auth.access");
@@ -973,7 +1528,7 @@ export function AgendaView({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       const data = await response.json().catch(() => null);
@@ -983,8 +1538,7 @@ export function AgendaView({
           open: true,
           title: "Panel de agenda",
           message:
-            data?.detail ||
-            "No se pudieron cargar las métricas y alertas.",
+            data?.detail || "No se pudieron cargar las métricas y alertas.",
         });
         return;
       }
@@ -1012,14 +1566,8 @@ export function AgendaView({
     window.addEventListener("fisionerv:sales-refresh", refresh);
 
     return () => {
-      window.removeEventListener(
-        "fisionerv:agenda-refresh",
-        refresh
-      );
-      window.removeEventListener(
-        "fisionerv:sales-refresh",
-        refresh
-      );
+      window.removeEventListener("fisionerv:agenda-refresh", refresh);
+      window.removeEventListener("fisionerv:sales-refresh", refresh);
     };
   }, [loadPanel]);
 
@@ -1028,14 +1576,9 @@ export function AgendaView({
       Boolean(
         quickSearch.trim() ||
         statusFilter !== "all" ||
-        (canSeeMoney && paymentFilter !== "all")
+        (canSeeMoney && paymentFilter !== "all"),
       ),
-    [
-      quickSearch,
-      statusFilter,
-      paymentFilter,
-      canSeeMoney,
-    ]
+    [quickSearch, statusFilter, paymentFilter, canSeeMoney],
   );
 
   const matchesCurrentFilter = useCallback(
@@ -1053,7 +1596,7 @@ export function AgendaView({
         ].some((value) =>
           String(value || "")
             .toLowerCase()
-            .includes(term)
+            .includes(term),
         );
 
         if (!matchSearch) return false;
@@ -1061,16 +1604,13 @@ export function AgendaView({
 
       if (
         statusFilter !== "all" &&
-        normalizeAppointmentStatus(appointment.status) !==
-        statusFilter
+        normalizeAppointmentStatus(appointment.status) !== statusFilter
       ) {
         return false;
       }
 
       if (canSeeMoney && paymentFilter !== "all") {
-        const paid = Boolean(
-          appointment.paid || appointment.pagado
-        );
+        const paid = Boolean(appointment.paid || appointment.pagado);
 
         if (paymentFilter === "paid" && !paid) return false;
         if (paymentFilter === "unpaid" && paid) return false;
@@ -1078,23 +1618,7 @@ export function AgendaView({
 
       return true;
     },
-    [
-      quickSearch,
-      statusFilter,
-      paymentFilter,
-      canSeeMoney,
-    ]
-  );
-
-  const filteredCount = useMemo(
-    () =>
-      sourceAppointments.filter(
-        (appointment) =>
-          !isBlockItem(appointment) &&
-          appointment.date === keyDate &&
-          matchesCurrentFilter(appointment)
-      ).length,
-    [sourceAppointments, keyDate, matchesCurrentFilter]
+    [quickSearch, statusFilter, paymentFilter, canSeeMoney],
   );
 
   const blockedSlots = useMemo(() => {
@@ -1102,15 +1626,13 @@ export function AgendaView({
 
     const byDateProfessional = new Map();
 
-    sourceAppointments
-      .filter(isBlockItem)
-      .forEach((block) => {
-        const key = `${block.date}|${block.professionalId}`;
-        if (!byDateProfessional.has(key)) {
-          byDateProfessional.set(key, []);
-        }
-        byDateProfessional.get(key).push(block);
-      });
+    sourceAppointments.filter(isBlockItem).forEach((block) => {
+      const key = `${block.date}|${block.professionalId}`;
+      if (!byDateProfessional.has(key)) {
+        byDateProfessional.set(key, []);
+      }
+      byDateProfessional.get(key).push(block);
+    });
 
     for (const [key, blocks] of byDateProfessional.entries()) {
       const [dateIso, professionalId] = key.split("|");
@@ -1122,16 +1644,10 @@ export function AgendaView({
         const covered = blocks.some((block) => {
           const start = toMinutes(block.time);
           const end = toMinutes(
-            block.endTime ||
-            addMinutesToTime(block.time, 60)
+            block.endTime || addMinutesToTime(block.time, 60),
           );
 
-          return overlapsMinutes(
-            hourStart,
-            hourEnd,
-            start,
-            end
-          );
+          return overlapsMinutes(hourStart, hourEnd, start, end);
         });
 
         if (covered) {
@@ -1146,14 +1662,14 @@ export function AgendaView({
   const activeAppointment = useMemo(
     () =>
       sourceAppointments.find(
-        (appointment) =>
-          String(appointment.id) === String(activeApptId)
+        (appointment) => String(appointment.id) === String(activeApptId),
       ) || null,
-    [sourceAppointments, activeApptId]
+    [sourceAppointments, activeApptId],
   );
 
   const handleDragStart = (event) => {
     if (isMobile) return;
+    setSlotMenu(null);
     setActiveApptId(event?.active?.id ?? null);
   };
 
@@ -1168,7 +1684,7 @@ export function AgendaView({
     if (!activeId || !overId) return;
 
     const appointment = sourceAppointments.find(
-      (item) => String(item.id) === String(activeId)
+      (item) => String(item.id) === String(activeId),
     );
 
     if (!appointment || isBlockItem(appointment)) return;
@@ -1188,18 +1704,16 @@ export function AgendaView({
       setUiMessage({
         open: true,
         title: "Horario bloqueado",
-        message:
-          "No puedes mover la cita a un horario que está bloqueado.",
+        message: "No puedes mover la cita a un horario que está bloqueado.",
       });
       return;
     }
 
     const oldStart = toMinutes(appointment.time);
     const oldEnd = toMinutes(
-      appointment.endTime ||
-      addMinutesToTime(appointment.time, 60)
+      appointment.endTime || addMinutesToTime(appointment.time, 60),
     );
-    const duration = Math.max(60, oldEnd - oldStart);
+    const duration = Math.max(1, oldEnd - oldStart);
 
     onMoveAppointment?.(appointment, {
       id: appointment.id,
@@ -1210,629 +1724,23 @@ export function AgendaView({
     });
   };
 
-  function computeLayouts(items) {
-    const appointmentsOnly = (items || [])
-      .filter((item) => !isBlockItem(item))
-      .map((appointment) => {
-        const start = clamp(
-          toMinutes(appointment.time),
-          DAY_START_MIN,
-          DAY_END_MIN
-        );
-        const rawEnd = toMinutes(
-          appointment.endTime ||
-          addMinutesToTime(appointment.time, 60)
-        );
-        const end = clamp(
-          Math.max(rawEnd, start + 30),
-          DAY_START_MIN,
-          DAY_END_MIN
-        );
-
-        return {
-          ...appointment,
-          __start: start,
-          __end: end,
-        };
-      })
-      .sort(
-        (a, b) =>
-          a.__start - b.__start ||
-          b.__end -
-          b.__start -
-          (a.__end - a.__start)
-      );
-
-    const columnById = new Map();
-    const active = [];
-    const usedColumns = new Set();
-
-    const release = (start) => {
-      for (let index = active.length - 1; index >= 0; index--) {
-        if (active[index].end <= start) {
-          usedColumns.delete(active[index].column);
-          active.splice(index, 1);
-        }
-      }
-    };
-
-    const nextColumn = () => {
-      let column = 0;
-      while (usedColumns.has(column)) column += 1;
-      return column;
-    };
-
-    for (const appointment of appointmentsOnly) {
-      release(appointment.__start);
-
-      const column = nextColumn();
-      usedColumns.add(column);
-      active.push({
-        id: appointment.id,
-        end: appointment.__end,
-        column,
-      });
-      columnById.set(appointment.id, column);
-    }
-
-    const adjacency = new Map(
-      appointmentsOnly.map((appointment) => [
-        appointment.id,
-        new Set(),
-      ])
-    );
-
-    for (
-      let first = 0;
-      first < appointmentsOnly.length;
-      first++
-    ) {
-      for (
-        let second = first + 1;
-        second < appointmentsOnly.length;
-        second++
-      ) {
-        const a = appointmentsOnly[first];
-        const b = appointmentsOnly[second];
-
-        if (
-          overlapsMinutes(
-            a.__start,
-            a.__end,
-            b.__start,
-            b.__end
-          )
-        ) {
-          adjacency.get(a.id).add(b.id);
-          adjacency.get(b.id).add(a.id);
-        }
-      }
-    }
-
-    const visited = new Set();
-    const columnsById = new Map();
-
-    for (const appointment of appointmentsOnly) {
-      if (visited.has(appointment.id)) continue;
-
-      const stack = [appointment.id];
-      const component = [];
-      visited.add(appointment.id);
-
-      while (stack.length) {
-        const current = stack.pop();
-        component.push(current);
-
-        for (const neighbor of adjacency.get(current) || []) {
-          if (!visited.has(neighbor)) {
-            visited.add(neighbor);
-            stack.push(neighbor);
-          }
-        }
-      }
-
-      let maxColumn = 0;
-
-      component.forEach((id) => {
-        maxColumn = Math.max(
-          maxColumn,
-          columnById.get(id) || 0
-        );
-      });
-
-      component.forEach((id) => {
-        columnsById.set(id, maxColumn + 1);
-      });
-    }
-
-    const layouts = new Map();
-
-    for (const appointment of appointmentsOnly) {
-      const column = columnById.get(appointment.id) || 0;
-      const totalColumns =
-        columnsById.get(appointment.id) || 1;
-
-      const top =
-        ((appointment.__start - DAY_START_MIN) / 60) *
-        HOUR_ROW_HEIGHT;
-      const height =
-        ((appointment.__end - appointment.__start) / 60) *
-        HOUR_ROW_HEIGHT;
-
-      const widthPercent = 100 / totalColumns;
-      const leftPercent = column * widthPercent;
-      const gap = totalColumns > 1 ? 1.5 : 3;
-
-      layouts.set(appointment.id, {
-        top: top + 2,
-        height: Math.max(30, height - 4),
-        left: `calc(${leftPercent}% + ${gap}px)`,
-        width: `calc(${widthPercent}% - ${gap * 2}px)`,
-        columns: totalColumns,
-        column,
-      });
-    }
-
-    return layouts;
-  }
-
-  function computeBlockLayouts(items) {
-    const layouts = new Map();
-
-    (items || [])
-      .filter(isBlockItem)
-      .forEach((block) => {
-        const start = clamp(
-          toMinutes(block.time),
-          DAY_START_MIN,
-          DAY_END_MIN
-        );
-        const rawEnd = toMinutes(
-          block.endTime ||
-          addMinutesToTime(block.time, 60)
-        );
-        const end = clamp(
-          Math.max(rawEnd, start + 30),
-          DAY_START_MIN,
-          DAY_END_MIN
-        );
-
-        const top =
-          ((start - DAY_START_MIN) / 60) *
-          HOUR_ROW_HEIGHT;
-        const height =
-          ((end - start) / 60) * HOUR_ROW_HEIGHT;
-
-        layouts.set(block.id, {
-          top: top + 2,
-          height: Math.max(30, height - 4),
-          left: "3px",
-          width: "calc(100% - 6px)",
-          columns: 1,
-          column: 0,
-        });
-      });
-
-    return layouts;
-  }
-
-  function DroppableHourSlot({
-    id,
-    disabled,
-    children,
-    onClick,
-  }) {
-    const { setNodeRef, isOver } = useDroppable({
-      id,
-      disabled,
-    });
-
-    return (
-      <div
-        ref={setNodeRef}
-        onClick={onClick}
-        className={`relative h-full w-full transition ${!disabled && isOver
-          ? "ring-2 ring-blue-300"
-          : ""
-          } ${disabled ? "cursor-not-allowed" : ""}`}
-      >
-        {children}
-      </div>
-    );
-  }
-
-  function AppointmentBlock({
-    appointment,
-    layout,
-    matchesFilter,
-  }) {
-    const isBlock = isBlockItem(appointment);
-    const paid = Boolean(
-      appointment.paid || appointment.pagado
-    );
-    const compact =
-      !isBlock && Number(layout?.columns || 1) > 1;
-    const veryCompact =
-      !isBlock && Number(layout?.columns || 1) > 3;
-
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      isDragging,
-    } = useDraggable({
-      id: appointment.id,
-      disabled: isBlock || isMobile,
-    });
-
-    const filteredClass = activeFilters
-      ? matchesFilter
-        ? "opacity-100 ring-2 ring-blue-300/70 shadow-lg"
-        : "opacity-25 saturate-50 grayscale-[30%]"
-      : "opacity-100";
-
-    return (
-      <button
-        ref={setNodeRef}
-        type="button"
-        data-appt="1"
-        style={{
-          top: layout.top,
-          height: layout.height,
-          left: layout.left,
-          width: layout.width,
-          transform: transform
-            ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
-            : undefined,
-          zIndex: isDragging
-            ? 50
-            : 10 + Number(layout.column || 0),
-        }}
-        onClick={(event) => {
-          event.stopPropagation();
-
-          if (isBlock) {
-            const point = getClientPoint(event);
-
-            setSlotMenu({
-              anchorRect: rectFromPoint(point.x, point.y),
-              date: appointment.date,
-              hour: appointment.time || "08:00",
-              professionalId: appointment.professionalId,
-              blockItem: appointment,
-              hasBlock: true,
-            });
-            return;
-          }
-
-          onOpenAppointment?.(appointment);
-        }}
-        className={[
-          "absolute overflow-hidden border text-left transition duration-200",
-          "hover:z-40 hover:-translate-y-px hover:shadow-[0_10px_24px_rgba(15,23,42,0.16)]",
-          compact
-            ? "rounded-lg px-1.5 py-1"
-            : "rounded-xl px-3 py-2.5",
-          appointment.color ||
-          (isBlock
-            ? "border-slate-300 bg-slate-100 text-slate-700"
-            : "border-blue-200 bg-blue-50 text-blue-900"),
-          filteredClass,
-          !isBlock && !isMobile ? "touch-none" : "",
-        ].join(" ")}
-        {...(!isBlock ? listeners : {})}
-        {...(!isBlock ? attributes : {})}
-      >
-        {paid && !isBlock && canSeeMoney && (
-          <span
-            className={`absolute bottom-0 left-0 top-0 bg-emerald-500 ${compact ? "w-1" : "w-1.5"
-              }`}
-            title="Pagada"
-          />
-        )}
-
-        <div
-          className={
-            paid && !isBlock && canSeeMoney
-              ? "min-w-0 pl-1"
-              : "min-w-0"
-          }
-        >
-          <div className="flex min-w-0 items-start gap-1">
-            <div className="min-w-0 flex-1">
-              <p
-                className={`truncate font-bold leading-tight ${compact ? "text-[9px]" : "text-[11px]"
-                  }`}
-                title={
-                  isBlock
-                    ? "Horario bloqueado"
-                    : appointment.patient || "Paciente"
-                }
-              >
-                {isBlock
-                  ? "Horario bloqueado"
-                  : appointment.patient || "Paciente"}
-              </p>
-
-              {!veryCompact && (
-                <p
-                  className={`mt-1 truncate opacity-75 ${compact ? "text-[8px]" : "text-[10px]"
-                    }`}
-                >
-                  {isBlock
-                    ? appointment.motivo || "No disponible"
-                    : appointment.service || "Servicio"}
-                </p>
-              )}
-            </div>
-
-            {!isBlock && (
-              <span
-                className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ring-2 ring-white/70 ${statusDot(
-                  appointment.status
-                )}`}
-                title={statusLabel(appointment.status)}
-              />
-            )}
-          </div>
-
-          <div
-            className={`flex items-end justify-between gap-1 font-semibold leading-none opacity-80 ${compact ? "mt-1 text-[8px]" : "mt-2 text-[10px]"
-              }`}
-          >
-            <span className="truncate">
-              {String(appointment.time || "").slice(0, 5)}
-              {!veryCompact && appointment.endTime
-                ? ` – ${String(appointment.endTime).slice(0, 5)}`
-                : ""}
-            </span>
-
-            {!isBlock &&
-              !compact &&
-              canSeeMoney && (
-                <span>
-                  {paid ? "Pagada" : "Pendiente"}
-                </span>
-              )}
-          </div>
-        </div>
-      </button>
-    );
-  }
-
-  function DayColumn({ dateIso, professionalId }) {
-    const items = useMemo(
-      () =>
-        sourceAppointments.filter(
-          (appointment) =>
-            appointment.date === dateIso &&
-            Number(appointment.professionalId) ===
-            Number(professionalId)
-        ),
-      [dateIso, professionalId, sourceAppointments]
-    );
-
-    const blockLayouts = useMemo(
-      () => computeBlockLayouts(items),
-      [items]
-    );
-
-    // Importante: NO se agrupan las citas simultáneas.
-    // Cada cita recibe su propia columna dentro de la misma celda.
-    const appointmentLayouts = useMemo(
-      () => computeLayouts(items),
-      [items]
-    );
-
-    const blockedByHour = useMemo(() => {
-      const map = new Map();
-      const blocks = items.filter(isBlockItem);
-
-      HOURS.forEach((hour) => {
-        const hourStart = toMinutes(hour);
-        const hourEnd = hourStart + 60;
-
-        const found =
-          blocks.find((block) => {
-            const start = toMinutes(block.time);
-            const end = toMinutes(
-              block.endTime ||
-              addMinutesToTime(block.time, 60)
-            );
-
-            return overlapsMinutes(
-              hourStart,
-              hourEnd,
-              start,
-              end
-            );
-          }) || null;
-
-        map.set(hour, found);
-      });
-
-      return map;
-    }, [items]);
-
-    const nowMinutes =
-      now.getHours() * 60 + now.getMinutes();
-    const nowY =
-      ((nowMinutes - DAY_START_MIN) / 60) *
-      HOUR_ROW_HEIGHT;
-    const showNow =
-      nowMinutes >= DAY_START_MIN &&
-      nowMinutes <= DAY_END_MIN &&
-      dateIso === todayIso;
-
-    return (
-      <div className="relative">
-        <div className="pointer-events-none absolute inset-0">
-          {HOURS.map((hour) => (
-            <div
-              key={hour}
-              style={{ height: HOUR_ROW_HEIGHT }}
-              className="border-b border-dashed border-slate-300"
-            />
-          ))}
-
-          {showNow && (
-            <div
-              className="absolute left-0 right-0 z-[8]"
-              style={{
-                top: clamp(nowY, 0, GRID_TOTAL_HEIGHT),
-              }}
-            >
-              <div className="h-[2px] bg-rose-500/90" />
-              <div className="absolute -left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-rose-500" />
-            </div>
-          )}
-        </div>
-
-        <div
-          className="relative"
-          style={{ height: GRID_TOTAL_HEIGHT }}
-        >
-          {HOURS.map((hour, index) => {
-            const top = index * HOUR_ROW_HEIGHT;
-            const slotId = `slot:${dateIso}:${professionalId}:${hour.slice(
-              0,
-              2
-            )}:00`;
-            const block = blockedByHour.get(hour);
-            const blocked = Boolean(block);
-
-            return (
-              <div
-                key={slotId}
-                className="absolute left-0 right-0 px-1"
-                style={{
-                  top,
-                  height: HOUR_ROW_HEIGHT,
-                }}
-              >
-                <DroppableHourSlot
-                  id={slotId}
-                  disabled={blocked}
-                  onClick={(event) => {
-                    if (
-                      event.target.closest?.("[data-appt='1']")
-                    ) {
-                      return;
-                    }
-
-                    const point = getClientPoint(event);
-
-                    setSlotMenu({
-                      anchorRect: rectFromPoint(
-                        point.x,
-                        point.y
-                      ),
-                      date: dateIso,
-                      hour,
-                      professionalId,
-                      blockItem: block,
-                      hasBlock: blocked,
-                    });
-                  }}
-                >
-                  <div
-                    className={`group relative h-[98%] w-[98%] rounded-lg p-1 ${blocked
-                      ? "bg-slate-100/80"
-                      : "bg-white/70"
-                      }`}
-                  >
-                    {!blocked && (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          const point =
-                            getClientPoint(event);
-
-                          setSlotMenu({
-                            anchorRect: rectFromPoint(
-                              point.x,
-                              point.y
-                            ),
-                            date: dateIso,
-                            hour,
-                            professionalId,
-                            blockItem: null,
-                            hasBlock: false,
-                          });
-                        }}
-                        className="absolute right-2 top-2 z-[80] flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white/95 text-blue-600 opacity-100 shadow-md transition hover:scale-105 hover:bg-blue-50"
-                        title="Agendar otra cita"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </DroppableHourSlot>
-              </div>
-            );
-          })}
-
-          {items
-            .filter(isBlockItem)
-            .map((block) => {
-              const layout = blockLayouts.get(block.id);
-              if (!layout) return null;
-
-              return (
-                <AppointmentBlock
-                  key={block.id}
-                  appointment={block}
-                  layout={layout}
-                  matchesFilter
-                />
-              );
-            })}
-
-          {items
-            .filter((item) => !isBlockItem(item))
-            .map((appointment) => {
-              const layout =
-                appointmentLayouts.get(appointment.id);
-              if (!layout) return null;
-
-              return (
-                <AppointmentBlock
-                  key={appointment.id}
-                  appointment={appointment}
-                  layout={layout}
-                  matchesFilter={matchesCurrentFilter(
-                    appointment
-                  )}
-                />
-              );
-            })}
-        </div>
-      </div>
-    );
-  }
-
-  const monday = startOfWeekMonday(currentDate);
+  const monday = useMemo(() => startOfWeekMonday(currentDate), [currentDate]);
 
   const weekDays = useMemo(
     () =>
-      Array.from(
-        { length: includeSunday ? 7 : 6 },
-        (_, index) => {
-          const day = new Date(monday);
-          day.setDate(monday.getDate() + index);
-          return day;
-        }
-      ),
-    [monday, includeSunday]
+      Array.from({ length: includeSunday ? 7 : 6 }, (_, index) => {
+        const day = new Date(monday);
+        day.setDate(monday.getDate() + index);
+        return day;
+      }),
+    [monday, includeSunday],
   );
 
   const monthCells = useMemo(() => {
     const first = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth(),
-      1
+      1,
     );
     const start = startOfWeekMonday(first);
 
@@ -1843,27 +1751,43 @@ export function AgendaView({
     });
   }, [currentDate]);
 
+  const citasDeProfesionalesVisibles = useMemo(() => {
+    const ids = new Set(
+      dayProfessionals.map((profesional) => Number(profesional.id)),
+    );
+    return sourceAppointments.filter(
+      (cita) => !isBlockItem(cita) && ids.has(Number(cita.professionalId)),
+    );
+  }, [sourceAppointments, dayProfessionals]);
+
   const monthCountMap = useMemo(() => {
-    const map = new Map();
+    const mapa = new Map();
+    citasDeProfesionalesVisibles.forEach((cita) => {
+      const conteo = mapa.get(cita.date) || { total: 0, matching: 0 };
+      conteo.total += 1;
+      if (matchesCurrentFilter(cita)) conteo.matching += 1;
+      mapa.set(cita.date, conteo);
+    });
+    return mapa;
+  }, [citasDeProfesionalesVisibles, matchesCurrentFilter]);
 
-    sourceAppointments
-      .filter((item) => !isBlockItem(item))
-      .forEach((appointment) => {
-        const current = map.get(appointment.date) || {
-          total: 0,
-          matching: 0,
-        };
-
-        current.total += 1;
-        if (matchesCurrentFilter(appointment)) {
-          current.matching += 1;
-        }
-
-        map.set(appointment.date, current);
-      });
-
-    return map;
-  }, [sourceAppointments, matchesCurrentFilter]);
+  const filteredCount = useMemo(() => {
+    const fechas = new Set(
+      viewMode === "day"
+        ? [keyDate]
+        : (viewMode === "week" ? weekDays : monthCells).map(dateKey),
+    );
+    return citasDeProfesionalesVisibles.filter(
+      (cita) => fechas.has(cita.date) && matchesCurrentFilter(cita),
+    ).length;
+  }, [
+    citasDeProfesionalesVisibles,
+    matchesCurrentFilter,
+    viewMode,
+    keyDate,
+    weekDays,
+    monthCells,
+  ]);
 
   let headerMainLabel = "";
 
@@ -1871,12 +1795,8 @@ export function AgendaView({
     headerMainLabel = formatLongDate(currentDate);
   } else if (viewMode === "week") {
     const end = new Date(monday);
-    end.setDate(
-      monday.getDate() + (includeSunday ? 6 : 5)
-    );
-    headerMainLabel = `${formatLongDate(
-      monday
-    )} – ${formatLongDate(end)}`;
+    end.setDate(monday.getDate() + (includeSunday ? 6 : 5));
+    headerMainLabel = `${formatLongDate(monday)} – ${formatLongDate(end)}`;
   } else {
     headerMainLabel = currentDate
       .toLocaleDateString("es-MX", {
@@ -1887,19 +1807,17 @@ export function AgendaView({
   }
 
   const headerModeLabel =
-    viewMode === "day"
-      ? "Día"
-      : viewMode === "week"
-        ? "Semana"
-        : "Mes";
+    viewMode === "day" ? "Día" : viewMode === "week" ? "Semana" : "Mes";
 
   const handlePrev = () => {
     const next = new Date(currentDate);
 
     if (viewMode === "day") next.setDate(next.getDate() - 1);
-    else if (viewMode === "week")
-      next.setDate(next.getDate() - 7);
-    else next.setMonth(next.getMonth() - 1);
+    else if (viewMode === "week") next.setDate(next.getDate() - 7);
+    else {
+      next.setDate(1);
+      next.setMonth(next.getMonth() - 1);
+    }
 
     setCurrentDate(next);
   };
@@ -1908,33 +1826,26 @@ export function AgendaView({
     const next = new Date(currentDate);
 
     if (viewMode === "day") next.setDate(next.getDate() + 1);
-    else if (viewMode === "week")
-      next.setDate(next.getDate() + 7);
-    else next.setMonth(next.getMonth() + 1);
+    else if (viewMode === "week") next.setDate(next.getDate() + 7);
+    else {
+      next.setDate(1);
+      next.setMonth(next.getMonth() + 1);
+    }
 
     setCurrentDate(next);
   };
 
   const metrics = panel?.metricas || {};
   const goalData = panel?.meta_diaria || {};
-  const goal = Math.max(
-    1,
-    Number(goalData.meta_efectiva || DEFAULT_GOAL)
-  );
+  const goal = Math.max(1, Number(goalData.meta_efectiva || DEFAULT_GOAL));
   const scheduled = Number(metrics.agendadas || 0);
   const attended = Number(metrics.atendidas || 0);
   const pending = Number(metrics.pendientes || 0);
   const cancelled = Number(metrics.canceladas || 0);
-  const goalPercentage = Math.min(
-    100,
-    Math.round((scheduled / goal) * 100)
-  );
+  const goalPercentage = Math.min(100, Math.round((scheduled / goal) * 100));
 
   const occupancy = useMemo(() => {
-    const professionalsVisible = Math.max(
-      1,
-      dayProfessionals.length || 1
-    );
+    const professionalsVisible = Math.max(1, dayProfessionals.length || 1);
 
     const active = sourceAppointments.filter(
       (appointment) =>
@@ -1943,38 +1854,27 @@ export function AgendaView({
         (dayProfessionals.length === 0 ||
           dayProfessionals.some(
             (professional) =>
-              Number(professional.id) ===
-              Number(appointment.professionalId)
+              Number(professional.id) === Number(appointment.professionalId),
           )) &&
-        normalizeAppointmentStatus(appointment.status) !==
-        "no_asistio"
+        normalizeAppointmentStatus(appointment.status) !== "no_asistio",
     );
 
-    const occupiedMinutes = active.reduce(
-      (sum, appointment) => {
-        const start = toMinutes(appointment.time);
-        const end = toMinutes(
-          appointment.endTime ||
-          addMinutesToTime(appointment.time, 60)
-        );
-        return sum + Math.max(0, end - start);
-      },
-      0
-    );
+    const occupiedMinutes = active.reduce((sum, appointment) => {
+      const start = toMinutes(appointment.time);
+      const end = toMinutes(
+        appointment.endTime || addMinutesToTime(appointment.time, 60),
+      );
+      return sum + Math.max(0, end - start);
+    }, 0);
 
     const availableMinutes =
-      (DAY_END_MIN - DAY_START_MIN) *
-      professionalsVisible;
+      (DAY_END_MIN - DAY_START_MIN) * professionalsVisible;
 
     return {
       occupiedMinutes,
       percentage: Math.min(
         100,
-        Math.round(
-          (occupiedMinutes /
-            Math.max(1, availableMinutes)) *
-          100
-        )
+        Math.round((occupiedMinutes / Math.max(1, availableMinutes)) * 100),
       ),
     };
   }, [
@@ -1987,24 +1887,19 @@ export function AgendaView({
 
   const financials = panel?.finanzas;
 
-  const nowMinutes =
-    now.getHours() * 60 + now.getMinutes();
-  const nowY =
-    ((nowMinutes - DAY_START_MIN) / 60) *
-    HOUR_ROW_HEIGHT;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowY = ((nowMinutes - DAY_START_MIN) / 60) * HOUR_ROW_HEIGHT;
   const nowLabel = `${String(now.getHours()).padStart(
     2,
-    "0"
+    "0",
   )}:${String(now.getMinutes()).padStart(2, "0")}`;
-  const weekHasToday = weekDays.some(
-    (day) => dateKey(day) === todayIso
-  );
+  const weekHasToday = weekDays.some((day) => dateKey(day) === todayIso);
 
   const dayGridStyle = {
     gridTemplateColumns: `56px repeat(${Math.max(
       1,
-      dayProfessionals.length
-    )}, minmax(${isMobile ? 0 : 230}px, 1fr))`,
+      dayProfessionals.length,
+    )}, minmax(${isMobile ? 240 : 230}px, 1fr))`,
   };
 
   const weekGridStyle = {
@@ -2014,7 +1909,10 @@ export function AgendaView({
 
   return (
     <>
-      <div className="h-full min-h-0 overflow-auto bg-[#f4f7fb] p-3 sm:p-4 lg:p-5">
+      <div
+        className="agenda-vista relative isolate h-full min-h-0 overflow-auto bg-[#f4f7fb] p-3 sm:p-4 lg:p-5"
+        data-arrastrando={activeApptId != null ? "true" : undefined}
+      >
         <div className="mx-auto flex min-h-full max-w-[1900px] flex-col gap-4">
           <section
             className={`grid grid-cols-2 gap-3 md:grid-cols-4 ${canSeeMoney ? "xl:grid-cols-6" : ""
@@ -2023,10 +1921,7 @@ export function AgendaView({
             <MetricCard
               title="Citas agendadas"
               value={scheduled}
-              helper={`${Math.max(
-                0,
-                goal - scheduled
-              )} para alcanzar la meta`}
+              helper={`${Math.max(0, goal - scheduled)} para alcanzar la meta`}
               icon={CalendarCheck2}
               accent="blue"
             />
@@ -2034,11 +1929,7 @@ export function AgendaView({
             <MetricCard
               title="Atendidas"
               value={attended}
-              helper={`${scheduled
-                ? Math.round(
-                  (attended / scheduled) * 100
-                )
-                : 0
+              helper={`${scheduled ? Math.round((attended / scheduled) * 100) : 0
                 }% del día`}
               icon={UserCheck2}
               accent="emerald"
@@ -2055,11 +1946,7 @@ export function AgendaView({
             <MetricCard
               title="No asistió"
               value={cancelled}
-              helper={`${scheduled
-                ? Math.round(
-                  (cancelled / scheduled) * 100
-                )
-                : 0
+              helper={`${scheduled ? Math.round((cancelled / scheduled) * 100) : 0
                 }% del día`}
               icon={CircleX}
               accent="rose"
@@ -2069,9 +1956,7 @@ export function AgendaView({
               <>
                 <MetricCard
                   title="Ingreso esperado del corte"
-                  value={formatCurrency(
-                    financials?.ingreso_esperado || 0
-                  )}
+                  value={formatCurrency(financials?.ingreso_esperado || 0)}
                   helper={`Por fecha de pago · ${keyDate}`}
                   icon={WalletCards}
                   accent="cyan"
@@ -2079,9 +1964,7 @@ export function AgendaView({
 
                 <MetricCard
                   title="Ingreso cobrado"
-                  value={formatCurrency(
-                    financials?.ingreso_cobrado || 0
-                  )}
+                  value={formatCurrency(financials?.ingreso_cobrado || 0)}
                   helper={`${financials?.pagos_registrados || 0
                     } pago(s) en el corte`}
                   icon={Banknote}
@@ -2108,8 +1991,7 @@ export function AgendaView({
                       </p>
                       {goalData?.profesional?.nombre && (
                         <p className="mt-1 text-[11px] font-semibold text-blue-700">
-                          Meta efectiva de{" "}
-                          {goalData.profesional.nombre}
+                          Meta efectiva de {goalData.profesional.nombre}
                         </p>
                       )}
                     </div>
@@ -2141,9 +2023,8 @@ export function AgendaView({
                   </div>
 
                   <p className="mt-3 text-[11px] text-slate-500">
-                    Faltan{" "}
-                    {Math.max(0, goal - scheduled)} consulta(s)
-                    para la meta de {keyDate}.
+                    Faltan {Math.max(0, goal - scheduled)} consulta(s) para la
+                    meta de {keyDate}.
                   </p>
                 </article>
 
@@ -2155,10 +2036,7 @@ export function AgendaView({
                     {occupancy.percentage}%
                   </p>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    {durationLabel(
-                      occupancy.occupiedMinutes
-                    )}{" "}
-                    ocupadas
+                    {durationLabel(occupancy.occupiedMinutes)} ocupadas
                   </p>
                 </article>
               </div>
@@ -2170,6 +2048,7 @@ export function AgendaView({
                       <button
                         type="button"
                         onClick={handlePrev}
+                        aria-label="Periodo anterior"
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                       >
                         <ChevronLeft className="h-4 w-4" />
@@ -2177,9 +2056,7 @@ export function AgendaView({
 
                       <button
                         type="button"
-                        onClick={() =>
-                          setCurrentDate(new Date())
-                        }
+                        onClick={() => setCurrentDate(new Date())}
                         className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                       >
                         Hoy
@@ -2188,6 +2065,7 @@ export function AgendaView({
                       <button
                         type="button"
                         onClick={handleNext}
+                        aria-label="Periodo siguiente"
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                       >
                         <ChevronRight className="h-4 w-4" />
@@ -2197,7 +2075,7 @@ export function AgendaView({
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-600">
                           {headerModeLabel}
                         </p>
-                        <h2 className="truncate text-sm font-bold text-slate-950 sm:text-base">
+                        <h2 className="break-words text-sm font-bold text-slate-950 sm:text-base">
                           {headerMainLabel}
                         </h2>
                         {viewMode === "week" && (
@@ -2209,104 +2087,78 @@ export function AgendaView({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="relative min-w-[190px] flex-1 2xl:flex-none">
+                      <div className="relative w-full min-w-0 sm:min-w-[190px] sm:flex-1 2xl:flex-none">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
                           value={quickSearch}
                           onChange={(event) =>
                             setQuickSearch(event.target.value)
                           }
+                          aria-label="Buscar paciente o servicio"
                           placeholder="Buscar paciente o servicio"
                           className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
                         />
                       </div>
 
                       <select
+                        aria-label="Sucursal"
                         value={branch}
-                        onChange={(event) =>
-                          setBranch(event.target.value)
-                        }
+                        onChange={(event) => setBranch(event.target.value)}
                         className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none"
                       >
                         <option>Fisionerv Centro</option>
                       </select>
 
                       <select
+                        aria-label="Profesional"
                         disabled={isProfessional}
-                        value={
-                          selectedProfessionalId || ""
-                        }
+                        value={selectedProfessionalId || ""}
                         onChange={(event) => {
                           const id = event.target.value
                             ? Number(event.target.value)
                             : null;
                           setSelectedProfessionalId?.(id);
                         }}
-                        className="h-10 min-w-[190px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                        className="h-10 w-full min-w-0 sm:w-auto sm:min-w-[190px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                       >
                         {canSeeAll && (
-                          <option value="">
-                            Todos los profesionales
-                          </option>
+                          <option value="">Todos los profesionales</option>
                         )}
 
-                        {(professionals || []).map(
-                          (professional) => (
-                            <option
-                              key={professional.id}
-                              value={professional.id}
-                            >
-                              {getProfessionalLabel(
-                                professional
-                              )}
-                            </option>
-                          )
-                        )}
+                        {(professionals || []).map((professional) => (
+                          <option key={professional.id} value={professional.id}>
+                            {getProfessionalLabel(professional)}
+                          </option>
+                        ))}
                       </select>
 
                       <select
+                        aria-label="Estado de la cita"
                         value={statusFilter}
                         onChange={(event) =>
                           setStatusFilter(event.target.value)
                         }
-                        className="h-10 min-w-[155px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none"
+                        className="h-10 w-full min-w-0 sm:w-auto sm:min-w-[155px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none"
                       >
-                        <option value="all">
-                          Todos los estados
-                        </option>
-                        <option value="reservado">
-                          Reservado
-                        </option>
-                        <option value="confirmado">
-                          Confirmado
-                        </option>
-                        <option value="si_asistio">
-                          Sí asistió
-                        </option>
-                        <option value="no_asistio">
-                          No asistió
-                        </option>
+                        <option value="all">Todos los estados</option>
+                        <option value="reservado">Reservado</option>
+                        <option value="confirmado">Confirmado</option>
+                        <option value="si_asistio">Sí asistió</option>
+                        <option value="no_asistio">No asistió</option>
                       </select>
 
                       {canSeeMoney && (
                         <select
+                          aria-label="Estado de pago"
                           value={paymentFilter}
                           onChange={(event) =>
-                            setPaymentFilter(
-                              event.target.value
-                            )
+                            setPaymentFilter(event.target.value)
                           }
-                          className="h-10 min-w-[145px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none"
+                          className="h-10 w-full min-w-0 sm:w-auto sm:min-w-[145px] rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none"
                         >
-                          <option value="all">
-                            Todos los cobros
-                          </option>
-                          <option value="paid">
-                            Pagadas
-                          </option>
-                          <option value="unpaid">
-                            No pagadas
-                          </option>
+                          <option value="all">Todos los cobros</option>
+                          <option value="paid">Pagadas</option>
+                          <option value="unpaid">No pagadas</option>
                         </select>
                       )}
 
@@ -2368,23 +2220,20 @@ export function AgendaView({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      {viewMode === "week" &&
-                        !isMobile && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setIncludeSunday(
-                                (current) => !current
-                              )
-                            }
-                            className={`h-9 rounded-xl border px-3 text-[11px] font-bold ${includeSunday
+                      {viewMode === "week" && !isMobile && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setIncludeSunday((current) => !current)
+                          }
+                          className={`h-9 rounded-xl border px-3 text-[11px] font-bold ${includeSunday
                               ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                               : "border-slate-200 bg-white text-slate-600"
-                              }`}
-                          >
-                            Domingo
-                          </button>
-                        )}
+                            }`}
+                        >
+                          Domingo
+                        </button>
+                      )}
 
                       <div className="inline-flex rounded-xl bg-slate-100 p-1">
                         {[
@@ -2395,15 +2244,11 @@ export function AgendaView({
                           <button
                             key={mode}
                             type="button"
-                            disabled={
-                              isMobile && mode !== "day"
-                            }
-                            onClick={() =>
-                              setViewMode(mode)
-                            }
+                            disabled={isMobile && mode !== "day"}
+                            onClick={() => setViewMode(mode)}
                             className={`h-8 rounded-lg px-3 text-[11px] font-bold transition ${viewMode === mode
-                              ? "bg-white text-blue-700 shadow-sm"
-                              : "text-slate-500 hover:text-slate-800"
+                                ? "bg-white text-blue-700 shadow-sm"
+                                : "text-slate-500 hover:text-slate-800"
                               } disabled:hidden`}
                           >
                             {label}
@@ -2418,49 +2263,51 @@ export function AgendaView({
                   sensors={sensors}
                   onDragStart={handleDragStart}
                   onDragEnd={handleDragEnd}
+                  onDragCancel={() => setActiveApptId(null)}
                 >
-                  <div className="min-h-0 overflow-auto bg-white">
+                  <div
+                    className={
+                      viewMode === "day"
+                        ? "agenda-rejilla-scroll min-h-0 overflow-auto bg-white"
+                        : "min-h-0 bg-white"
+                    }
+                  >
                     {viewMode === "day" && (
                       <div
-                        className={
-                          isMobile
-                            ? "min-w-[420px]"
-                            : "min-w-[980px]"
-                        }
+                        className="w-full"
+                        style={{
+                          minWidth:
+                            56 +
+                            Math.max(1, dayProfessionals.length) *
+                            (isMobile ? 240 : 230),
+                        }}
                       >
                         <div
-                          className="grid border-b border-slate-200 bg-slate-50/80 text-xs"
+                          className="sticky top-0 z-30 grid border-b border-slate-200 bg-slate-50 text-xs"
                           style={dayGridStyle}
                         >
-                          <div className="p-3 text-right font-semibold text-slate-500">
+                          <div className="sticky left-0 z-10 bg-slate-50 p-3 text-right font-semibold text-slate-500">
                             Hora
                           </div>
 
-                          {dayProfessionals.map(
-                            (professional) => (
-                              <div
-                                key={professional.id}
-                                className="border-l border-slate-200 p-3 text-center"
-                              >
-                                <p className="font-bold text-slate-800">
-                                  {getProfessionalLabel(
-                                    professional
-                                  )}
-                                </p>
-                                <p className="mt-0.5 text-[10px] text-slate-400">
-                                  {keyDate}
-                                </p>
-                              </div>
-                            )
-                          )}
+                          {dayProfessionals.map((professional) => (
+                            <div
+                              key={professional.id}
+                              className="border-l border-slate-200 p-3 text-center"
+                            >
+                              <p className="font-bold text-slate-800">
+                                {getProfessionalLabel(professional)}
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-slate-400">
+                                {keyDate}
+                              </p>
+                            </div>
+                          ))}
                         </div>
 
-                        <div
-                          className="grid text-xs"
-                          style={dayGridStyle}
-                        >
+                        <div className="grid text-xs" style={dayGridStyle}>
                           <div
-                            className="relative border-r border-slate-200 bg-slate-50/70 pr-3 text-right"
+                            className="sticky left-0 z-20 border-r border-slate-200 bg-slate-50 pr-3 text-right"
                             style={{
                               height: GRID_TOTAL_HEIGHT,
                             }}
@@ -2478,19 +2325,12 @@ export function AgendaView({
                             ))}
 
                             {keyDate === todayIso &&
-                              nowMinutes >=
-                              DAY_START_MIN &&
-                              nowMinutes <=
-                              DAY_END_MIN && (
+                              nowMinutes >= DAY_START_MIN &&
+                              nowMinutes <= DAY_END_MIN && (
                                 <div
                                   className="pointer-events-none absolute right-2 z-[10]"
                                   style={{
-                                    top:
-                                      clamp(
-                                        nowY,
-                                        0,
-                                        GRID_TOTAL_HEIGHT
-                                      ) - 8,
+                                    top: clamp(nowY, 0, GRID_TOTAL_HEIGHT) - 8,
                                   }}
                                 >
                                   <div className="rounded-full bg-rose-500 px-2 py-1 text-[10px] text-white shadow">
@@ -2500,168 +2340,164 @@ export function AgendaView({
                               )}
                           </div>
 
-                          {dayProfessionals.map(
-                            (professional) => (
-                              <div
-                                key={professional.id}
-                                className="relative border-r border-slate-100"
-                              >
-                                <DayColumn
-                                  dateIso={keyDate}
-                                  professionalId={
-                                    professional.id
-                                  }
-                                />
-                              </div>
-                            )
-                          )}
+                          {dayProfessionals.map((professional) => (
+                            <div
+                              key={professional.id}
+                              className="relative border-r border-slate-100"
+                            >
+                              <DayColumn
+                                sourceAppointments={sourceAppointments}
+                                now={now}
+                                todayIso={todayIso}
+                                activeFilters={activeFilters}
+                                isMobile={isMobile}
+                                canSeeMoney={canSeeMoney}
+                                setSlotMenu={setSlotMenu}
+                                onOpenAppointment={onOpenAppointment}
+                                matchesCurrentFilter={matchesCurrentFilter}
+                                bloquearInteraccion={bloquearInteraccion}
+                                dateIso={keyDate}
+                                professionalId={professional.id}
+                              />
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
 
                     {viewMode === "week" && (
                       <div className="space-y-6 bg-slate-50/40 p-3">
-                        {weekProfessionals.map(
-                          (professional) => (
-                            <section
-                              key={professional.id}
-                              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-                            >
-                              <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-                                    <UsersRound className="h-5 w-5" />
-                                  </span>
-
-                                  <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-600">
-                                      Agenda semanal
-                                    </p>
-                                    <h3 className="text-sm font-bold text-slate-900">
-                                      {getProfessionalLabel(
-                                        professional
-                                      )}
-                                    </h3>
-                                  </div>
-                                </div>
-
-                                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-semibold text-slate-500">
-                                  ID {professional.id}
+                        {weekProfessionals.map((professional) => (
+                          <section
+                            key={professional.id}
+                            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                          >
+                            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                                  <UsersRound className="h-5 w-5" />
                                 </span>
-                              </div>
 
-                              <div className="overflow-x-auto">
-                                <div className="min-w-[1550px]">
-                                  <div
-                                    className="grid border-b border-slate-200 bg-slate-50/80 text-xs"
-                                    style={weekGridStyle}
-                                  >
-                                    <div className="p-3 text-right font-semibold text-slate-500">
-                                      Hora
-                                    </div>
-
-                                    {weekDays.map(
-                                      (day) => (
-                                        <div
-                                          key={dateKey(day)}
-                                          className="border-l border-slate-200 p-3 text-center"
-                                        >
-                                          <p className="font-bold text-slate-700">
-                                            {weekdayShortEs(
-                                              day
-                                            )}{" "}
-                                            {String(
-                                              day.getDate()
-                                            ).padStart(
-                                              2,
-                                              "0"
-                                            )}
-                                            /
-                                            {String(
-                                              day.getMonth() +
-                                              1
-                                            ).padStart(
-                                              2,
-                                              "0"
-                                            )}
-                                          </p>
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
-
-                                  <div
-                                    className="grid text-xs"
-                                    style={weekGridStyle}
-                                  >
-                                    <div
-                                      className="relative border-r border-slate-200 bg-slate-50/70 pr-3 text-right"
-                                      style={{
-                                        height:
-                                          GRID_TOTAL_HEIGHT,
-                                      }}
-                                    >
-                                      {HOURS.map((hour) => (
-                                        <div
-                                          key={hour}
-                                          style={{
-                                            height:
-                                              HOUR_ROW_HEIGHT,
-                                          }}
-                                          className="flex items-start justify-end pt-2 text-[11px] text-slate-400"
-                                        >
-                                          {hour}
-                                        </div>
-                                      ))}
-
-                                      {weekHasToday &&
-                                        nowMinutes >=
-                                        DAY_START_MIN &&
-                                        nowMinutes <=
-                                        DAY_END_MIN && (
-                                          <div
-                                            className="pointer-events-none absolute right-2 z-[10]"
-                                            style={{
-                                              top:
-                                                clamp(
-                                                  nowY,
-                                                  0,
-                                                  GRID_TOTAL_HEIGHT
-                                                ) - 8,
-                                            }}
-                                          >
-                                            <div className="rounded-full bg-rose-500 px-2 py-1 text-[10px] text-white shadow">
-                                              {
-                                                nowLabel
-                                              }
-                                            </div>
-                                          </div>
-                                        )}
-                                    </div>
-
-                                    {weekDays.map(
-                                      (day) => (
-                                        <div
-                                          key={dateKey(day)}
-                                          className="relative border-r border-slate-100"
-                                        >
-                                          <DayColumn
-                                            dateIso={dateKey(
-                                              day
-                                            )}
-                                            professionalId={
-                                              professional.id
-                                            }
-                                          />
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-600">
+                                    Agenda semanal
+                                  </p>
+                                  <h3 className="text-sm font-bold text-slate-900">
+                                    {getProfessionalLabel(professional)}
+                                  </h3>
                                 </div>
                               </div>
-                            </section>
-                          )
-                        )}
+
+                              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-semibold text-slate-500">
+                                ID {professional.id}
+                              </span>
+                            </div>
+
+                            <div className="agenda-rejilla-scroll overflow-auto">
+                              <div
+                                style={{
+                                  minWidth: 56 + (includeSunday ? 7 : 6) * 210,
+                                }}
+                              >
+                                <div
+                                  className="sticky top-0 z-30 grid border-b border-slate-200 bg-slate-50 text-xs"
+                                  style={weekGridStyle}
+                                >
+                                  <div className="sticky left-0 z-10 bg-slate-50 p-3 text-right font-semibold text-slate-500">
+                                    Hora
+                                  </div>
+
+                                  {weekDays.map((day) => (
+                                    <div
+                                      key={dateKey(day)}
+                                      className="border-l border-slate-200 p-3 text-center"
+                                    >
+                                      <p className="font-bold text-slate-700">
+                                        {weekdayShortEs(day)}{" "}
+                                        {String(day.getDate()).padStart(2, "0")}
+                                        /
+                                        {String(day.getMonth() + 1).padStart(
+                                          2,
+                                          "0",
+                                        )}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div
+                                  className="grid text-xs"
+                                  style={weekGridStyle}
+                                >
+                                  <div
+                                    className="sticky left-0 z-20 border-r border-slate-200 bg-slate-50 pr-3 text-right"
+                                    style={{
+                                      height: GRID_TOTAL_HEIGHT,
+                                    }}
+                                  >
+                                    {HOURS.map((hour) => (
+                                      <div
+                                        key={hour}
+                                        style={{
+                                          height: HOUR_ROW_HEIGHT,
+                                        }}
+                                        className="flex items-start justify-end pt-2 text-[11px] text-slate-400"
+                                      >
+                                        {hour}
+                                      </div>
+                                    ))}
+
+                                    {weekHasToday &&
+                                      nowMinutes >= DAY_START_MIN &&
+                                      nowMinutes <= DAY_END_MIN && (
+                                        <div
+                                          className="pointer-events-none absolute right-2 z-[10]"
+                                          style={{
+                                            top:
+                                              clamp(
+                                                nowY,
+                                                0,
+                                                GRID_TOTAL_HEIGHT,
+                                              ) - 8,
+                                          }}
+                                        >
+                                          <div className="rounded-full bg-rose-500 px-2 py-1 text-[10px] text-white shadow">
+                                            {nowLabel}
+                                          </div>
+                                        </div>
+                                      )}
+                                  </div>
+
+                                  {weekDays.map((day) => (
+                                    <div
+                                      key={dateKey(day)}
+                                      className="relative border-r border-slate-100"
+                                    >
+                                      <DayColumn
+                                        sourceAppointments={sourceAppointments}
+                                        now={now}
+                                        todayIso={todayIso}
+                                        activeFilters={activeFilters}
+                                        isMobile={isMobile}
+                                        canSeeMoney={canSeeMoney}
+                                        setSlotMenu={setSlotMenu}
+                                        onOpenAppointment={onOpenAppointment}
+                                        matchesCurrentFilter={
+                                          matchesCurrentFilter
+                                        }
+                                        bloquearInteraccion={
+                                          bloquearInteraccion
+                                        }
+                                        dateIso={dateKey(day)}
+                                        professionalId={professional.id}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </section>
+                        ))}
 
                         {!weekProfessionals.length && (
                           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
@@ -2683,10 +2519,7 @@ export function AgendaView({
                             "Sáb",
                             "Dom",
                           ].map((day) => (
-                            <div
-                              key={day}
-                              className="py-2"
-                            >
+                            <div key={day} className="py-2">
                               {day}
                             </div>
                           ))}
@@ -2695,16 +2528,13 @@ export function AgendaView({
                         <div className="grid grid-cols-7 gap-2">
                           {monthCells.map((day) => {
                             const iso = dateKey(day);
-                            const counts =
-                              monthCountMap.get(iso) || {
-                                total: 0,
-                                matching: 0,
-                              };
+                            const counts = monthCountMap.get(iso) || {
+                              total: 0,
+                              matching: 0,
+                            };
                             const currentMonth =
-                              day.getMonth() ===
-                              currentDate.getMonth();
-                            const isToday =
-                              iso === todayIso;
+                              day.getMonth() === currentDate.getMonth();
+                            const isToday = iso === todayIso;
 
                             return (
                               <button
@@ -2715,12 +2545,9 @@ export function AgendaView({
                                   setViewMode("day");
                                 }}
                                 className={`min-h-24 rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${currentMonth
-                                  ? "border-slate-200 bg-white"
-                                  : "border-slate-100 bg-slate-50 text-slate-300"
-                                  } ${isToday
-                                    ? "ring-2 ring-blue-300"
-                                    : ""
-                                  }`}
+                                    ? "border-slate-200 bg-white"
+                                    : "border-slate-100 bg-slate-50 text-slate-300"
+                                  } ${isToday ? "ring-2 ring-blue-300" : ""}`}
                               >
                                 <span className="text-xs font-bold">
                                   {day.getDate()}
@@ -2747,17 +2574,14 @@ export function AgendaView({
                     )}
                   </div>
 
-                  <DragOverlay>
-                    {activeAppointment &&
-                      !isBlockItem(activeAppointment) ? (
+                  <DragOverlay zIndex={90} dropAnimation={null}>
+                    {activeAppointment && !isBlockItem(activeAppointment) ? (
                       <div className="w-56 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 shadow-2xl">
                         <p className="truncate text-xs font-bold text-blue-900">
-                          {activeAppointment.patient ||
-                            "Paciente"}
+                          {activeAppointment.patient || "Paciente"}
                         </p>
                         <p className="mt-1 text-[10px] text-blue-700">
-                          {activeAppointment.time} ·{" "}
-                          {activeAppointment.service}
+                          {activeAppointment.time} · {activeAppointment.service}
                         </p>
                       </div>
                     ) : null}
@@ -2775,10 +2599,7 @@ export function AgendaView({
                 }}
               />
 
-              <AlertSection
-                panel={panel}
-                canSeeMoney={canSeeMoney}
-              />
+              <AlertSection panel={panel} canSeeMoney={canSeeMoney} />
 
               {panelLoading && (
                 <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-700">
@@ -2790,28 +2611,15 @@ export function AgendaView({
         </div>
       </div>
 
-      {slotMenu?.anchorRect && (
-        <div
-          className="fixed z-[120] min-w-[210px] rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
-          style={{
-            left: Math.min(
-              slotMenu.anchorRect.left,
-              window.innerWidth - 230
-            ),
-            top: Math.min(
-              slotMenu.anchorRect.top + 8,
-              window.innerHeight - 160
-            ),
-          }}
-        >
+      {slotMenu?.anchorRect && !bloquearInteraccion && (
+        <MenuHorario anchorRect={slotMenu.anchorRect} onClose={cerrarMenu}>
           {slotMenu.hasBlock ? (
             <>
               <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                 Horario bloqueado
               </p>
               <p className="px-2 pb-2 text-xs text-slate-600">
-                {slotMenu.blockItem?.motivo ||
-                  "No disponible"}
+                {slotMenu.blockItem?.motivo || "No disponible"}
               </p>
               <button
                 type="button"
@@ -2832,8 +2640,7 @@ export function AgendaView({
                   onNewReservation?.({
                     date: slotMenu.date,
                     time: slotMenu.hour,
-                    professionalId:
-                      slotMenu.professionalId,
+                    professionalId: slotMenu.professionalId,
                   });
                   setSlotMenu(null);
                 }}
@@ -2848,12 +2655,8 @@ export function AgendaView({
                   onOpenBlockModal?.({
                     date: slotMenu.date,
                     startTime: slotMenu.hour,
-                    endTime: addMinutesToTime(
-                      slotMenu.hour,
-                      60
-                    ),
-                    professionalId:
-                      slotMenu.professionalId,
+                    endTime: addMinutesToTime(slotMenu.hour, 60),
+                    professionalId: slotMenu.professionalId,
                   });
                   setSlotMenu(null);
                 }}
@@ -2871,7 +2674,7 @@ export function AgendaView({
           >
             Cerrar
           </button>
-        </div>
+        </MenuHorario>
       )}
 
       <GoalModal

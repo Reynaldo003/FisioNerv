@@ -1,7 +1,6 @@
 // src/App.jsx
 import { Routes, Route } from "react-router-dom";
 import SiteLayout from "@/layout/SiteLayout";
-import "./App.css";
 
 import Inicio from "@/pages/Inicio";
 import ServiciosPage from "@/pages/ServiciosPage";
@@ -31,13 +30,16 @@ export default function App() {
         <Route path="/contacto" element={<ContactoPage />} />
         <Route path="/equipo" element={<EquipoPage />} />
       </Route>
-
       {/*
         Rutas administrativas SIN Header/Footer
         (fuera de SiteLayout)
       */}
       <Route path="/login" element={<Login />} />
-      <Route path="/reset-password/:uid/:token" element={<ResetPassword />} /> {/* ✅ NUEVO */}
+      <Route
+        path="/reset-password/:uid/:token"
+        element={<ResetPassword />}
+      />{" "}
+      {/* ✅ NUEVO */}
       <Route path="/administrativa" element={<Administrativa />} />
     </Routes>
   );

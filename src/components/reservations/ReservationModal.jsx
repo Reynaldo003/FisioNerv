@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Banknote,
   CalendarDays,
@@ -29,6 +24,8 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+
+import { PortalModal } from "../ui/PortalModal";
 
 import { installFetchWithRefresh } from "../../services/apiFetch";
 
@@ -78,23 +75,14 @@ function getLocalDate() {
 }
 
 function isoToDate(value) {
-  const [year, month, day] = String(value)
-    .split("-")
-    .map(Number);
+  const [year, month, day] = String(value).split("-").map(Number);
 
-  return new Date(
-    year,
-    (month || 1) - 1,
-    day || 1
-  );
+  return new Date(year, (month || 1) - 1, day || 1);
 }
 
 function dateToIso(date) {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(
-    2,
-    "0"
-  );
+  const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
@@ -106,29 +94,19 @@ function durationToMinutes(duration) {
   const [hours = "0", minutes = "0", seconds = "0"] =
     String(duration).split(":");
 
-  return (
-    Number(hours) * 60 +
-    Number(minutes) +
-    Number(seconds) / 60
-  );
+  return Number(hours) * 60 + Number(minutes) + Number(seconds) / 60;
 }
 
 function addMinutesToTime(time, minutesToAdd) {
   if (!time) return "08:00";
 
-  const [hours = "0", minutes = "0"] =
-    String(time).split(":");
+  const [hours = "0", minutes = "0"] = String(time).split(":");
 
-  let total =
-    Number(hours) * 60 +
-    Number(minutes) +
-    Number(minutesToAdd || 0);
+  let total = Number(hours) * 60 + Number(minutes) + Number(minutesToAdd || 0);
 
   total = Math.max(0, total);
 
-  const hh = String(
-    Math.floor(total / 60) % 24
-  ).padStart(2, "0");
+  const hh = String(Math.floor(total / 60) % 24).padStart(2, "0");
   const mm = String(total % 60).padStart(2, "0");
 
   return `${hh}:${mm}`;
@@ -142,21 +120,14 @@ function onlyMoney(value) {
   const [integer = "", ...rest] = normalized.split(".");
   const decimals = rest.join("").slice(0, 2);
 
-  return normalized.includes(".")
-    ? `${integer}.${decimals}`
-    : integer;
+  return normalized.includes(".") ? `${integer}.${decimals}` : integer;
 }
 
 function onlyPercent(value) {
   const normalized = onlyMoney(value);
   if (!normalized) return "";
 
-  return String(
-    Math.min(
-      100,
-      Math.max(0, Number(normalized) || 0)
-    )
-  );
+  return String(Math.min(100, Math.max(0, Number(normalized) || 0)));
 }
 
 function onlyDigits(value) {
@@ -187,31 +158,15 @@ function normalizeGender(value) {
     .trim()
     .toLowerCase();
 
-  if (
-    ["m", "masculino", "hombre", "male"].includes(
-      gender
-    )
-  ) {
+  if (["m", "masculino", "hombre", "male"].includes(gender)) {
     return "masculino";
   }
 
-  if (
-    ["f", "femenino", "mujer", "female"].includes(
-      gender
-    )
-  ) {
+  if (["f", "femenino", "mujer", "female"].includes(gender)) {
     return "femenino";
   }
 
-  if (
-    [
-      "otro",
-      "otros",
-      "no binario",
-      "no_binario",
-      "other",
-    ].includes(gender)
-  ) {
+  if (["otro", "otros", "no binario", "no_binario", "other"].includes(gender)) {
     return "otro";
   }
 
@@ -255,22 +210,15 @@ function normalizeList(data) {
   return [];
 }
 
-function buildRepeatDates({
-  startDateIso,
-  repeatDays,
-  repeatSessions,
-}) {
-  const sessions = Math.max(
-    0,
-    Number(repeatSessions || 0)
-  );
+function buildRepeatDates({ startDateIso, repeatDays, repeatSessions }) {
+  const sessions = Math.max(0, Number(repeatSessions || 0));
 
   if (!sessions) return [];
 
   const acceptedDays = new Set(
     (repeatDays || [])
       .map((key) => DAYKEY_TO_JS[key])
-      .filter((value) => typeof value === "number")
+      .filter((value) => typeof value === "number"),
   );
 
   if (!acceptedDays.size) return [];
@@ -294,28 +242,26 @@ function buildRepeatDates({
   return result;
 }
 
-function MessageModal({
-  open,
-  title,
-  message,
-  onClose,
-}) {
+function MessageModal({ open, title, message, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
+    <PortalModal
+      onClose={onClose}
+      etiqueta={title || "Aviso"}
+      className="flex items-center justify-center p-4"
+    >
       <button
         type="button"
+        tabIndex={-1}
         className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
         onClick={onClose}
         aria-label="Cerrar"
       />
 
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div className="fisionerv-modal-tarjeta relative z-10 w-full max-w-md overflow-auto rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <h3 className="text-sm font-bold text-slate-900">
-            {title}
-          </h3>
+          <h3 className="text-sm font-bold text-slate-900">{title}</h3>
 
           <button
             type="button"
@@ -340,21 +286,14 @@ function MessageModal({
           </button>
         </div>
       </div>
-    </div>
+    </PortalModal>
   );
 }
 
-function buildInitialForm({
-  appointment,
-  preset,
-  today,
-}) {
-  const initialTime =
-    appointment?.time ?? preset?.time ?? "08:00";
+function buildInitialForm({ appointment, preset, today }) {
+  const initialTime = appointment?.time ?? preset?.time ?? "08:00";
 
-  const price = appointment?.price
-    ? String(Number(appointment.price))
-    : "";
+  const price = appointment?.price ? String(Number(appointment.price)) : "";
 
   return {
     id: appointment?.id ?? null,
@@ -369,22 +308,16 @@ function buildInitialForm({
     telefono: appointment?.telefono ?? "",
     molestia: appointment?.molestia ?? "",
 
-    date:
-      appointment?.date ?? preset?.date ?? today,
+    date: appointment?.date ?? preset?.date ?? today,
     time: initialTime,
-    endTime:
-      appointment?.endTime ??
-      addMinutesToTime(initialTime, 60),
+    endTime: appointment?.endTime ?? addMinutesToTime(initialTime, 60),
 
     serviceId: appointment?.serviceId ?? null,
     professionalId:
-      appointment?.professionalId ??
-      preset?.professionalId ??
-      null,
+      appointment?.professionalId ?? preset?.professionalId ?? null,
 
     status: appointment?.status ?? "reservado",
-    notesInternal:
-      appointment?.notesInternal ?? "",
+    notesInternal: appointment?.notesInternal ?? "",
 
     price,
     montoFacturado:
@@ -436,25 +369,18 @@ export function ReservationModal({
       appointment,
       preset,
       today,
-    })
+    }),
   );
 
-  const [activeSection, setActiveSection] =
-    useState("paciente");
-  const [patientQuery, setPatientQuery] = useState(
-    appointment?.patient || ""
-  );
-  const [
-    patientDropdownOpen,
-    setPatientDropdownOpen,
-  ] = useState(false);
+  const [activeSection, setActiveSection] = useState("paciente");
+  const [patientQuery, setPatientQuery] = useState(appointment?.patient || "");
+  const [patientDropdownOpen, setPatientDropdownOpen] = useState(false);
   const [message, setMessage] = useState({
     open: false,
     title: "",
     message: "",
   });
-  const [lastPaymentId, setLastPaymentId] =
-    useState(null);
+  const [lastPaymentId, setLastPaymentId] = useState(null);
 
   const patientBoxRef = useRef(null);
   const originalPaymentsRef = useRef([]);
@@ -474,19 +400,14 @@ export function ReservationModal({
         appointment,
         preset,
         today,
-      })
+      }),
     );
     setPatientQuery(appointment?.patient || "");
     setPatientDropdownOpen(false);
     setActiveSection("paciente");
     setLastPaymentId(null);
     originalPaymentsRef.current = [];
-  }, [
-    appointment?.id,
-    preset?.date,
-    preset?.time,
-    preset?.professionalId,
-  ]);
+  }, [appointment?.id, preset?.date, preset?.time, preset?.professionalId]);
 
   useEffect(() => {
     const onDocumentClick = (event) => {
@@ -498,16 +419,9 @@ export function ReservationModal({
       }
     };
 
-    document.addEventListener(
-      "mousedown",
-      onDocumentClick
-    );
+    document.addEventListener("mousedown", onDocumentClick);
 
-    return () =>
-      document.removeEventListener(
-        "mousedown",
-        onDocumentClick
-      );
+    return () => document.removeEventListener("mousedown", onDocumentClick);
   }, []);
 
   useEffect(() => {
@@ -537,24 +451,17 @@ export function ReservationModal({
           }),
         ]);
 
-        const [
-          meData,
-          servicesData,
-          professionalsData,
-          patientsData,
-        ] = await Promise.all([
-          meResponse.json().catch(() => null),
-          servicesResponse.json().catch(() => []),
-          professionalsResponse
-            .json()
-            .catch(() => []),
-          patientsResponse.json().catch(() => []),
-        ]);
+        const [meData, servicesData, professionalsData, patientsData] =
+          await Promise.all([
+            meResponse.json().catch(() => null),
+            servicesResponse.json().catch(() => []),
+            professionalsResponse.json().catch(() => []),
+            patientsResponse.json().catch(() => []),
+          ]);
 
         if (!meResponse.ok) {
           throw new Error(
-            meData?.detail ||
-            "No se pudo identificar al usuario."
+            meData?.detail || "No se pudo identificar al usuario.",
           );
         }
 
@@ -563,14 +470,11 @@ export function ReservationModal({
           !professionalsResponse.ok ||
           !patientsResponse.ok
         ) {
-          throw new Error(
-            "No se pudieron cargar los catálogos de la cita."
-          );
+          throw new Error("No se pudieron cargar los catálogos de la cita.");
         }
 
         const serviceList = normalizeList(servicesData);
-        const professionalList =
-          normalizeList(professionalsData);
+        const professionalList = normalizeList(professionalsData);
         const patientList = normalizeList(patientsData);
 
         setMe(meData);
@@ -579,16 +483,10 @@ export function ReservationModal({
         setPatients(patientList);
 
         setForm((current) => {
-          const serviceId =
-            current.serviceId ??
-            serviceList[0]?.id ??
-            null;
+          const serviceId = current.serviceId ?? serviceList[0]?.id ?? null;
 
           const service =
-            serviceList.find(
-              (item) =>
-                Number(item.id) === Number(serviceId)
-            ) ||
+            serviceList.find((item) => Number(item.id) === Number(serviceId)) ||
             serviceList[0] ||
             null;
 
@@ -600,37 +498,26 @@ export function ReservationModal({
             "dentista",
           ].includes(meData?.rol);
 
-          const professionalId =
-            isProfessionalRole
-              ? meData.id
-              : current.professionalId ??
-              professionalList[0]?.id ??
-              null;
+          const professionalId = isProfessionalRole
+            ? meData.id
+            : (current.professionalId ?? professionalList[0]?.id ?? null);
 
           const duration = service
             ? durationToMinutes(
               service.duracion ||
               service.duracion_str ||
-              service.duracion_text
+              service.duracion_text,
             )
             : 60;
 
-          const servicePrice = Number(
-            service?.precio || 0
-          );
+          const servicePrice = Number(service?.precio || 0);
 
           return {
             ...current,
             serviceId: service?.id ?? serviceId,
             professionalId,
-            endTime: addMinutesToTime(
-              current.time || "08:00",
-              duration
-            ),
-            price:
-              current.price === ""
-                ? String(servicePrice)
-                : current.price,
+            endTime: addMinutesToTime(current.time || "08:00", duration),
+            price: current.price === "" ? String(servicePrice) : current.price,
             montoFacturado:
               current.montoFacturado === ""
                 ? String(servicePrice)
@@ -642,8 +529,7 @@ export function ReservationModal({
           open: true,
           title: "No se pudo cargar la cita",
           message:
-            error?.message ||
-            "Ocurrió un problema al cargar la información.",
+            error?.message || "Ocurrió un problema al cargar la información.",
         });
       } finally {
         setLoading(false);
@@ -673,43 +559,29 @@ export function ReservationModal({
             headers: {
               Authorization: `Bearer ${token || ""}`,
             },
-          }
+          },
         );
 
         const data = await response.json().catch(() => []);
         if (!response.ok) {
-          throw new Error(
-            data?.detail ||
-            "No se pudieron cargar los pagos."
-          );
+          throw new Error(data?.detail || "No se pudieron cargar los pagos.");
         }
 
         const list = normalizeList(data)
-          .filter(
-            (payment) =>
-              Number(payment.cita) ===
-              Number(appointment.id)
-          )
-          .sort(
-            (a, b) => Number(a.id) - Number(b.id)
-          )
+          .filter((payment) => Number(payment.cita) === Number(appointment.id))
+          .sort((a, b) => Number(a.id) - Number(b.id))
           .map((payment) => ({
             id: payment.id,
-            method:
-              payment.metodo_pago || "efectivo",
-            amount: String(
-              Number(payment.anticipo || 0)
-            ),
+            method: payment.metodo_pago || "efectivo",
+            amount: String(Number(payment.anticipo || 0)),
             date: payment.fecha_pago || getLocalDate(),
           }));
 
-        originalPaymentsRef.current = list.map(
-          (payment) => ({
-            ...payment,
-            amount: Number(payment.amount || 0),
-            date: payment.date || getLocalDate(),
-          })
-        );
+        originalPaymentsRef.current = list.map((payment) => ({
+          ...payment,
+          amount: Number(payment.amount || 0),
+          date: payment.date || getLocalDate(),
+        }));
 
         setForm((current) => ({
           ...current,
@@ -723,17 +595,14 @@ export function ReservationModal({
                 date: getLocalDate(),
               },
             ],
-          montoFacturado:
-            list[0]?.monto_facturado ??
-            current.montoFacturado,
+          montoFacturado: list[0]?.monto_facturado ?? current.montoFacturado,
         }));
       } catch (error) {
         setMessage({
           open: true,
           title: "Pagos",
           message:
-            error?.message ||
-            "No se pudieron cargar los pagos registrados.",
+            error?.message || "No se pudieron cargar los pagos registrados.",
         });
       }
     };
@@ -743,71 +612,47 @@ export function ReservationModal({
 
   const selectedService = useMemo(
     () =>
-      services.find(
-        (service) =>
-          Number(service.id) ===
-          Number(form.serviceId)
-      ),
-    [services, form.serviceId]
+      services.find((service) => Number(service.id) === Number(form.serviceId)),
+    [services, form.serviceId],
   );
 
   const selectedProfessional = useMemo(
     () =>
       professionals.find(
         (professional) =>
-          Number(professional.id) ===
-          Number(form.professionalId)
+          Number(professional.id) === Number(form.professionalId),
       ),
-    [professionals, form.professionalId]
+    [professionals, form.professionalId],
   );
 
   const patientMatches = useMemo(() => {
-    const query = patientQuery
-      .trim()
-      .toLowerCase();
+    const query = patientQuery.trim().toLowerCase();
 
     if (!query) return [];
 
     return patients
       .filter((patient) =>
-        getPatientLabel(patient)
-          .toLowerCase()
-          .includes(query)
+        getPatientLabel(patient).toLowerCase().includes(query),
       )
       .slice(0, 8);
   }, [patients, patientQuery]);
 
   const isNewPatient =
-    !form.patientId &&
-    String(form.patient || "").trim().length > 0;
+    !form.patientId && String(form.patient || "").trim().length > 0;
 
-  const subtotal = toNumber(
-    form.montoFacturado,
-    toNumber(form.price, 0)
-  );
-  const discountPct = toNumber(
-    form.discountPct,
-    0
-  );
-  const discountAmount =
-    (subtotal * discountPct) / 100;
-  const totalAfterDiscount = Math.max(
-    0,
-    subtotal - discountAmount
-  );
+  const subtotal = toNumber(form.montoFacturado, toNumber(form.price, 0));
+  const discountPct = toNumber(form.discountPct, 0);
+  const discountAmount = (subtotal * discountPct) / 100;
+  const totalAfterDiscount = Math.max(0, subtotal - discountAmount);
   const paymentsTotal = useMemo(
     () =>
       (form.paymentLines || []).reduce(
-        (sum, line) =>
-          sum + toNumber(line.amount, 0),
-        0
+        (sum, line) => sum + toNumber(line.amount, 0),
+        0,
       ),
-    [form.paymentLines]
+    [form.paymentLines],
   );
-  const remaining = Math.max(
-    0,
-    totalAfterDiscount - paymentsTotal
-  );
+  const remaining = Math.max(0, totalAfterDiscount - paymentsTotal);
 
   const sections = useMemo(() => {
     const base = [
@@ -845,15 +690,11 @@ export function ReservationModal({
   }, [canSeeMoney]);
 
   const activeIndex = sections.findIndex(
-    (section) => section.id === activeSection
+    (section) => section.id === activeSection,
   );
 
   useEffect(() => {
-    if (
-      !sections.some(
-        (section) => section.id === activeSection
-      )
-    ) {
+    if (!sections.some((section) => section.id === activeSection)) {
       setActiveSection(sections[0]?.id || "paciente");
     }
   }, [sections, activeSection]);
@@ -864,26 +705,19 @@ export function ReservationModal({
         ? durationToMinutes(
           selectedService.duracion ||
           selectedService.duracion_str ||
-          selectedService.duracion_text
+          selectedService.duracion_text,
         )
         : 60;
 
       setForm((current) => ({
         ...current,
         time: value,
-        endTime: addMinutesToTime(
-          value,
-          duration
-        ),
+        endTime: addMinutesToTime(value, duration),
       }));
       return;
     }
 
-    if (
-      ["price", "montoFacturado"].includes(
-        field
-      )
-    ) {
+    if (["price", "montoFacturado"].includes(field)) {
       setForm((current) => ({
         ...current,
         [field]: onlyMoney(value),
@@ -915,15 +749,11 @@ export function ReservationModal({
 
   const handleServiceChange = (serviceId) => {
     const id = Number(serviceId);
-    const service = services.find(
-      (item) => Number(item.id) === id
-    );
+    const service = services.find((item) => Number(item.id) === id);
 
     const duration = service
       ? durationToMinutes(
-        service.duracion ||
-        service.duracion_str ||
-        service.duracion_text
+        service.duracion || service.duracion_str || service.duracion_text,
       )
       : 60;
 
@@ -932,10 +762,7 @@ export function ReservationModal({
     setForm((current) => ({
       ...current,
       serviceId: id,
-      endTime: addMinutesToTime(
-        current.time,
-        duration
-      ),
+      endTime: addMinutesToTime(current.time, duration),
       price: String(price),
       montoFacturado: String(price),
     }));
@@ -963,9 +790,7 @@ export function ReservationModal({
 
   const toggleRepeatDay = (key) => {
     setForm((current) => {
-      const days = new Set(
-        current.repeatDays || []
-      );
+      const days = new Set(current.repeatDays || []);
 
       if (days.has(key)) days.delete(key);
       else days.add(key);
@@ -979,9 +804,7 @@ export function ReservationModal({
 
   const setPaymentLine = (index, patch) => {
     setForm((current) => {
-      const lines = [
-        ...(current.paymentLines || []),
-      ];
+      const lines = [...(current.paymentLines || [])];
 
       lines[index] = {
         ...lines[index],
@@ -989,9 +812,7 @@ export function ReservationModal({
       };
 
       if ("amount" in patch) {
-        lines[index].amount = onlyMoney(
-          patch.amount
-        );
+        lines[index].amount = onlyMoney(patch.amount);
       }
 
       return {
@@ -1018,9 +839,7 @@ export function ReservationModal({
 
   const removePaymentLine = (index) => {
     setForm((current) => {
-      const lines = [
-        ...(current.paymentLines || []),
-      ];
+      const lines = [...(current.paymentLines || [])];
 
       if (lines[index]?.id) return current;
 
@@ -1050,11 +869,8 @@ export function ReservationModal({
       };
     }
 
-    const token =
-      localStorage.getItem("auth.access") || "";
-    const currentLines = (
-      form.paymentLines || []
-    ).map((line) => ({
+    const token = localStorage.getItem("auth.access") || "";
+    const currentLines = (form.paymentLines || []).map((line) => ({
       id: line.id ?? null,
       method: line.method || "efectivo",
       amount: toNumber(line.amount, 0),
@@ -1064,18 +880,15 @@ export function ReservationModal({
     if (paymentsTotal > totalAfterDiscount) {
       throw new Error(
         `La suma de pagos excede el total. Máximo permitido: ${formatMoney(
-          totalAfterDiscount
-        )}.`
+          totalAfterDiscount,
+        )}.`,
       );
     }
 
     const originalById = new Map(
       (originalPaymentsRef.current || [])
         .filter((line) => line.id)
-        .map((line) => [
-          Number(line.id),
-          line,
-        ])
+        .map((line) => [Number(line.id), line]),
     );
 
     let changed = false;
@@ -1084,19 +897,14 @@ export function ReservationModal({
     for (const line of currentLines) {
       if (line.id) {
         if (line.amount <= 0) {
-          throw new Error(
-            "Un pago ya registrado no puede quedar en cero."
-          );
+          throw new Error("Un pago ya registrado no puede quedar en cero.");
         }
 
-        const previous = originalById.get(
-          Number(line.id)
-        );
+        const previous = originalById.get(Number(line.id));
         const changedLine =
           !previous ||
           previous.method !== line.method ||
-          Number(previous.amount) !==
-          Number(line.amount) ||
+          Number(previous.amount) !== Number(line.amount) ||
           String(previous.date || "") !== String(line.date || "");
 
         if (!changedLine) {
@@ -1104,36 +912,27 @@ export function ReservationModal({
           continue;
         }
 
-        const response = await fetch(
-          `${API_BASE}/api/pagos/${line.id}/`,
-          {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              fecha_pago: line.date || getLocalDate(),
-              comprobante:
-                form.comprobante || "",
-              monto_facturado: subtotal,
-              metodo_pago: line.method,
-              descuento_porcentaje:
-                discountPct,
-              anticipo: line.amount,
-            }),
-          }
-        );
+        const response = await fetch(`${API_BASE}/api/pagos/${line.id}/`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            fecha_pago: line.date || getLocalDate(),
+            comprobante: form.comprobante || "",
+            monto_facturado: subtotal,
+            metodo_pago: line.method,
+            descuento_porcentaje: discountPct,
+            anticipo: line.amount,
+          }),
+        });
 
-        const data = await response
-          .json()
-          .catch(() => null);
+        const data = await response.json().catch(() => null);
 
         if (!response.ok) {
           throw new Error(
-            data?.anticipo ||
-            data?.detail ||
-            "No se pudo actualizar un pago."
+            data?.anticipo || data?.detail || "No se pudo actualizar un pago.",
           );
         }
 
@@ -1144,37 +943,28 @@ export function ReservationModal({
 
       if (line.amount <= 0) continue;
 
-      const response = await fetch(
-        `${API_BASE}/api/pagos/`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            cita: citaId,
-            fecha_pago: line.date || getLocalDate(),
-            comprobante:
-              form.comprobante || "",
-            monto_facturado: subtotal,
-            metodo_pago: line.method,
-            descuento_porcentaje:
-              discountPct,
-            anticipo: line.amount,
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/pagos/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          cita: citaId,
+          fecha_pago: line.date || getLocalDate(),
+          comprobante: form.comprobante || "",
+          monto_facturado: subtotal,
+          metodo_pago: line.method,
+          descuento_porcentaje: discountPct,
+          anticipo: line.amount,
+        }),
+      });
 
-      const data = await response
-        .json()
-        .catch(() => null);
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         throw new Error(
-          data?.anticipo ||
-          data?.detail ||
-          "No se pudo registrar el pago."
+          data?.anticipo || data?.detail || "No se pudo registrar el pago.",
         );
       }
 
@@ -1183,34 +973,23 @@ export function ReservationModal({
     }
 
     const currentIds = new Set(
-      currentLines
-        .filter((line) => line.id)
-        .map((line) => Number(line.id))
+      currentLines.filter((line) => line.id).map((line) => Number(line.id)),
     );
 
-    const removed = (
-      originalPaymentsRef.current || []
-    ).filter(
-      (line) =>
-        line.id &&
-        !currentIds.has(Number(line.id))
+    const removed = (originalPaymentsRef.current || []).filter(
+      (line) => line.id && !currentIds.has(Number(line.id)),
     );
 
     for (const line of removed) {
-      const response = await fetch(
-        `${API_BASE}/api/pagos/${line.id}/`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/pagos/${line.id}/`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
-        throw new Error(
-          "No se pudo eliminar un pago retirado del formulario."
-        );
+        throw new Error("No se pudo eliminar un pago retirado del formulario.");
       }
 
       changed = true;
@@ -1227,8 +1006,7 @@ export function ReservationModal({
   const downloadTicket = async (paymentId) => {
     if (!paymentId || !canSeeMoney) return;
 
-    const token =
-      localStorage.getItem("auth.access") || "";
+    const token = localStorage.getItem("auth.access") || "";
 
     try {
       const response = await fetch(
@@ -1237,13 +1015,11 @@ export function ReservationModal({
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {
-        throw new Error(
-          "No se pudo generar el ticket."
-        );
+        throw new Error("No se pudo generar el ticket.");
       }
 
       const blob = await response.blob();
@@ -1260,9 +1036,7 @@ export function ReservationModal({
       setMessage({
         open: true,
         title: "Ticket",
-        message:
-          error?.message ||
-          "No se pudo generar el ticket.",
+        message: error?.message || "No se pudo generar el ticket.",
       });
     }
   };
@@ -1275,14 +1049,12 @@ export function ReservationModal({
       setMessage({
         open: true,
         title: "WhatsApp",
-        message:
-          "El paciente no tiene un teléfono válido.",
+        message: "El paciente no tiene un teléfono válido.",
       });
       return;
     }
 
-    const serviceName =
-      selectedService?.nombre || "tu servicio";
+    const serviceName = selectedService?.nombre || "tu servicio";
 
     const dateLong = isoToDate(form.date)
       .toLocaleDateString("es-MX", {
@@ -1291,27 +1063,22 @@ export function ReservationModal({
         month: "long",
         year: "numeric",
       })
-      .replace(/^\w/, (char) =>
-        char.toUpperCase()
-      );
+      .replace(/^\w/, (char) => char.toUpperCase());
 
     const text = encodeURIComponent(
       `Hola ${form.patient || ""
       }. Te confirmo tu cita de ${serviceName} el ${dateLong} a las ${form.time
-      }.`
+      }.`,
     );
 
     window.open(
       `https://wa.me/${phone}?text=${text}`,
       "_blank",
-      "noopener,noreferrer"
+      "noopener,noreferrer",
     );
   };
 
-  const buildPayload = (
-    date = form.date,
-    repeated = false
-  ) => ({
+  const buildPayload = (date = form.date, repeated = false) => ({
     id: repeated ? null : form.id,
     patientId: form.patientId,
     patient: form.patient,
@@ -1334,13 +1101,16 @@ export function ReservationModal({
       : Number(appointment?.price || form.price || 0),
     montoFacturado: canEditMoney
       ? subtotal
-      : Number(appointment?.montoFacturado || appointment?.price || form.montoFacturado || 0),
+      : Number(
+        appointment?.montoFacturado ||
+        appointment?.price ||
+        form.montoFacturado ||
+        0,
+      ),
     discountPct: canEditMoney
       ? discountPct
       : Number(appointment?.discountPct || form.discountPct || 0),
-    paymentLines: repeated
-      ? []
-      : form.paymentLines,
+    paymentLines: repeated ? [] : form.paymentLines,
     repeatEnabled: false,
     repeatDays: [],
     repeatSessions: 1,
@@ -1349,46 +1119,32 @@ export function ReservationModal({
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (
-      !form.patientId &&
-      !String(form.patient || "").trim()
-    ) {
+    if (!form.patientId && !String(form.patient || "").trim()) {
       setActiveSection("paciente");
       setMessage({
         open: true,
         title: "Falta el paciente",
-        message:
-          "Escribe el nombre del paciente o selecciona uno existente.",
+        message: "Escribe el nombre del paciente o selecciona uno existente.",
       });
       return;
     }
 
-    if (
-      !form.serviceId ||
-      !form.professionalId ||
-      !form.date ||
-      !form.time
-    ) {
+    if (!form.serviceId || !form.professionalId || !form.date || !form.time) {
       setActiveSection("cita");
       setMessage({
         open: true,
         title: "Datos incompletos",
-        message:
-          "Selecciona servicio, profesional, fecha y hora.",
+        message: "Selecciona servicio, profesional, fecha y hora.",
       });
       return;
     }
 
-    if (
-      form.repeatEnabled &&
-      !(form.repeatDays || []).length
-    ) {
+    if (form.repeatEnabled && !(form.repeatDays || []).length) {
       setActiveSection("cita");
       setMessage({
         open: true,
         title: "Repetición incompleta",
-        message:
-          "Selecciona al menos un día para repetir la cita.",
+        message: "Selecciona al menos un día para repetir la cita.",
       });
       return;
     }
@@ -1396,18 +1152,13 @@ export function ReservationModal({
     try {
       setSaving(true);
 
-      const savedBase = await onSave?.(
-        buildPayload()
-      );
+      const savedBase = await onSave?.(buildPayload());
 
-      const citaId =
-        savedBase?.id ||
-        savedBase?.cita_id ||
-        savedBase?.pk;
+      const citaId = savedBase?.id || savedBase?.cita_id || savedBase?.pk;
 
       if (!citaId) {
         throw new Error(
-          "La cita se guardó, pero el servidor no devolvió su ID."
+          "La cita se guardó, pero el servidor no devolvió su ID.",
         );
       }
 
@@ -1420,8 +1171,7 @@ export function ReservationModal({
         paymentResult = await syncPayments(citaId);
       }
 
-      const refreshed =
-        await onRefreshAppointment?.(citaId);
+      const refreshed = await onRefreshAppointment?.(citaId);
 
       if (
         canEditMoney &&
@@ -1429,29 +1179,19 @@ export function ReservationModal({
         paymentResult.lastId &&
         (refreshed?.pagado || refreshed?.paid)
       ) {
-        await downloadTicket(
-          paymentResult.lastId
-        );
+        await downloadTicket(paymentResult.lastId);
       }
 
       if (form.repeatEnabled) {
-        const totalSessions = Math.max(
-          1,
-          Number(form.repeatSessions || 1)
-        );
+        const totalSessions = Math.max(1, Number(form.repeatSessions || 1));
         const dates = buildRepeatDates({
           startDateIso: form.date,
           repeatDays: form.repeatDays,
-          repeatSessions: Math.max(
-            0,
-            totalSessions - 1
-          ),
+          repeatSessions: Math.max(0, totalSessions - 1),
         });
 
         const patientId =
-          savedBase?.paciente ??
-          savedBase?.patientId ??
-          form.patientId;
+          savedBase?.paciente ?? savedBase?.patientId ?? form.patientId;
 
         for (const date of dates) {
           await onSave?.({
@@ -1466,9 +1206,7 @@ export function ReservationModal({
       setMessage({
         open: true,
         title: "No se pudo guardar",
-        message:
-          error?.message ||
-          "Ocurrió un problema al guardar la cita.",
+        message: error?.message || "Ocurrió un problema al guardar la cita.",
       });
     } finally {
       setSaving(false);
@@ -1486,8 +1224,7 @@ export function ReservationModal({
       setMessage({
         open: true,
         title: "Eliminar cita",
-        message:
-          "No se pudo eliminar la cita.",
+        message: "No se pudo eliminar la cita.",
       });
     } finally {
       setSaving(false);
@@ -1496,42 +1233,49 @@ export function ReservationModal({
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
+      <PortalModal
+        onClose={onClose}
+        etiqueta="Cargando información de la cita"
+        className="flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm"
+      >
         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-2xl">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
           Cargando información de la cita...
         </div>
-      </div>
+      </PortalModal>
     );
   }
 
   const previousSection = () => {
     if (activeIndex > 0) {
-      setActiveSection(
-        sections[activeIndex - 1].id
-      );
+      setActiveSection(sections[activeIndex - 1].id);
     }
   };
 
   const nextSection = () => {
     if (activeIndex < sections.length - 1) {
-      setActiveSection(
-        sections[activeIndex + 1].id
-      );
+      setActiveSection(sections[activeIndex + 1].id);
     }
   };
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-0 backdrop-blur-[3px] sm:p-4 lg:p-6">
+      <PortalModal
+        onClose={onClose}
+        ocupado={saving}
+        etiqueta={isEditing ? "Editar cita" : "Agendar nueva cita"}
+        className="flex items-center justify-center bg-slate-950/45 p-0 backdrop-blur-[3px] sm:p-4 lg:p-6"
+      >
         <button
           type="button"
+          tabIndex={-1}
           className="absolute inset-0"
           onClick={onClose}
+          disabled={saving}
           aria-label="Cerrar modal"
         />
 
-        <div className="relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden bg-[#f5f7fb] shadow-2xl sm:h-auto sm:max-h-[94vh] sm:w-[min(96vw,1120px)] sm:rounded-[26px] sm:border sm:border-white/80">
+        <div className="fisionerv-reserva-panel relative z-10 flex w-full min-w-0 flex-col overflow-hidden bg-[#f5f7fb] shadow-2xl sm:rounded-[26px] sm:border sm:border-white/80">
           <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
@@ -1541,14 +1285,11 @@ export function ReservationModal({
 
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">
-                    {isEditing
-                      ? "Edición de reservación"
-                      : "Nueva reservación"}
+                    {isEditing ? "Edición de reservación" : "Nueva reservación"}
                   </p>
                   <h2 className="truncate text-lg font-bold text-slate-950 sm:text-xl">
                     {isEditing
-                      ? form.patient ||
-                      "Editar cita"
+                      ? form.patient || "Editar cita"
                       : "Agendar nueva cita"}
                   </h2>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
@@ -1560,10 +1301,14 @@ export function ReservationModal({
                       <Clock3 className="h-3.5 w-3.5" />
                       {form.time} – {form.endTime}
                     </span>
-                    <span className="hidden items-center gap-1 sm:inline-flex">
+                    <span className="hidden min-w-0 max-w-full items-center gap-1 sm:inline-flex [&_svg]:shrink-0">
                       <Stethoscope className="h-3.5 w-3.5" />
-                      {selectedService?.nombre ||
-                        "Servicio"}
+                      <span
+                        className="truncate"
+                        title={selectedService?.nombre || "Servicio"}
+                      >
+                        {selectedService?.nombre || "Servicio"}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -1572,6 +1317,8 @@ export function ReservationModal({
               <button
                 type="button"
                 onClick={onClose}
+                disabled={saving}
+                aria-label="Cerrar reservación"
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
               >
                 <X className="h-5 w-5" />
@@ -1581,29 +1328,25 @@ export function ReservationModal({
             <nav className="mt-4 flex gap-2 overflow-x-auto pb-1">
               {sections.map((section, index) => {
                 const Icon = section.icon;
-                const active =
-                  activeSection === section.id;
-                const completed =
-                  index < activeIndex;
+                const active = activeSection === section.id;
+                const completed = index < activeIndex;
 
                 return (
                   <button
                     key={section.id}
                     type="button"
-                    onClick={() =>
-                      setActiveSection(section.id)
-                    }
+                    onClick={() => setActiveSection(section.id)}
                     className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition sm:min-w-0 ${active
-                      ? "border-blue-200 bg-blue-50 text-blue-800 shadow-sm"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        ? "border-blue-200 bg-blue-50 text-blue-800 shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                       }`}
                   >
                     <span
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active
-                        ? "bg-blue-600 text-white"
-                        : completed
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-500"
+                          ? "bg-blue-600 text-white"
+                          : completed
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-slate-100 text-slate-500"
                         }`}
                     >
                       {completed ? (
@@ -1632,25 +1375,24 @@ export function ReservationModal({
             autoComplete="off"
             className="flex min-h-0 flex-1 flex-col"
           >
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 lg:px-8">
-              <div className="mx-auto max-w-5xl">
+            <div className="fisionerv-modal-contenido min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 lg:px-8">
+              <div className="mx-auto min-w-0 max-w-5xl">
                 {activeSection === "paciente" && (
-                  <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
+                  <section className="relative rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
                     <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                       <div>
                         <h3 className="text-base font-bold text-slate-950">
                           Información del paciente
                         </h3>
                         <p className="mt-1 text-xs text-slate-500">
-                          Busca un paciente existente o
-                          registra uno nuevo.
+                          Busca un paciente existente o registra uno nuevo.
                         </p>
                       </div>
 
                       <span
                         className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold ${form.patientId
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : "border-blue-200 bg-blue-50 text-blue-700"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-blue-200 bg-blue-50 text-blue-700"
                           }`}
                       >
                         {form.patientId ? (
@@ -1674,88 +1416,75 @@ export function ReservationModal({
                           <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
                           <input
+                            aria-label="Nombre o paciente existente"
+                            aria-expanded={
+                              patientDropdownOpen &&
+                              Boolean(patientQuery.trim())
+                            }
+                            onKeyDown={(evento) => {
+                              if (
+                                evento.key === "Escape" &&
+                                patientDropdownOpen
+                              ) {
+                                evento.preventDefault();
+                                evento.stopPropagation();
+                                setPatientDropdownOpen(false);
+                              }
+                            }}
                             value={patientQuery}
                             onChange={(event) => {
-                              const value =
-                                event.target.value;
+                              const value = event.target.value;
                               setPatientQuery(value);
-                              setPatientDropdownOpen(
-                                true
-                              );
+                              setPatientDropdownOpen(true);
                               setForm((current) => ({
                                 ...current,
                                 patientId: null,
                                 patient: value,
                               }));
                             }}
-                            onFocus={() =>
-                              setPatientDropdownOpen(
-                                true
-                              )
-                            }
+                            onFocus={() => setPatientDropdownOpen(true)}
                             className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
                             placeholder="Escribe el nombre..."
                           />
 
-                          {patientDropdownOpen &&
-                            patientQuery.trim() && (
-                              <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                                {patientMatches.length ? (
-                                  <div className="max-h-64 overflow-auto p-1.5">
-                                    {patientMatches.map(
-                                      (patient) => (
-                                        <button
-                                          key={
-                                            patient.id
-                                          }
-                                          type="button"
-                                          onMouseDown={(
-                                            event
-                                          ) => {
-                                            event.preventDefault();
-                                            selectPatient(
-                                              patient
-                                            );
-                                          }}
-                                          className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50"
-                                        >
-                                          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-700">
-                                            {getPatientLabel(
-                                              patient
-                                            )
-                                              .slice(
-                                                0,
-                                                1
-                                              )
-                                              .toUpperCase()}
+                          {patientDropdownOpen && patientQuery.trim() && (
+                            <div className="absolute left-0 right-0 top-full z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                              {patientMatches.length ? (
+                                <div className="max-h-[min(16rem,40dvh)] overflow-auto overscroll-contain p-1.5">
+                                  {patientMatches.map((patient) => (
+                                    <button
+                                      key={patient.id}
+                                      type="button"
+                                      onClick={() => selectPatient(patient)}
+                                      className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50"
+                                    >
+                                      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-700">
+                                        {getPatientLabel(patient)
+                                          .slice(0, 1)
+                                          .toUpperCase()}
+                                      </span>
+                                      <span className="min-w-0">
+                                        <span className="block truncate text-sm font-semibold text-slate-800">
+                                          {getPatientLabel(patient)}
+                                        </span>
+                                        {canSeePatientContact && (
+                                          <span className="block truncate text-[11px] text-slate-500">
+                                            {patient.telefono || "Sin teléfono"}{" "}
+                                            · {patient.correo || "Sin correo"}
                                           </span>
-                                          <span className="min-w-0">
-                                            <span className="block truncate text-sm font-semibold text-slate-800">
-                                              {getPatientLabel(
-                                                patient
-                                              )}
-                                            </span>
-                                            {canSeePatientContact && (
-                                              <span className="block truncate text-[11px] text-slate-500">
-                                                {patient.telefono || "Sin teléfono"}{" "}
-                                                ·{" "}
-                                                {patient.correo || "Sin correo"}
-                                              </span>
-                                            )}
-                                          </span>
-                                        </button>
-                                      )
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="px-4 py-4 text-sm text-slate-600">
-                                    Sin coincidencias.
-                                    Se registrará como
-                                    paciente nuevo.
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                        )}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="px-4 py-4 text-sm text-slate-600">
+                                  Sin coincidencias. Se registrará como paciente
+                                  nuevo.
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1766,14 +1495,9 @@ export function ReservationModal({
                               Apellido paterno
                             </label>
                             <input
-                              value={
-                                form.apellido_pat
-                              }
+                              value={form.apellido_pat}
                               onChange={(event) =>
-                                handleChange(
-                                  "apellido_pat",
-                                  event.target.value
-                                )
+                                handleChange("apellido_pat", event.target.value)
                               }
                               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                             />
@@ -1784,14 +1508,9 @@ export function ReservationModal({
                               Apellido materno
                             </label>
                             <input
-                              value={
-                                form.apellido_mat
-                              }
+                              value={form.apellido_mat}
                               onChange={(event) =>
-                                handleChange(
-                                  "apellido_mat",
-                                  event.target.value
-                                )
+                                handleChange("apellido_mat", event.target.value)
                               }
                               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                             />
@@ -1806,10 +1525,7 @@ export function ReservationModal({
                               max={today}
                               value={form.fecha_nac}
                               onChange={(event) =>
-                                handleChange(
-                                  "fecha_nac",
-                                  event.target.value
-                                )
+                                handleChange("fecha_nac", event.target.value)
                               }
                               className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                             />
@@ -1832,7 +1548,10 @@ export function ReservationModal({
                                     disabled={Boolean(form.patientId)}
                                     value={form.telefono}
                                     onChange={(event) =>
-                                      handleChange("telefono", event.target.value)
+                                      handleChange(
+                                        "telefono",
+                                        event.target.value,
+                                      )
                                     }
                                     className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
                                   />
@@ -1872,30 +1591,17 @@ export function ReservationModal({
                             Género
                           </label>
                           <select
-                            disabled={Boolean(
-                              form.patientId
-                            )}
+                            disabled={Boolean(form.patientId)}
                             value={form.genero}
                             onChange={(event) =>
-                              handleChange(
-                                "genero",
-                                event.target.value
-                              )
+                              handleChange("genero", event.target.value)
                             }
                             className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none disabled:bg-slate-100 disabled:text-slate-500"
                           >
-                            <option value="">
-                              Selecciona
-                            </option>
-                            <option value="masculino">
-                              Masculino
-                            </option>
-                            <option value="femenino">
-                              Femenino
-                            </option>
-                            <option value="otro">
-                              Otro
-                            </option>
+                            <option value="">Selecciona</option>
+                            <option value="masculino">Masculino</option>
+                            <option value="femenino">Femenino</option>
+                            <option value="otro">Otro</option>
                           </select>
                         </div>
                       </div>
@@ -1906,14 +1612,9 @@ export function ReservationModal({
                             Motivo de consulta
                           </label>
                           <textarea
-                            value={
-                              form.molestia
-                            }
+                            value={form.molestia}
                             onChange={(event) =>
-                              handleChange(
-                                "molestia",
-                                event.target.value
-                              )
+                              handleChange("molestia", event.target.value)
                             }
                             className="min-h-[90px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
                           />
@@ -1930,8 +1631,7 @@ export function ReservationModal({
                         Detalles de la cita
                       </h3>
                       <p className="mt-1 text-xs text-slate-500">
-                        Servicio, profesional,
-                        horario y estado.
+                        Servicio, profesional, horario y estado.
                       </p>
                     </div>
 
@@ -1942,26 +1642,17 @@ export function ReservationModal({
                             Servicio
                           </label>
                           <select
-                            value={
-                              form.serviceId ?? ""
-                            }
+                            value={form.serviceId ?? ""}
                             onChange={(event) =>
-                              handleServiceChange(
-                                event.target.value
-                              )
+                              handleServiceChange(event.target.value)
                             }
                             className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
                           >
-                            {services.map(
-                              (service) => (
-                                <option
-                                  key={service.id}
-                                  value={service.id}
-                                >
-                                  {service.nombre}
-                                </option>
-                              )
-                            )}
+                            {services.map((service) => (
+                              <option key={service.id} value={service.id}>
+                                {service.nombre}
+                              </option>
+                            ))}
                           </select>
                         </div>
 
@@ -1977,37 +1668,23 @@ export function ReservationModal({
                               "nutriologo",
                               "dentista",
                             ].includes(me?.rol)}
-                            value={
-                              form.professionalId ??
-                              ""
-                            }
+                            value={form.professionalId ?? ""}
                             onChange={(event) =>
                               handleChange(
                                 "professionalId",
-                                Number(
-                                  event.target
-                                    .value
-                                )
+                                Number(event.target.value),
                               )
                             }
                             className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none disabled:bg-slate-100 disabled:text-slate-500"
                           >
-                            {professionals.map(
-                              (professional) => (
-                                <option
-                                  key={
-                                    professional.id
-                                  }
-                                  value={
-                                    professional.id
-                                  }
-                                >
-                                  {getProfessionalLabel(
-                                    professional
-                                  )}
-                                </option>
-                              )
-                            )}
+                            {professionals.map((professional) => (
+                              <option
+                                key={professional.id}
+                                value={professional.id}
+                              >
+                                {getProfessionalLabel(professional)}
+                              </option>
+                            ))}
                           </select>
                         </div>
                       </div>
@@ -2021,10 +1698,7 @@ export function ReservationModal({
                             type="date"
                             value={form.date}
                             onChange={(event) =>
-                              handleChange(
-                                "date",
-                                event.target.value
-                              )
+                              handleChange("date", event.target.value)
                             }
                             className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                           />
@@ -2037,34 +1711,19 @@ export function ReservationModal({
                           <select
                             value={form.time}
                             onChange={(event) =>
-                              handleChange(
-                                "time",
-                                event.target.value
-                              )
+                              handleChange("time", event.target.value)
                             }
                             className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none"
                           >
-                            {Array.from(
-                              { length: 29 },
-                              (_, index) => {
-                                const minutes =
-                                  7 * 60 +
-                                  index * 30;
-                                const hh = String(
-                                  Math.floor(
-                                    minutes / 60
-                                  )
-                                ).padStart(2, "0");
-                                const mm = String(
-                                  minutes % 60
-                                ).padStart(2, "0");
-                                return `${hh}:${mm}`;
-                              }
-                            ).map((time) => (
-                              <option
-                                key={time}
-                                value={time}
-                              >
+                            {Array.from({ length: 29 }, (_, index) => {
+                              const minutes = 7 * 60 + index * 30;
+                              const hh = String(
+                                Math.floor(minutes / 60),
+                              ).padStart(2, "0");
+                              const mm = String(minutes % 60).padStart(2, "0");
+                              return `${hh}:${mm}`;
+                            }).map((time) => (
+                              <option key={time} value={time}>
                                 {time}
                               </option>
                             ))}
@@ -2111,31 +1770,19 @@ export function ReservationModal({
                               "No asistió",
                               "border-rose-200 bg-rose-50 text-rose-700",
                             ],
-                          ].map(
-                            ([
-                              value,
-                              label,
-                              selectedClass,
-                            ]) => (
-                              <button
-                                key={value}
-                                type="button"
-                                onClick={() =>
-                                  handleChange(
-                                    "status",
-                                    value
-                                  )
-                                }
-                                className={`rounded-xl border px-3 py-3 text-xs font-bold ${form.status ===
-                                  value
+                          ].map(([value, label, selectedClass]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => handleChange("status", value)}
+                              className={`rounded-xl border px-3 py-3 text-xs font-bold ${form.status === value
                                   ? `${selectedClass} ring-2 ring-current/20`
                                   : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-                                  }`}
-                              >
-                                {label}
-                              </button>
-                            )
-                          )}
+                                }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
@@ -2147,12 +1794,10 @@ export function ReservationModal({
                             </span>
                             <div>
                               <p className="text-sm font-bold text-slate-800">
-                                Repetir
-                                tratamiento
+                                Repetir tratamiento
                               </p>
                               <p className="text-[11px] text-slate-500">
-                                Crea sesiones
-                                posteriores.
+                                Crea sesiones posteriores.
                               </p>
                             </div>
                           </div>
@@ -2160,14 +1805,11 @@ export function ReservationModal({
                           <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
                             <input
                               type="checkbox"
-                              checked={Boolean(
-                                form.repeatEnabled
-                              )}
+                              checked={Boolean(form.repeatEnabled)}
                               onChange={(event) =>
                                 handleChange(
                                   "repeatEnabled",
-                                  event.target
-                                    .checked
+                                  event.target.checked,
                                 )
                               }
                             />
@@ -2182,56 +1824,39 @@ export function ReservationModal({
                                 Días
                               </label>
                               <div className="flex flex-wrap gap-2">
-                                {DAYS.map(
-                                  (day) => {
-                                    const active = (
-                                      form.repeatDays ||
-                                      []
-                                    ).includes(
-                                      day.key
-                                    );
+                                {DAYS.map((day) => {
+                                  const active = (
+                                    form.repeatDays || []
+                                  ).includes(day.key);
 
-                                    return (
-                                      <button
-                                        key={
-                                          day.key
-                                        }
-                                        type="button"
-                                        onClick={() =>
-                                          toggleRepeatDay(
-                                            day.key
-                                          )
-                                        }
-                                        className={`h-10 min-w-12 rounded-xl border px-3 text-xs font-bold ${active
+                                  return (
+                                    <button
+                                      key={day.key}
+                                      type="button"
+                                      onClick={() => toggleRepeatDay(day.key)}
+                                      className={`h-10 min-w-12 rounded-xl border px-3 text-xs font-bold ${active
                                           ? "border-blue-600 bg-blue-600 text-white"
                                           : "border-slate-200 bg-white text-slate-600"
-                                          }`}
-                                      >
-                                        {
-                                          day.label
-                                        }
-                                      </button>
-                                    );
-                                  }
-                                )}
+                                        }`}
+                                    >
+                                      {day.label}
+                                    </button>
+                                  );
+                                })}
                               </div>
                             </div>
 
                             <div>
                               <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                                Total de
-                                sesiones
+                                Total de sesiones
                               </label>
                               <input
                                 inputMode="numeric"
-                                value={
-                                  form.repeatSessions
-                                }
+                                value={form.repeatSessions}
                                 onChange={(event) =>
                                   handleChange(
                                     "repeatSessions",
-                                    event.target
-                                      .value
+                                    event.target.value,
                                   )
                                 }
                                 className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none"
@@ -2244,344 +1869,242 @@ export function ReservationModal({
                   </section>
                 )}
 
-                {activeSection === "pago" &&
-                  canSeeMoney && (
-                    <section className="space-y-4">
-                      <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
-                        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
-                          <div>
-                            <h3 className="text-base font-bold text-slate-950">
-                              Información de
-                              pago
-                            </h3>
-                            <p className="mt-1 text-xs text-slate-500">
-                              Estos campos solo
-                              están disponibles
-                              para administrador,
-                              fisioterapeuta y recepción.
-                            </p>
-                          </div>
-
-                          {lastPaymentId && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                downloadTicket(
-                                  lastPaymentId
-                                )
-                              }
-                              className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                            >
-                              <Download className="h-4 w-4" />
-                              Ticket
-                            </button>
-                          )}
+                {activeSection === "pago" && canSeeMoney && (
+                  <section className="space-y-4">
+                    <div className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+                        <div>
+                          <h3 className="text-base font-bold text-slate-950">
+                            Información de pago
+                          </h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Estos campos solo están disponibles para
+                            administrador, fisioterapeuta y recepción.
+                          </p>
                         </div>
 
-                        <div className="space-y-6 p-4 sm:p-6">
-                          <div className="grid gap-4 sm:grid-cols-3">
-                            <div>
-                              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                                Precio
-                              </label>
-                              <input
-                                inputMode="decimal"
-                                disabled={!canEditMoney}
-                                value={
-                                  form.price
-                                }
-                                onChange={(event) =>
-                                  handleChange(
-                                    "price",
-                                    event.target
-                                      .value
-                                  )
-                                }
-                                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none"
-                              />
-                            </div>
+                        {lastPaymentId && (
+                          <button
+                            type="button"
+                            onClick={() => downloadTicket(lastPaymentId)}
+                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                          >
+                            <Download className="h-4 w-4" />
+                            Ticket
+                          </button>
+                        )}
+                      </div>
 
-                            <div>
-                              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                                Monto a facturar
-                              </label>
-                              <input
-                                inputMode="decimal"
-                                disabled={!canEditMoney}
-                                value={
-                                  form.montoFacturado
-                                }
-                                onChange={(event) =>
-                                  handleChange(
-                                    "montoFacturado",
-                                    event.target
-                                      .value
-                                  )
-                                }
-                                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                                Descuento %
-                              </label>
-                              <input
-                                inputMode="decimal"
-                                disabled={!canEditMoney}
-                                value={
-                                  form.discountPct
-                                }
-                                onChange={(event) =>
-                                  handleChange(
-                                    "discountPct",
-                                    event.target
-                                      .value
-                                  )
-                                }
-                                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none"
-                              />
-                            </div>
-                          </div>
-
+                      <div className="space-y-6 p-4 sm:p-6">
+                        <div className="grid gap-4 sm:grid-cols-3">
                           <div>
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-bold text-slate-900">
-                                  Métodos de pago
-                                </p>
-                                <p className="text-[11px] text-slate-500">
-                                  La fecha de pago
-                                  registrada será la
-                                  fecha real del corte.
-                                </p>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={addPaymentLine}
-                                disabled={!canEditMoney}
-                                className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0a2f68] px-4 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
-                              >
-                                <Plus className="h-4 w-4" />
-                                Agregar
-                              </button>
-                            </div>
-
-                            <div className="mt-3 space-y-3">
-                              {(
-                                form.paymentLines ||
-                                []
-                              ).map(
-                                (
-                                  line,
-                                  index
-                                ) => (
-                                  <div
-                                    key={
-                                      line.id ||
-                                      index
-                                    }
-                                    className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[165px_155px_minmax(0,1fr)_44px]"
-                                  >
-                                    <select
-                                      disabled={!canEditMoney}
-                                      value={
-                                        line.method
-                                      }
-                                      onChange={(
-                                        event
-                                      ) =>
-                                        setPaymentLine(
-                                          index,
-                                          {
-                                            method:
-                                              event
-                                                .target
-                                                .value,
-                                          }
-                                        )
-                                      }
-                                      className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
-                                    >
-                                      {PAYMENT_METHODS.map(
-                                        (
-                                          method
-                                        ) => (
-                                          <option
-                                            key={
-                                              method.id
-                                            }
-                                            value={
-                                              method.id
-                                            }
-                                          >
-                                            {
-                                              method.label
-                                            }
-                                          </option>
-                                        )
-                                      )}
-                                    </select>
-
-                                    <input
-                                      type="date"
-                                      disabled={!canEditMoney}
-                                      value={
-                                        line.date || getLocalDate()
-                                      }
-                                      onChange={(
-                                        event
-                                      ) =>
-                                        setPaymentLine(
-                                          index,
-                                          {
-                                            date:
-                                              event
-                                                .target
-                                                .value,
-                                          }
-                                        )
-                                      }
-                                      className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
-                                      title="Fecha real del pago"
-                                    />
-
-                                    <input
-                                      inputMode="decimal"
-                                      disabled={!canEditMoney}
-                                      value={
-                                        line.amount
-                                      }
-                                      onChange={(
-                                        event
-                                      ) =>
-                                        setPaymentLine(
-                                          index,
-                                          {
-                                            amount:
-                                              event
-                                                .target
-                                                .value,
-                                          }
-                                        )
-                                      }
-                                      placeholder="Monto"
-                                      className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
-                                    />
-
-                                    <button
-                                      type="button"
-                                      disabled={!canEditMoney || Boolean(
-                                        line.id
-                                      )}
-                                      onClick={() =>
-                                        removePaymentLine(
-                                          index
-                                        )
-                                      }
-                                      className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-rose-600 disabled:cursor-not-allowed disabled:opacity-30"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="grid gap-3 rounded-2xl bg-slate-950 p-4 text-white sm:grid-cols-3">
-                            <div>
-                              <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                Total
-                              </p>
-                              <p className="mt-1 text-lg font-bold">
-                                {formatMoney(
-                                  totalAfterDiscount
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                Pagos
-                              </p>
-                              <p className="mt-1 text-lg font-bold">
-                                {formatMoney(
-                                  paymentsTotal
-                                )}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                                Restante
-                              </p>
-                              <p className="mt-1 text-lg font-bold">
-                                {formatMoney(
-                                  remaining
-                                )}
-                              </p>
-                            </div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                              Precio
+                            </label>
+                            <input
+                              inputMode="decimal"
+                              disabled={!canEditMoney}
+                              value={form.price}
+                              onChange={(event) =>
+                                handleChange("price", event.target.value)
+                              }
+                              className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none"
+                            />
                           </div>
 
                           <div>
                             <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                              Notas internas
+                              Monto a facturar
                             </label>
-                            <textarea
-                              value={
-                                form.notesInternal
-                              }
+                            <input
+                              inputMode="decimal"
+                              disabled={!canEditMoney}
+                              value={form.montoFacturado}
                               onChange={(event) =>
                                 handleChange(
-                                  "notesInternal",
-                                  event.target.value
+                                  "montoFacturado",
+                                  event.target.value,
                                 )
                               }
-                              className="min-h-[100px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none"
+                              className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                              Descuento %
+                            </label>
+                            <input
+                              inputMode="decimal"
+                              disabled={!canEditMoney}
+                              value={form.discountPct}
+                              onChange={(event) =>
+                                handleChange("discountPct", event.target.value)
+                              }
+                              className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none"
                             />
                           </div>
                         </div>
-                      </div>
-                    </section>
-                  )}
 
-                {activeSection === "notas" &&
-                  !canSeeMoney && (
-                    <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
-                      <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
-                        <h3 className="text-base font-bold text-slate-950">
-                          Notas y seguimiento
-                        </h3>
-                        <p className="mt-1 text-xs text-slate-500">
-                          Tu rol no muestra
-                          importes, descuentos ni
-                          métodos de pago.
-                        </p>
-                      </div>
+                        <div>
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">
+                                Métodos de pago
+                              </p>
+                              <p className="text-[11px] text-slate-500">
+                                La fecha de pago registrada será la fecha real
+                                del corte.
+                              </p>
+                            </div>
 
-                      <div className="p-4 sm:p-6">
-                        <label className="mb-1.5 block text-xs font-semibold text-slate-700">
-                          Notas internas
-                        </label>
-                        <textarea
-                          value={
-                            form.notesInternal
-                          }
-                          onChange={(event) =>
-                            handleChange(
-                              "notesInternal",
-                              event.target.value
-                            )
-                          }
-                          className="min-h-[150px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
-                        />
+                            <button
+                              type="button"
+                              onClick={addPaymentLine}
+                              disabled={!canEditMoney}
+                              className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#0a2f68] px-4 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Agregar
+                            </button>
+                          </div>
+
+                          <div className="mt-3 space-y-3">
+                            {(form.paymentLines || []).map((line, index) => (
+                              <div
+                                key={line.id || index}
+                                className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[165px_155px_minmax(0,1fr)_44px]"
+                              >
+                                <select
+                                  disabled={!canEditMoney}
+                                  value={line.method}
+                                  onChange={(event) =>
+                                    setPaymentLine(index, {
+                                      method: event.target.value,
+                                    })
+                                  }
+                                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                >
+                                  {PAYMENT_METHODS.map((method) => (
+                                    <option key={method.id} value={method.id}>
+                                      {method.label}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                <input
+                                  type="date"
+                                  disabled={!canEditMoney}
+                                  value={line.date || getLocalDate()}
+                                  onChange={(event) =>
+                                    setPaymentLine(index, {
+                                      date: event.target.value,
+                                    })
+                                  }
+                                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                  title="Fecha real del pago"
+                                />
+
+                                <input
+                                  inputMode="decimal"
+                                  disabled={!canEditMoney}
+                                  value={line.amount}
+                                  onChange={(event) =>
+                                    setPaymentLine(index, {
+                                      amount: event.target.value,
+                                    })
+                                  }
+                                  placeholder="Monto"
+                                  className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                                />
+
+                                <button
+                                  type="button"
+                                  disabled={!canEditMoney || Boolean(line.id)}
+                                  onClick={() => removePaymentLine(index)}
+                                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-rose-600 disabled:cursor-not-allowed disabled:opacity-30"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 rounded-2xl bg-slate-950 p-4 text-white sm:grid-cols-3">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                              Total
+                            </p>
+                            <p className="mt-1 text-lg font-bold">
+                              {formatMoney(totalAfterDiscount)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                              Pagos
+                            </p>
+                            <p className="mt-1 text-lg font-bold">
+                              {formatMoney(paymentsTotal)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                              Restante
+                            </p>
+                            <p className="mt-1 text-lg font-bold">
+                              {formatMoney(remaining)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                            Notas internas
+                          </label>
+                          <textarea
+                            value={form.notesInternal}
+                            onChange={(event) =>
+                              handleChange("notesInternal", event.target.value)
+                            }
+                            className="min-h-[100px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none"
+                          />
+                        </div>
                       </div>
-                    </section>
-                  )}
+                    </div>
+                  </section>
+                )}
+
+                {activeSection === "notas" && !canSeeMoney && (
+                  <section className="overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
+                    <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
+                      <h3 className="text-base font-bold text-slate-950">
+                        Notas y seguimiento
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Tu rol no muestra importes, descuentos ni métodos de
+                        pago.
+                      </p>
+                    </div>
+
+                    <div className="p-4 sm:p-6">
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                        Notas internas
+                      </label>
+                      <textarea
+                        value={form.notesInternal}
+                        onChange={(event) =>
+                          handleChange("notesInternal", event.target.value)
+                        }
+                        className="min-h-[150px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                      />
+                    </div>
+                  </section>
+                )}
               </div>
             </div>
 
-            <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+            <footer className="fisionerv-modal-pie shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   {isEditing && (
@@ -2597,7 +2120,7 @@ export function ReservationModal({
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
                   {activeIndex > 0 && (
                     <button
                       type="button"
@@ -2609,8 +2132,7 @@ export function ReservationModal({
                     </button>
                   )}
 
-                  {activeIndex <
-                    sections.length - 1 ? (
+                  {activeIndex < sections.length - 1 ? (
                     <button
                       type="button"
                       onClick={nextSection}
@@ -2626,9 +2148,7 @@ export function ReservationModal({
                       className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 disabled:opacity-60"
                     >
                       <CheckCircle2 className="h-4 w-4" />
-                      {saving
-                        ? "Guardando..."
-                        : "Guardar cita"}
+                      {saving ? "Guardando..." : "Guardar cita"}
                     </button>
                   )}
                 </div>
@@ -2636,7 +2156,7 @@ export function ReservationModal({
             </footer>
           </form>
         </div>
-      </div>
+      </PortalModal>
 
       <MessageModal
         open={message.open}
@@ -2653,5 +2173,3 @@ export function ReservationModal({
     </>
   );
 }
-
-

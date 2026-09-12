@@ -1,15 +1,16 @@
 // /src/components/layout/agenda/BlockTimeModal.jsx
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
+import { PortalModal } from "../../ui/PortalModal";
 
 const DAYS = [
     { k: "D", label: "Dom" },
     { k: "L", label: "Lun" },
     { k: "M", label: "Mar" },
-    { k: "X", label: "Mie" },
+    { k: "X", label: "Mié" },
     { k: "J", label: "Jue" },
     { k: "V", label: "Vie" },
-    { k: "S", label: "Sab" },
+    { k: "S", label: "Sáb" },
 ];
 
 function addMinutesToTime(timeStr, minutesToAdd) {
@@ -23,11 +24,13 @@ function addMinutesToTime(timeStr, minutesToAdd) {
 }
 
 export function BlockTimeModal({ preset, onClose, onSave }) {
+    const [guardando, setGuardando] = useState(false);
     const [form, setForm] = useState({
         motivo: "",
         date: preset?.date,
         startTime: preset?.startTime || "08:00",
-        endTime: preset?.endTime || addMinutesToTime(preset?.startTime || "08:00", 60),
+        endTime:
+            preset?.endTime || addMinutesToTime(preset?.startTime || "08:00", 60),
         repeatEnabled: false,
         repeatDays: ["L", "M", "X", "J", "V", "S"],
         repeatCount: 1,
@@ -44,7 +47,12 @@ export function BlockTimeModal({ preset, onClose, onSave }) {
             repeatDays: ["D", "L", "M", "X", "J", "V", "S"],
             repeatCount: 1,
         });
-    }, [preset?.date, preset?.startTime, preset?.endTime, preset?.professionalId]);
+    }, [
+        preset?.date,
+        preset?.startTime,
+        preset?.endTime,
+        preset?.professionalId,
+    ]);
 
     function toggleDay(dayKey) {
         setForm((prev) => {
@@ -64,20 +72,43 @@ export function BlockTimeModal({ preset, onClose, onSave }) {
 
     const submit = async (e) => {
         e.preventDefault();
-        await onSave?.({ ...form, professionalId: preset?.professionalId ?? null });
+        if (!canSave || guardando) return;
+        setGuardando(true);
+        try {
+            await onSave?.({
+                ...form,
+                professionalId: preset?.professionalId ?? null,
+            });
+        } finally {
+            setGuardando(false);
+        }
     };
 
     return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6">
-            <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+        <PortalModal
+            onClose={onClose}
+            ocupado={guardando}
+            etiqueta="Bloquear horario"
+            className="flex items-center justify-center p-3 sm:p-6"
+        >
+            <button
+                type="button"
+                tabIndex={-1}
+                aria-label="Cerrar bloqueo"
+                disabled={guardando}
+                className="absolute inset-0 bg-black/30"
+                onClick={onClose}
+            />
 
             <form
                 onSubmit={submit}
-                className="relative z-10 w-[min(96vw,720px)] rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden max-h-[88vh] flex flex-col"
+                className="fisionerv-bloqueo-panel relative z-10 w-full max-w-[720px] min-w-0 rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden flex flex-col"
             >
-                <div className="px-4 sm:px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-start justify-between gap-3">
+                <div className="shrink-0 px-4 sm:px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-start justify-between gap-3">
                     <div>
-                        <h2 className="text-sm font-semibold text-slate-800">Bloquear horario</h2>
+                        <h2 className="text-sm font-semibold text-slate-800">
+                            Bloquear horario
+                        </h2>
                         <p className="text-xs text-slate-500">
                             {form.date} · {form.startTime} – {form.endTime}
                         </p>
@@ -86,37 +117,49 @@ export function BlockTimeModal({ preset, onClose, onSave }) {
                     <button
                         type="button"
                         onClick={onClose}
-                        className="h-8 w-8 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center"
+                        disabled={guardando}
+                        aria-label="Cerrar bloqueo"
+                        className="h-8 w-8 shrink-0 rounded-full border border-slate-200 hover:bg-slate-100 flex items-center justify-center"
                     >
                         <X className="h-4 w-4 text-slate-600" />
                     </button>
                 </div>
 
                 {/* body scrolleable en móvil */}
-                <div className="px-4 sm:px-6 py-4 space-y-4 overflow-y-auto">
+                <div className="fisionerv-modal-contenido min-h-0 flex-1 px-4 sm:px-6 py-4 space-y-4 overflow-y-auto overscroll-contain">
                     <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Motivo</label>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                            Motivo
+                        </label>
                         <input
                             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                             value={form.motivo}
-                            onChange={(e) => setForm((p) => ({ ...p, motivo: e.target.value }))}
+                            onChange={(e) =>
+                                setForm((p) => ({ ...p, motivo: e.target.value }))
+                            }
                             placeholder="Ej. Horario de comida, imprevisto, etc."
                         />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
-                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Fecha</label>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                Fecha
+                            </label>
                             <input
                                 type="date"
                                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                                 value={form.date || ""}
-                                onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+                                onChange={(e) =>
+                                    setForm((p) => ({ ...p, date: e.target.value }))
+                                }
                             />
                         </div>
 
                         <div>
-                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Desde</label>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                Desde
+                            </label>
                             <input
                                 type="time"
                                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
@@ -131,29 +174,37 @@ export function BlockTimeModal({ preset, onClose, onSave }) {
                                 }}
                             />
                             <p className="text-[10px] text-slate-500 mt-1">
-                                Default bloquea 1 hora (puedes ajustar “Hasta”).
+                                Por defecto bloquea 1 hora (puedes ajustar “Hasta”).
                             </p>
                         </div>
 
                         <div>
-                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Hasta</label>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                Hasta
+                            </label>
                             <input
                                 type="time"
                                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                                 value={form.endTime}
-                                onChange={(e) => setForm((p) => ({ ...p, endTime: e.target.value }))}
+                                onChange={(e) =>
+                                    setForm((p) => ({ ...p, endTime: e.target.value }))
+                                }
                             />
                         </div>
                     </div>
 
                     <div className="rounded-xl border border-slate-200 p-3">
                         <div className="flex items-center justify-between">
-                            <p className="text-[11px] font-semibold text-slate-600">Repetición</p>
+                            <p className="text-[11px] font-semibold text-slate-600">
+                                Repetición
+                            </p>
                             <label className="flex items-center gap-2 text-xs text-slate-700">
                                 <input
                                     type="checkbox"
                                     checked={Boolean(form.repeatEnabled)}
-                                    onChange={(e) => setForm((p) => ({ ...p, repeatEnabled: e.target.checked }))}
+                                    onChange={(e) =>
+                                        setForm((p) => ({ ...p, repeatEnabled: e.target.checked }))
+                                    }
                                 />
                                 Repetir bloqueo
                             </label>
@@ -162,7 +213,9 @@ export function BlockTimeModal({ preset, onClose, onSave }) {
                         {form.repeatEnabled && (
                             <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div className="md:col-span-2">
-                                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Días</label>
+                                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                        Días
+                                    </label>
                                     <div className="flex gap-2 flex-wrap">
                                         {DAYS.map((d) => {
                                             const active = (form.repeatDays || []).includes(d.k);
@@ -196,7 +249,10 @@ export function BlockTimeModal({ preset, onClose, onSave }) {
                                         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                                         value={form.repeatCount}
                                         onChange={(e) =>
-                                            setForm((p) => ({ ...p, repeatCount: Number(e.target.value || 1) }))
+                                            setForm((p) => ({
+                                                ...p,
+                                                repeatCount: Number(e.target.value || 1),
+                                            }))
                                         }
                                     />
                                     <p className="text-[10px] text-slate-500 mt-1">
@@ -208,23 +264,24 @@ export function BlockTimeModal({ preset, onClose, onSave }) {
                     </div>
                 </div>
 
-                <div className="px-4 sm:px-6 py-3 border-t border-slate-200 flex justify-end gap-2">
+                <div className="fisionerv-modal-pie shrink-0 px-4 sm:px-6 py-3 border-t border-slate-200 flex flex-wrap justify-end gap-2">
                     <button
                         type="button"
                         onClick={onClose}
+                        disabled={guardando}
                         className="h-10 px-4 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
-                        disabled={!canSave}
+                        disabled={!canSave || guardando}
                         className="h-10 px-6 rounded-md bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-60 text-sm"
                     >
-                        Guardar bloqueo
+                        {guardando ? "Guardando..." : "Guardar bloqueo"}
                     </button>
                 </div>
             </form>
-        </div>
+        </PortalModal>
     );
 }
