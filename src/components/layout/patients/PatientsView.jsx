@@ -306,7 +306,9 @@ function AltaFutureAppointmentsModal({
 export function PatientsView({ role, permissions }) {
   const canSeePatientContact =
     role !== "practicante" &&
-    (permissions?.puede_ver_contacto_paciente ?? true);
+    Boolean(
+      permissions?.puede_ver_contacto_paciente
+    );
   const [patients, setPatients] = useState([]);
   const [citas, setCitas] = useState([]);
   const [professionals, setProfessionals] = useState([]);

@@ -719,44 +719,90 @@ export default function Administrativa() {
     }
     async function handleSaveReservation(form) {
         if (savingLockRef.current) return null;
+
         savingLockRef.current = true;
 
         const existing = form.id
-            ? appointments.find((item) => String(item.id) === String(form.id))
+            ? appointments.find(
+                (item) =>
+                    String(item.id) === String(form.id)
+            )
             : null;
-        const canEditMoney = ["admin", "fisioterapeuta", "recepcion"].includes(
-            role,
+
+        const canEditMoney = [
+            "admin",
+            "fisioterapeuta",
+            "recepcion",
+        ].includes(role);
+
+        const canSeeContact = [
+            "admin",
+            "recepcion",
+        ].includes(
+            String(role || "").trim().toLowerCase()
         );
-        const canSeeContact =
-            role !== "practicante" &&
-            (permissions?.puede_ver_contacto_paciente ?? true);
 
         const base = {
             servicio: form.serviceId,
             profesional: form.professionalId,
             fecha: form.date,
-            hora_inicio: `${String(form.time || "").slice(0, 5)}:00`,
-            hora_termina: `${String(form.endTime || form.time || "").slice(0, 5)}:00`,
+            hora_inicio: `${String(
+                form.time || ""
+            ).slice(0, 5)}:00`,
+            hora_termina: `${String(
+                form.endTime || form.time || ""
+            ).slice(0, 5)}:00`,
             estado: form.status || "reservado",
             notas: form.notesInternal || "",
         };
 
         if (canEditMoney) {
-            const price = Number(form.price ?? existing?.price ?? 0);
-            const discount = Number(form.discountPct ?? existing?.discountPct ?? 0);
+            const price = Number(
+                form.price ??
+                existing?.price ??
+                0
+            );
+
+            const discount = Number(
+                form.discountPct ??
+                existing?.discountPct ??
+                0
+            );
+
             Object.assign(base, {
                 precio: price,
-                pagado: Boolean(form.paid ?? existing?.paid ?? false),
-                metodo_pago: mapFrontendPaymentMethodToBackend(
-                    form.metodo_pago ?? existing?.metodo_pago ?? "",
+
+                pagado: Boolean(
+                    form.paid ??
+                    existing?.paid ??
+                    false
                 ),
+
+                metodo_pago:
+                    mapFrontendPaymentMethodToBackend(
+                        form.metodo_pago ??
+                        existing?.metodo_pago ??
+                        ""
+                    ),
+
                 descuento_porcentaje: discount,
-                anticipo: Number(form.deposit ?? existing?.deposit ?? 0),
-                monto_final: price - (price * discount) / 100,
+
+                anticipo: Number(
+                    form.deposit ??
+                    existing?.deposit ??
+                    0
+                ),
+
+                monto_final:
+                    price -
+                    (price * discount) / 100,
             });
         }
 
-        const isExistingPatient = Boolean(form.patientId);
+        const isExistingPatient = Boolean(
+            form.patientId
+        );
+
         const patientData = {
             nombres: form.patient,
             apellido_pat: form.apellido_pat || "",
@@ -768,49 +814,88 @@ export default function Administrativa() {
         };
 
         if (canSeeContact) {
-            patientData.telefono = normalizePhoneMX(form.telefono);
-            patientData.correo = form.correo || "";
+            patientData.telefono =
+                normalizePhoneMX(form.telefono);
+
+            patientData.correo =
+                form.correo || "";
         }
 
         const payload = isExistingPatient
-            ? { ...base, paciente: form.patientId }
-            : { ...base, paciente: patientData };
+            ? {
+                ...base,
+                paciente: form.patientId,
+            }
+            : {
+                ...base,
+                paciente: patientData,
+            };
+
         const editing = Boolean(form.id);
 
         try {
             const response = await apiFetch(
-                editing ? `/api/citas/${form.id}/` : "/api/citas/",
+                editing
+                    ? `/api/citas/${form.id}/`
+                    : "/api/citas/",
                 {
-                    method: editing ? "PATCH" : "POST",
-                    headers: { "Content-Type": "application/json" },
+                    method: editing
+                        ? "PATCH"
+                        : "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                    },
                     body: JSON.stringify(payload),
                 },
             );
+
             const data = await readJson(response);
+
             if (!response.ok) {
-                const first = data && Object.values(data)[0];
+                const first =
+                    data &&
+                    Object.values(data)[0];
+
                 throw new Error(
                     data?.detail ||
-                    (Array.isArray(first) ? first[0] : first) ||
+                    (
+                        Array.isArray(first)
+                            ? first[0]
+                            : first
+                    ) ||
                     "No se pudo guardar la cita.",
                 );
             }
+
             if (data?.id) {
-                const appt = mapCitaToAppointment(data);
+                const appt =
+                    mapCitaToAppointment(data);
+
                 setAppointments((prev) =>
-                    (editing
-                        ? prev.map((item) =>
-                            String(item.id) === String(appt.id) ? appt : item,
-                        )
-                        : [...prev, appt]
-                    ).sort(sortAppointments),
+                    (
+                        editing
+                            ? prev.map((item) =>
+                                String(item.id) ===
+                                    String(appt.id)
+                                    ? appt
+                                    : item
+                            )
+                            : [...prev, appt]
+                    ).sort(sortAppointments)
                 );
             } else {
                 await loadAgendaData();
             }
+
             return data;
         } catch (error) {
-            showInfo(error.message || "No se pudo guardar la cita.", "Cita");
+            showInfo(
+                error.message ||
+                "No se pudo guardar la cita.",
+                "Cita"
+            );
+
             return null;
         } finally {
             savingLockRef.current = false;

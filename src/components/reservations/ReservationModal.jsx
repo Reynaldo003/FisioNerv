@@ -45,7 +45,31 @@ const PAYMENT_METHODS = [
   { id: "otro", label: "Otro", icon: CreditCard },
 ];
 
-const MONEY_ROLES = ["admin", "fisioterapeuta", "recepcion"];
+const MONEY_ROLES = ["admin", "recepcion"];
+
+function puedeVerContactoPaciente(usuario) {
+  if (!usuario) return false;
+
+  const rol = String(
+    usuario.rol || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  // Regla explícita:
+  // un practicante nunca puede visualizar
+  // teléfono ni correo.
+  if (rol === "practicante") {
+    return false;
+  }
+
+  return Boolean(
+    usuario?.permisos
+      ?.puede_ver_contacto_paciente ??
+    usuario?.puede_ver_contacto_paciente ??
+    false
+  );
+}
 
 const DAYS = [
   { key: "L", label: "Lun" },
@@ -389,10 +413,7 @@ export function ReservationModal({
   const canSeeMoney = isMoneyRole;
   const canEditMoney = isMoneyRole;
   const canSeePatientContact =
-    me?.rol !== "practicante" &&
-    (me?.permisos?.puede_ver_contacto_paciente ??
-      me?.puede_ver_contacto_paciente ??
-      true);
+    puedeVerContactoPaciente(me);
 
   useEffect(() => {
     setForm(
@@ -451,17 +472,22 @@ export function ReservationModal({
           }),
         ]);
 
-        const [meData, servicesData, professionalsData, patientsData] =
-          await Promise.all([
-            meResponse.json().catch(() => null),
-            servicesResponse.json().catch(() => []),
-            professionalsResponse.json().catch(() => []),
-            patientsResponse.json().catch(() => []),
-          ]);
+        const [
+          meData,
+          servicesData,
+          professionalsData,
+          patientsData,
+        ] = await Promise.all([
+          meResponse.json().catch(() => null),
+          servicesResponse.json().catch(() => []),
+          professionalsResponse.json().catch(() => []),
+          patientsResponse.json().catch(() => []),
+        ]);
 
         if (!meResponse.ok) {
           throw new Error(
-            meData?.detail || "No se pudo identificar al usuario.",
+            meData?.detail ||
+            "No se pudo identificar al usuario."
           );
         }
 
@@ -470,12 +496,19 @@ export function ReservationModal({
           !professionalsResponse.ok ||
           !patientsResponse.ok
         ) {
-          throw new Error("No se pudieron cargar los catálogos de la cita.");
+          throw new Error(
+            "No se pudieron cargar los catálogos de la cita."
+          );
         }
 
         const serviceList = normalizeList(servicesData);
-        const professionalList = normalizeList(professionalsData);
+        const professionalList = normalizeList(
+          professionalsData
+        );
         const patientList = normalizeList(patientsData);
+
+        const puedeVerContacto =
+          puedeVerContactoPaciente(meData);
 
         setMe(meData);
         setServices(serviceList);
@@ -483,12 +516,32 @@ export function ReservationModal({
         setPatients(patientList);
 
         setForm((current) => {
-          const serviceId = current.serviceId ?? serviceList[0]?.id ?? null;
+          const serviceId =
+            current.serviceId ??
+            serviceList[0]?.id ??
+            null;
 
           const service =
-            serviceList.find((item) => Number(item.id) === Number(serviceId)) ||
+            serviceList.find(
+              (item) =>
+                Number(item.id) === Number(serviceId)
+            ) ||
             serviceList[0] ||
             null;
+
+          /*
+           * Cuando estamos editando una cita, appointment solamente
+           * contiene patientId y el nombre del paciente.
+           *
+           * Aquí recuperamos el registro completo desde /api/pacientes/
+           * para poder mostrar sus datos reales.
+           */
+          const selectedPatient =
+            patientList.find(
+              (patient) =>
+                Number(patient.id) ===
+                Number(current.patientId)
+            ) || null;
 
           const isProfessionalRole = [
             "fisioterapeuta",
@@ -498,30 +551,84 @@ export function ReservationModal({
             "dentista",
           ].includes(meData?.rol);
 
-          const professionalId = isProfessionalRole
-            ? meData.id
-            : (current.professionalId ?? professionalList[0]?.id ?? null);
+          const professionalId =
+            isProfessionalRole
+              ? meData.id
+              : current.professionalId ??
+              professionalList[0]?.id ??
+              null;
 
           const duration = service
             ? durationToMinutes(
               service.duracion ||
               service.duracion_str ||
-              service.duracion_text,
+              service.duracion_text
             )
             : 60;
 
-          const servicePrice = Number(service?.precio || 0);
+          const servicePrice = Number(
+            service?.precio || 0
+          );
 
           return {
             ...current,
+
             serviceId: service?.id ?? serviceId,
             professionalId,
-            endTime: addMinutesToTime(current.time || "08:00", duration),
-            price: current.price === "" ? String(servicePrice) : current.price,
+
+            endTime: addMinutesToTime(
+              current.time || "08:00",
+              duration
+            ),
+
+            price:
+              current.price === ""
+                ? String(servicePrice)
+                : current.price,
+
             montoFacturado:
               current.montoFacturado === ""
                 ? String(servicePrice)
                 : current.montoFacturado,
+
+            /*
+             * Hidratamos los datos del paciente cuando ya existe.
+             */
+            patient: selectedPatient
+              ? getPatientLabel(selectedPatient)
+              : current.patient,
+
+            apellido_pat:
+              selectedPatient?.apellido_pat ??
+              current.apellido_pat,
+
+            apellido_mat:
+              selectedPatient?.apellido_mat ??
+              current.apellido_mat,
+
+            fecha_nac:
+              selectedPatient?.fecha_nac ??
+              current.fecha_nac,
+
+            genero: selectedPatient
+              ? normalizeGender(selectedPatient.genero)
+              : current.genero,
+
+            molestia:
+              selectedPatient?.molestia ??
+              current.molestia,
+
+            /*
+             * Teléfono y correo únicamente entran al estado
+             * del formulario para admin y recepción.
+             */
+            telefono: puedeVerContacto
+              ? selectedPatient?.telefono || ""
+              : "",
+
+            correo: puedeVerContacto
+              ? selectedPatient?.correo || ""
+              : "",
           };
         });
       } catch (error) {
@@ -529,7 +636,8 @@ export function ReservationModal({
           open: true,
           title: "No se pudo cargar la cita",
           message:
-            error?.message || "Ocurrió un problema al cargar la información.",
+            error?.message ||
+            "Ocurrió un problema al cargar la información.",
         });
       } finally {
         setLoading(false);
@@ -779,8 +887,15 @@ export function ReservationModal({
       apellido_mat: patient.apellido_mat || "",
       fecha_nac: patient.fecha_nac || "",
       genero: normalizeGender(patient.genero),
-      correo: patient.correo || "",
-      telefono: patient.telefono || "",
+
+      correo: canSeePatientContact
+        ? patient.correo || ""
+        : "",
+
+      telefono: canSeePatientContact
+        ? patient.telefono || ""
+        : "",
+
       molestia: patient.molestia || "",
     }));
 
@@ -1337,16 +1452,16 @@ export function ReservationModal({
                     type="button"
                     onClick={() => setActiveSection(section.id)}
                     className={`flex min-w-[150px] flex-1 items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition sm:min-w-0 ${active
-                        ? "border-blue-200 bg-blue-50 text-blue-800 shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      ? "border-blue-200 bg-blue-50 text-blue-800 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                       }`}
                   >
                     <span
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active
-                          ? "bg-blue-600 text-white"
-                          : completed
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-slate-100 text-slate-500"
+                        ? "bg-blue-600 text-white"
+                        : completed
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-100 text-slate-500"
                         }`}
                     >
                       {completed ? (
@@ -1391,8 +1506,8 @@ export function ReservationModal({
 
                       <span
                         className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold ${form.patientId
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-blue-200 bg-blue-50 text-blue-700"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-blue-200 bg-blue-50 text-blue-700"
                           }`}
                       >
                         {form.patientId ? (
@@ -1776,8 +1891,8 @@ export function ReservationModal({
                               type="button"
                               onClick={() => handleChange("status", value)}
                               className={`rounded-xl border px-3 py-3 text-xs font-bold ${form.status === value
-                                  ? `${selectedClass} ring-2 ring-current/20`
-                                  : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                                ? `${selectedClass} ring-2 ring-current/20`
+                                : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
                                 }`}
                             >
                               {label}
@@ -1835,8 +1950,8 @@ export function ReservationModal({
                                       type="button"
                                       onClick={() => toggleRepeatDay(day.key)}
                                       className={`h-10 min-w-12 rounded-xl border px-3 text-xs font-bold ${active
-                                          ? "border-blue-600 bg-blue-600 text-white"
-                                          : "border-slate-200 bg-white text-slate-600"
+                                        ? "border-blue-600 bg-blue-600 text-white"
+                                        : "border-slate-200 bg-white text-slate-600"
                                         }`}
                                     >
                                       {day.label}
