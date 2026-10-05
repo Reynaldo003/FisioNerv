@@ -396,6 +396,7 @@ export function ReservationModal({
   onDelete,
   onRefreshAppointment,
   onRequestCloseModal,
+  onOpenPatientProfile,
 }) {
   const today = getLocalDate();
   const isEditing = Boolean(appointment?.id);
@@ -1363,6 +1364,11 @@ export function ReservationModal({
     }
   };
 
+  const handleOpenPatientProfile = () => {
+    if (!form.patientId || saving) return;
+    onOpenPatientProfile?.(form.patientId);
+  };
+
   const handleDelete = async () => {
     if (!form.id || saving) return;
 
@@ -1441,11 +1447,21 @@ export function ReservationModal({
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">
                     {isEditing ? "Edición de reservación" : "Nueva reservación"}
                   </p>
-                  <h2 className="truncate text-lg font-bold text-slate-950 sm:text-xl">
-                    {isEditing
-                      ? form.patient || "Editar cita"
-                      : "Agendar nueva cita"}
-                  </h2>
+                  {isEditing && form.patientId ? (
+                    <button
+                      type="button"
+                      onClick={handleOpenPatientProfile}
+                      disabled={saving}
+                      title="Ver expediente del paciente"
+                      className="block max-w-full truncate text-left text-lg font-bold text-slate-950 transition hover:text-blue-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60 sm:text-xl"
+                    >
+                      {form.patient || "Ver expediente"}
+                    </button>
+                  ) : (
+                    <h2 className="truncate text-lg font-bold text-slate-950 sm:text-xl">
+                      {isEditing ? form.patient || "Editar cita" : "Agendar nueva cita"}
+                    </h2>
+                  )}
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
                     <span className="inline-flex items-center gap-1">
                       <CalendarDays className="h-3.5 w-3.5" />

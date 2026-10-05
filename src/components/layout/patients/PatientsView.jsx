@@ -303,7 +303,12 @@ function AltaFutureAppointmentsModal({
 }
 
 
-export function PatientsView({ role, permissions }) {
+export function PatientsView({
+  role,
+  permissions,
+  patientIdToOpen = null,
+  onPatientOpened,
+}) {
   const canSeePatientContact =
     role !== "practicante" &&
     Boolean(
@@ -819,6 +824,19 @@ export function PatientsView({ role, permissions }) {
 
     await loadPatientProfile(patient.id);
   };
+
+  useEffect(() => {
+    if (!patientIdToOpen || loading) return;
+
+    const patient = enhancedPatients.find(
+      (item) => Number(item.id) === Number(patientIdToOpen),
+    );
+
+    if (!patient) return;
+
+    handleOpenProfile(patient);
+    onPatientOpened?.(patient.id);
+  }, [patientIdToOpen, loading, enhancedPatients]);
 
 
   const handleDeletePatient = (patient) => {
