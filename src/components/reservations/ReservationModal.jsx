@@ -45,7 +45,7 @@ const PAYMENT_METHODS = [
   { id: "otro", label: "Otro", icon: CreditCard },
 ];
 
-const MONEY_ROLES = ["admin", "recepcion"];
+const MONEY_ROLES = ["admin", "fisioterapeuta", "recepcion"];
 
 function puedeVerContactoPaciente(usuario) {
   if (!usuario) return false;
@@ -232,6 +232,25 @@ function normalizeList(data) {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.results)) return data.results;
   return [];
+}
+
+function normalizeServiceName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function orderServices(services) {
+  return [...services].sort((a, b) => {
+    const aName = normalizeServiceName(a?.nombre);
+    const bName = normalizeServiceName(b?.nombre);
+    const aPreferred = aName === "sesiones subsecuentes" || (aName.includes("sesion") && aName.includes("subsecuente"));
+    const bPreferred = bName === "sesiones subsecuentes" || (bName.includes("sesion") && bName.includes("subsecuente"));
+    if (aPreferred !== bPreferred) return aPreferred ? -1 : 1;
+    return aName.localeCompare(bName, "es");
+  });
 }
 
 function buildRepeatDates({ startDateIso, repeatDays, repeatSessions }) {
@@ -501,7 +520,7 @@ export function ReservationModal({
           );
         }
 
-        const serviceList = normalizeList(servicesData);
+        const serviceList = orderServices(normalizeList(servicesData));
         const professionalList = normalizeList(
           professionalsData
         );
@@ -733,6 +752,14 @@ export function ReservationModal({
     [professionals, form.professionalId],
   );
 
+  const selectedPatientRecord = useMemo(
+    () =>
+      patients.find(
+        (patient) => Number(patient.id) === Number(form.patientId),
+      ) || null,
+    [patients, form.patientId],
+  );
+
   const patientMatches = useMemo(() => {
     const query = patientQuery.trim().toLowerCase();
 
@@ -806,6 +833,14 @@ export function ReservationModal({
       setActiveSection(sections[0]?.id || "paciente");
     }
   }, [sections, activeSection]);
+
+  useEffect(() => {
+    const requestedSection = appointment?._openSection;
+    if (!me || !requestedSection) return;
+    if (sections.some((section) => section.id === requestedSection)) {
+      setActiveSection(requestedSection);
+    }
+  }, [appointment?.id, appointment?._openSection, me, sections]);
 
   const handleChange = (field, value) => {
     if (field === "time") {
@@ -1394,8 +1429,12 @@ export function ReservationModal({
           <header className="shrink-0 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0a2f68] text-white shadow-lg shadow-blue-950/20">
-                  <CalendarDays className="h-5 w-5" />
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#0a2f68] text-white shadow-lg shadow-blue-950/20">
+                  {selectedPatientRecord?.foto_url ? (
+                    <img src={selectedPatientRecord.foto_url} alt={getPatientLabel(selectedPatientRecord)} className="h-full w-full object-cover" />
+                  ) : (
+                    <UserRound className="h-5 w-5" />
+                  )}
                 </span>
 
                 <div className="min-w-0">
