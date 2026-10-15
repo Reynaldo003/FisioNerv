@@ -1,3 +1,4 @@
+//src/Administrativa.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PortalModal } from "./components/ui/PortalModal";
 import {
@@ -12,6 +13,7 @@ import {
     Globe2,
     LogOut,
     Menu,
+    Images,
     MessageSquareText,
     Plus,
     Stethoscope,
@@ -21,6 +23,7 @@ import {
     X,
 } from "lucide-react";
 import { AgendaView } from "./components/layout/agenda/AgendaView";
+import { ControlOperativoView } from "./components/layout/control/ControlOperativoView";
 import { PatientsView } from "./components/layout/patients/PatientsView";
 import { SalesView } from "./components/layout/sales/SalesView";
 import { ReservationModal } from "./components/reservations/ReservationModal";
@@ -30,6 +33,7 @@ import { BlockTimeModal } from "./components/layout/agenda/BlockTimeModal";
 import { ServiciosAdminView } from "./components/layout/servicios/ServiciosAdminView";
 import { UserProfileView } from "./components/layout/profile/UserProfileView";
 import { InsumosView } from "./components/layout/insumos/InsumosView";
+import ImagenesSitioView from "./components/layout/imagenes/ImagenesSitioView";
 import { apiFetch, installFetchWithRefresh } from "./services/apiFetch";
 import { notifySalesRefresh } from "./utils/salesSync";
 
@@ -69,6 +73,16 @@ const TAB_CONFIG = {
         label: "Insumos",
         description: "Controla inventario, compras y ventas de productos.",
         icon: Boxes,
+    },
+    control: {
+        label: "Control operativo",
+        description: "Ocupación, comisiones, cobros masivos y bitácora.",
+        icon: Activity,
+    },
+    imagenes: {
+        label: "Imágenes web",
+        description: "Actualiza fotografías, portadas y convenios del sitio público.",
+        icon: Images,
     },
     perfil: {
         label: "Mi perfil",
@@ -121,7 +135,8 @@ function mapCitaToAppointment(cita) {
         notesInternal: cita.notas || "",
         discountPct: Number(cita.descuento_porcentaje || 0),
         deposit: Number(cita.anticipo || 0),
-        montoFacturado: Number(cita.monto_final || cita.precio || 0),
+        // En ReservationModal se hidrata desde Pago cuando hay cobros.
+        montoFacturado: Number(cita.precio || 0),
         metodo_pago: cita.metodo_pago || "",
         color,
         _type: "cita",
@@ -191,11 +206,7 @@ function normalizePhoneMX(raw) {
 }
 function ModalShell({ title, children, onClose, actions }) {
     return (
-        <PortalModal
-            onClose={onClose}
-            etiqueta={title || "Aviso"}
-            className="flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
-        >
+        <PortalModal onClose={onClose} etiqueta={title || "Aviso"} className="flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]">
             <div className="fisionerv-modal-tarjeta w-full max-w-md overflow-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                     <p className="text-sm font-black text-slate-900">{title}</p>
@@ -505,6 +516,10 @@ export default function Administrativa() {
         const moneyRole = ["admin", "fisioterapeuta", "recepcion"].includes(role);
         let valid = source.filter((tab) => TAB_CONFIG[tab]);
         if (!moneyRole) valid = valid.filter((tab) => tab !== "ventas");
+        // La nueva app Django valida rol admin; /api/me/ de core aún no envía este módulo.
+        if (role === "admin" && !valid.includes("imagenes")) valid.push("imagenes");
+        if (role !== "admin") valid = valid.filter((tab) => tab !== "imagenes");
+        if (["admin", "recepcion", "fisioterapeuta"].includes(role) && !valid.includes("control")) valid.push("control");
         return valid.includes("perfil") ? valid : [...valid, "perfil"];
     }, [me, role]);
     useEffect(() => {
@@ -793,9 +808,10 @@ export default function Administrativa() {
                     0
                 ),
 
-                monto_final:
-                    price -
-                    (price * discount) / 100,
+                // El monto a facturar puede ser distinto del precio de catálogo.
+                monto_final: Math.max(0,
+                    Number(form.montoFacturado ?? price) * (1 - discount / 100)
+                ),
             });
         }
 
@@ -829,6 +845,10 @@ export default function Administrativa() {
             : {
                 ...base,
                 paciente: patientData,
+                // Se usa para atribuir a recepción los pacientes sin recomendación.
+                origen: ["nuevo", "recomendado", "otro"].includes(form.origen)
+                    ? form.origen
+                    : "nuevo",
             };
 
         const editing = Boolean(form.id);
@@ -1073,10 +1093,12 @@ export default function Administrativa() {
                                 myUserId={me?.id}
                             />
                         )}{" "}
-                        {activeTab === "ventas" && <SalesView permissions={permissions} />}{" "}
+                        {activeTab === "ventas" && <SalesView permissions={permissions} />}
+                        {activeTab === "control" && <ControlOperativoView role={role} />}{" "}
                         {activeTab === "servicios" && <ServiciosAdminView role={role} />}{" "}
                         {activeTab === "comentarios" && <CommentsModerationView />}{" "}
                         {activeTab === "equipo" && <Equipo />}{" "}
+                        {activeTab === "imagenes" && role === "admin" && <ImagenesSitioView />}
                         {activeTab === "insumos" && (
                             <InsumosView permissions={permissions} />
                         )}{" "}

@@ -1056,6 +1056,7 @@ export function PatientsView({ role, permissions }) {
       genero: formData.genero || "",
       molestia: formData.molestia.trim(),
       notas: formData.notas.trim(),
+      origen: formData.origen || "nuevo",
       estado_tratamiento:
         formData.estado_tratamiento || "en_tratamiento",
       fecha_alta:
@@ -1187,9 +1188,7 @@ export function PatientsView({ role, permissions }) {
       await refreshSummaryAndBirthdays();
     } catch (error) {
       if (error?.status === 409) {
-        window.alert(
-          "Este paciente tiene citas asociadas. Marca la opción para eliminar también sus citas.",
-        );
+        window.alert(error.message || "Hay citas o pagos que impiden eliminar este paciente.");
       } else {
         showError(
           error,
@@ -1621,6 +1620,9 @@ export function PatientsView({ role, permissions }) {
                                       "0",
                                     )}
                                   </p>
+                                  <p className="mt-1 text-[10px] text-slate-500">
+                                    {patient.citas_completadas ?? 0} realizadas · {patient.citas_canceladas ?? 0} canceladas · {(patient.citas_reservadas ?? 0) + (patient.citas_confirmadas ?? 0)} agendadas
+                                  </p>
                                 </div>
                               </div>
                             </Td>
@@ -1858,6 +1860,7 @@ export function PatientsView({ role, permissions }) {
               actionLoading
             }
             canSeePatientContact={canSeePatientContact}
+            puedeEditarSesiones={role === "admin"}
             onClose={() =>
               setProfileOpen(false)
             }
@@ -2090,12 +2093,47 @@ const PROFILE_SECTIONS = [
 ];
 
 
+function SesionesPacientePanel({ pacienteId, puedeEditar }) {
+  const [datos, setDatos] = useState(null);
+  const [meta, setMeta] = useState('');
+  const [error, setError] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  useEffect(() => {
+    let activo = true;
+    apiRequest(`/api/control/sesiones/${pacienteId}/`).then(x => {
+      if (activo) { setDatos(x); setMeta(String(x.contratadas)); }
+    }).catch(e => { if (activo) setError(e.message); });
+    return () => { activo = false; };
+  }, [pacienteId]);
+  async function guardar() {
+    setGuardando(true); setError('');
+    try {
+      const siguiente = await apiRequest(`/api/control/sesiones/${pacienteId}/`, {
+        method: 'PUT', body: { contratadas: Number(meta) },
+      });
+      setDatos(siguiente);
+    } catch (e) { setError(e.message); } finally { setGuardando(false); }
+  }
+  return <section className="mb-4 rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+    <div className="flex flex-wrap items-center justify-between gap-4">
+      <div><h3 className="text-sm font-bold text-slate-900">Sesiones del paciente</h3>
+        <p className="mt-1 text-xl font-black text-indigo-700">{datos ? `${datos.realizadas} de ${datos.contratadas || 'sin meta'}` : 'Cargando...'}</p>
+        {datos && <p className="mt-1 text-[11px] text-slate-500">{datos.restantes} restantes · {datos.agendadas} próximas · {datos.canceladas} canceladas · {datos.total_citas} citas en total</p>}
+      </div>
+      {puedeEditar && <div className="flex items-end gap-2"><label className="text-xs font-bold text-slate-600">Contratadas<input className="mt-1 block h-10 w-28 rounded-lg border px-2" type="number" min="0" max="500" value={meta} onChange={e => setMeta(e.target.value)} /></label><button type="button" onClick={guardar} disabled={guardando} className="h-10 rounded-lg bg-indigo-600 px-3 text-xs font-bold text-white disabled:opacity-50">Guardar</button></div>}
+    </div>
+    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${datos?.porcentaje || 0}%` }} /></div>
+    {error && <p role="alert" className="mt-2 text-xs text-rose-600">{error}</p>}
+  </section>;
+}
+
 function PatientProfileModal({
   patient,
   data,
   loading,
   actionLoading,
   canSeePatientContact,
+  puedeEditarSesiones,
   onClose,
   onEdit,
   onChangePhoto,
@@ -2313,6 +2351,7 @@ function PatientProfileModal({
               </div>
             ) : (
               <>
+                {section === "general" && <SesionesPacientePanel pacienteId={patient.id} puedeEditar={puedeEditarSesiones} />}
                 {section ===
                   "general" && (
                     <GeneralSection
@@ -3120,6 +3159,7 @@ function PatientFormModal({
       "en_tratamiento",
     fecha_alta:
       patient?.fecha_alta ?? "",
+    origen: "nuevo",
   });
 
   const [photoPreview, setPhotoPreview] =
@@ -3294,6 +3334,7 @@ function PatientFormModal({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
+            {!isEdit && <Field label="Origen del paciente"><select className="form-control" value={form.origen} onChange={e => change("origen", e.target.value)}><option value="nuevo">Nuevo, sin recomendación</option><option value="recomendado">Recomendado por otro paciente</option><option value="otro">Otro origen</option></select></Field>}
             <Field label="Nombre(s)">
               <input
                 className="form-control"

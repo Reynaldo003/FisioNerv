@@ -1,3 +1,4 @@
+//src/components/reservations/ReservationModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Banknote,
@@ -27,12 +28,7 @@ import {
 
 import { PortalModal } from "../ui/PortalModal";
 
-import { installFetchWithRefresh } from "../../services/apiFetch";
-
-installFetchWithRefresh();
-
-const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
-//const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+import { apiFetch } from "../../services/apiFetch";
 
 const PAYMENT_METHODS = [
   { id: "tarjeta", label: "Tarjeta", icon: CreditCard },
@@ -45,7 +41,7 @@ const PAYMENT_METHODS = [
   { id: "otro", label: "Otro", icon: CreditCard },
 ];
 
-const MONEY_ROLES = ["admin", "recepcion"];
+const MONEY_ROLES = ["admin", "fisioterapeuta", "recepcion"];
 
 function puedeVerContactoPaciente(usuario) {
   if (!usuario) return false;
@@ -344,15 +340,15 @@ function buildInitialForm({ appointment, preset, today }) {
     notesInternal: appointment?.notesInternal ?? "",
 
     price,
-    montoFacturado:
-      appointment?.montoFacturado != null
-        ? String(Number(appointment.montoFacturado))
-        : price,
+    // "monto_final" en Cita ya contiene el descuento; no se debe descontar dos veces.
+    // En citas con pagos se restaurará el monto facturado original desde Pago.
+    montoFacturado: price,
     discountPct:
       appointment?.discountPct != null
         ? String(Number(appointment.discountPct))
         : "",
     comprobante: appointment?.comprobante ?? "",
+    origen: "nuevo",
     paymentLines: [
       {
         id: null,
@@ -405,13 +401,14 @@ export function ReservationModal({
     message: "",
   });
   const [lastPaymentId, setLastPaymentId] = useState(null);
+  const [paymentsLoading, setPaymentsLoading] = useState(Boolean(appointment?.id));
+  const [paymentsError, setPaymentsError] = useState(false);
 
   const patientBoxRef = useRef(null);
   const originalPaymentsRef = useRef([]);
 
-  const isMoneyRole = MONEY_ROLES.includes(me?.rol);
-  const canSeeMoney = isMoneyRole;
-  const canEditMoney = isMoneyRole;
+  const canSeeMoney = Boolean(me?.permisos?.puede_ver_montos ?? MONEY_ROLES.includes(me?.rol));
+  const canEditMoney = Boolean(me?.permisos?.puede_modificar_montos ?? MONEY_ROLES.includes(me?.rol));
   const canSeePatientContact =
     puedeVerContactoPaciente(me);
 
@@ -427,6 +424,8 @@ export function ReservationModal({
     setPatientDropdownOpen(false);
     setActiveSection("paciente");
     setLastPaymentId(null);
+    setPaymentsLoading(Boolean(appointment?.id));
+    setPaymentsError(false);
     originalPaymentsRef.current = [];
   }, [appointment?.id, preset?.date, preset?.time, preset?.professionalId]);
 
@@ -446,30 +445,20 @@ export function ReservationModal({
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("auth.access");
-
     const loadData = async () => {
       setLoading(true);
 
       try {
-        const headers = {
-          Authorization: `Bearer ${token || ""}`,
-        };
-
         const [
           meResponse,
           servicesResponse,
           professionalsResponse,
           patientsResponse,
         ] = await Promise.all([
-          fetch(`${API_BASE}/api/me/`, { headers }),
-          fetch(`${API_BASE}/api/servicios/`),
-          fetch(`${API_BASE}/api/profesionales/`, {
-            headers,
-          }),
-          fetch(`${API_BASE}/api/pacientes/`, {
-            headers,
-          }),
+          apiFetch("/api/me/"),
+          apiFetch("/api/servicios/"),
+          apiFetch("/api/profesionales/"),
+          apiFetch("/api/pacientes/"),
         ]);
 
         const [
@@ -654,21 +643,15 @@ export function ReservationModal({
 
     if (!allowed) {
       originalPaymentsRef.current = [];
+      setPaymentsLoading(false);
       return;
     }
 
-    const token = localStorage.getItem("auth.access");
-
     const loadPayments = async () => {
+      setPaymentsLoading(true);
+      setPaymentsError(false);
       try {
-        const response = await fetch(
-          `${API_BASE}/api/pagos/?cita=${appointment.id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token || ""}`,
-            },
-          },
-        );
+        const response = await apiFetch(`/api/pagos/?cita=${appointment.id}`);
 
         const data = await response.json().catch(() => []);
         if (!response.ok) {
@@ -683,6 +666,9 @@ export function ReservationModal({
             method: payment.metodo_pago || "efectivo",
             amount: String(Number(payment.anticipo || 0)),
             date: payment.fecha_pago || getLocalDate(),
+            comprobante: payment.comprobante || "",
+            montoFacturado: Number(payment.monto_facturado || 0),
+            descuentoPct: Number(payment.descuento_porcentaje || 0),
           }));
 
         originalPaymentsRef.current = list.map((payment) => ({
@@ -703,7 +689,13 @@ export function ReservationModal({
                 date: getLocalDate(),
               },
             ],
-          montoFacturado: list[0]?.monto_facturado ?? current.montoFacturado,
+          montoFacturado: list.length
+            ? String(list[0].montoFacturado)
+            : current.montoFacturado,
+          discountPct: list.length
+            ? String(list[0].descuentoPct)
+            : current.discountPct,
+          comprobante: list[0]?.comprobante ?? current.comprobante,
         }));
       } catch (error) {
         setMessage({
@@ -712,6 +704,9 @@ export function ReservationModal({
           message:
             error?.message || "No se pudieron cargar los pagos registrados.",
         });
+        setPaymentsError(true);
+      } finally {
+        setPaymentsLoading(false);
       }
     };
 
@@ -984,7 +979,6 @@ export function ReservationModal({
       };
     }
 
-    const token = localStorage.getItem("auth.access") || "";
     const currentLines = (form.paymentLines || []).map((line) => ({
       id: line.id ?? null,
       method: line.method || "efectivo",
@@ -1020,22 +1014,27 @@ export function ReservationModal({
           !previous ||
           previous.method !== line.method ||
           Number(previous.amount) !== Number(line.amount) ||
-          String(previous.date || "") !== String(line.date || "");
+          String(previous.date || "") !== String(line.date || "") ||
+          Number(previous.montoFacturado) !== subtotal ||
+          Number(previous.descuentoPct) !== discountPct ||
+          // Solo cambiar el comprobante de todos si el usuario lo modificó.
+          (form.comprobante !== (originalPaymentsRef.current[0]?.comprobante || "") &&
+            form.comprobante !== (previous.comprobante || ""));
 
         if (!changedLine) {
           lastId = line.id;
           continue;
         }
 
-        const response = await fetch(`${API_BASE}/api/pagos/${line.id}/`, {
+        const nuevoComprobante = form.comprobante !== (originalPaymentsRef.current[0]?.comprobante || "")
+          ? form.comprobante
+          : previous.comprobante;
+        const response = await apiFetch(`/api/pagos/${line.id}/`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             fecha_pago: line.date || getLocalDate(),
-            comprobante: form.comprobante || "",
+            comprobante: nuevoComprobante || "",
             monto_facturado: subtotal,
             metodo_pago: line.method,
             descuento_porcentaje: discountPct,
@@ -1058,12 +1057,9 @@ export function ReservationModal({
 
       if (line.amount <= 0) continue;
 
-      const response = await fetch(`${API_BASE}/api/pagos/`, {
+      const response = await apiFetch("/api/pagos/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cita: citaId,
           fecha_pago: line.date || getLocalDate(),
@@ -1096,11 +1092,8 @@ export function ReservationModal({
     );
 
     for (const line of removed) {
-      const response = await fetch(`${API_BASE}/api/pagos/${line.id}/`, {
+      const response = await apiFetch(`/api/pagos/${line.id}/`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       if (!response.ok) {
@@ -1121,17 +1114,8 @@ export function ReservationModal({
   const downloadTicket = async (paymentId) => {
     if (!paymentId || !canSeeMoney) return;
 
-    const token = localStorage.getItem("auth.access") || "";
-
     try {
-      const response = await fetch(
-        `${API_BASE}/api/pagos/${paymentId}/ticket/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
+      const response = await apiFetch(`/api/pagos/${paymentId}/ticket/`);
 
       if (!response.ok) {
         throw new Error("No se pudo generar el ticket.");
@@ -1204,6 +1188,7 @@ export function ReservationModal({
     correo: canSeePatientContact ? form.correo : "",
     telefono: canSeePatientContact ? form.telefono : "",
     molestia: form.molestia,
+    origen: form.patientId ? undefined : form.origen,
     date,
     time: form.time,
     endTime: form.endTime,
@@ -1234,6 +1219,15 @@ export function ReservationModal({
   const handleSubmit = async (event) => {
     event.preventDefault();
 
+    if (isEditing && canEditMoney && (paymentsLoading || paymentsError)) {
+      setMessage({
+        open: true,
+        title: "No se pueden guardar los pagos",
+        message: "Espera a que se carguen los pagos o vuelve a abrir la cita si ocurrió un error de consulta.",
+      });
+      return;
+    }
+
     if (!form.patientId && !String(form.patient || "").trim()) {
       setActiveSection("paciente");
       setMessage({
@@ -1254,6 +1248,16 @@ export function ReservationModal({
       return;
     }
 
+    if (form.repeatEnabled && (!Number.isInteger(Number(form.repeatSessions)) || Number(form.repeatSessions) < 1 || Number(form.repeatSessions) > 120)) {
+      setActiveSection("cita");
+      setMessage({
+        open: true,
+        title: "Cantidad de sesiones inválida",
+        message: "Selecciona entre 1 y 120 sesiones.",
+      });
+      return;
+    }
+
     if (form.repeatEnabled && !(form.repeatDays || []).length) {
       setActiveSection("cita");
       setMessage({
@@ -1264,6 +1268,7 @@ export function ReservationModal({
       return;
     }
 
+    let citaGuardada = false;
     try {
       setSaving(true);
 
@@ -1272,10 +1277,9 @@ export function ReservationModal({
       const citaId = savedBase?.id || savedBase?.cita_id || savedBase?.pk;
 
       if (!citaId) {
-        throw new Error(
-          "La cita se guardó, pero el servidor no devolvió su ID.",
-        );
+        throw new Error("No se pudo guardar la cita o el servidor no devolvió su ID.");
       }
+      citaGuardada = true;
 
       let paymentResult = {
         changed: false,
@@ -1309,10 +1313,13 @@ export function ReservationModal({
           savedBase?.paciente ?? savedBase?.patientId ?? form.patientId;
 
         for (const date of dates) {
-          await onSave?.({
+          const repetida = await onSave?.({
             ...buildPayload(date, true),
             patientId,
           });
+          if (!repetida?.id) {
+            throw new Error(`No se pudo crear la sesión del ${date}. Las citas anteriores sí se guardaron.`);
+          }
         }
       }
 
@@ -1321,7 +1328,9 @@ export function ReservationModal({
       setMessage({
         open: true,
         title: "No se pudo guardar",
-        message: error?.message || "Ocurrió un problema al guardar la cita.",
+        message: citaGuardada
+          ? `La cita principal ya se guardó. ${error?.message || "Falló un paso posterior."} Cierra y vuelve a abrir la cita antes de reintentar, para evitar pagos duplicados.`
+          : error?.message || "Ocurrió un problema al guardar la cita.",
       });
     } finally {
       setSaving(false);
@@ -1605,6 +1614,20 @@ export function ReservationModal({
 
                       {isNewPatient && (
                         <div className="grid gap-4 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                          <div className="sm:col-span-2 lg:col-span-3">
+                            <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                              ¿Cómo llegó el paciente?
+                            </label>
+                            <select
+                              value={form.origen}
+                              onChange={(event) => handleChange("origen", event.target.value)}
+                              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                            >
+                              <option value="nuevo">Paciente directo (sin recomendación)</option>
+                              <option value="recomendado">Recomendado por otro paciente</option>
+                              <option value="otro">Otro medio</option>
+                            </select>
+                          </div>
                           <div>
                             <label className="mb-1.5 block text-xs font-semibold text-slate-700">
                               Apellido paterno
@@ -2259,7 +2282,7 @@ export function ReservationModal({
                   ) : (
                     <button
                       type="submit"
-                      disabled={saving}
+                      disabled={saving || (isEditing && canEditMoney && (paymentsLoading || paymentsError))}
                       className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-5 text-xs font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 disabled:opacity-60"
                     >
                       <CheckCircle2 className="h-4 w-4" />

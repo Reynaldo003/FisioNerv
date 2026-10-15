@@ -1,3 +1,4 @@
+//src/components/layout/agenda/AgendaView.jsx
 import {
   useCallback,
   useEffect,
@@ -565,8 +566,8 @@ function GoalModal({
                 type="button"
                 onClick={() => setScope("general")}
                 className={`rounded-xl border px-3 py-3 text-xs font-bold transition ${scope === "general"
-                    ? "border-blue-600 bg-blue-600 text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 Clínica completa
@@ -576,8 +577,8 @@ function GoalModal({
                 type="button"
                 onClick={() => setScope("professional")}
                 className={`rounded-xl border px-3 py-3 text-xs font-bold transition ${scope === "professional"
-                    ? "border-blue-600 bg-blue-600 text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
               >
                 Usuario específico
@@ -652,6 +653,7 @@ function AlertSection({ panel, canSeeMoney }) {
   const noShows = panel?.alertas?.no_asistencias || [];
   const birthdays = panel?.alertas?.cumpleanos || [];
   const pendingPayments = panel?.alertas?.cobros_pendientes || [];
+  const inactivos = panel?.alertas?.inactivos || [];
 
   return (
     <div className="space-y-3">
@@ -691,6 +693,15 @@ function AlertSection({ panel, canSeeMoney }) {
             </p>
           )}
         </div>
+      </article>
+
+      <article className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600" /><b className="text-xs">Pacientes con más de 3 días sin venir</b></div>
+        <div className="mt-3 space-y-2">{inactivos.length ? inactivos.slice(0, 5).map(x => (
+          <div key={x.paciente_id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px]">
+            <span className="truncate font-semibold text-slate-700">{x.paciente}</span><span className="shrink-0 font-bold text-amber-700">{x.dias_sin_venir} días</span>
+          </div>
+        )) : <p className="text-[11px] text-slate-400">Sin pacientes inactivos en el período.</p>}</div>
       </article>
 
       <article className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)]">
@@ -2227,8 +2238,8 @@ export function AgendaView({
                             setIncludeSunday((current) => !current)
                           }
                           className={`h-9 rounded-xl border px-3 text-[11px] font-bold ${includeSunday
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-slate-200 bg-white text-slate-600"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-white text-slate-600"
                             }`}
                         >
                           Domingo
@@ -2247,8 +2258,8 @@ export function AgendaView({
                             disabled={isMobile && mode !== "day"}
                             onClick={() => setViewMode(mode)}
                             className={`h-8 rounded-lg px-3 text-[11px] font-bold transition ${viewMode === mode
-                                ? "bg-white text-blue-700 shadow-sm"
-                                : "text-slate-500 hover:text-slate-800"
+                              ? "bg-white text-blue-700 shadow-sm"
+                              : "text-slate-500 hover:text-slate-800"
                               } disabled:hidden`}
                           >
                             {label}
@@ -2545,8 +2556,8 @@ export function AgendaView({
                                   setViewMode("day");
                                 }}
                                 className={`min-h-24 rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${currentMonth
-                                    ? "border-slate-200 bg-white"
-                                    : "border-slate-100 bg-slate-50 text-slate-300"
+                                  ? "border-slate-200 bg-white"
+                                  : "border-slate-100 bg-slate-50 text-slate-300"
                                   } ${isToday ? "ring-2 ring-blue-300" : ""}`}
                               >
                                 <span className="text-xs font-bold">

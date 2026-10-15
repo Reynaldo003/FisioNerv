@@ -1,15 +1,422 @@
-// src/pages/AgendaPage.jsx
-import Agenda from "@/components/Agenda";
+import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { CalendarDays, Clock3, PhoneCall } from "lucide-react";
+import { nextDays, formatDateLong, formatDayChip, buildSlots } from "@/lib/schedule";
+import { TextAnimate } from "@/components/ui/text-animate";
 import { CLINIC, PRIMARY } from "../shared/clinicData";
 import { useServicios } from "../shared/useServicios";
 
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
+
+// Solo como “hint” (el backend ya lo fuerza)
+const DEFAULT_PUBLIC_PROFESSIONAL = "L.F.T Edgar Mauricio Medina Cruz";
+
 export default function AgendaPage() {
     const { SERVICES, loadingServices } = useServicios();
-    return (
-        <div className="space-y-6">
-            {loadingServices ? (
-                <p className="text-sm text-slate-500">Cargando agenda...</p>) : null}
+    const [searchParams] = useSearchParams();
+    const servicioPorUrl = searchParams.get("servicio");
+    const includeSunday = typeof window !== "undefined" && localStorage.getItem("agenda.includeSunday") === "1";
+    const days = useMemo(() => {
+        const list = nextDays(14);
+        if (includeSunday) return list;
+        return list.filter((d) => d.getDay() !== 0);
+    }, [includeSunday]);
 
-            <Agenda CLINIC={CLINIC} SERVICES={SERVICES} PRIMARY={PRIMARY} />        </div>
+    const [selectedServiceId, setSelectedServiceId] = useState(null);
+    const selectedService = useMemo(() => {
+        return SERVICES.find((s) => String(s.id) === selectedServiceId)
+            || SERVICES.find((s) => (s.name || s.nombre) === servicioPorUrl)
+            || SERVICES[0]
+            || null;
+    }, [SERVICES, selectedServiceId, servicioPorUrl]);
+    function toMinutes(hhmm) {
+        const [h = "0", m = "0"] = String(hhmm || "").split(":");
+        return (Number(h) || 0) * 60 + (Number(m) || 0);
+    }
+
+    function overlaps(aStart, aEnd, bStart, bEnd) {
+        return aStart < bEnd && bStart < aEnd;
+    }
+    function durationToMinutes(durationStr) {
+        if (!durationStr) return 60;
+        const [h = "0", m = "0", s = "0"] = String(durationStr).split(":");
+        return Number(h) * 60 + Number(m) + Number(s) / 60;
+    }
+
+    function addMinutesToLabel(label, mins) {
+        const total = toMinutes(label) + Number(mins || 0);
+        const hh = String(Math.floor(total / 60) % 24).padStart(2, "0");
+        const mm = String(total % 60).padStart(2, "0");
+        return `${hh}:${mm}`;
+    }
+
+    const [selectedDate, setSelectedDate] = useState(days[0]);
+    const [period, setPeriod] = useState("Todo");
+    const [selectedSlot, setSelectedSlot] = useState(null);
+    const [busySlots, setBusySlots] = useState([]);
+
+    const [name, setName] = useState("");
+    const [phone, setPhone] = useState("");
+    const [booking, setBooking] = useState(false);
+    const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
+    const slots = useMemo(() => buildSlots(selectedDate), [selectedDate]);
+
+    const filtered = useMemo(() => {
+        const busySet = new Set(busySlots);
+        return slots
+            .filter((s) => (period === "Todo" ? true : s.period === period))
+            .map((s) => ({ ...s, disabled: s.disabled || busySet.has(s.label) }));
+    }, [slots, period, busySlots]);
+    useEffect(() => {
+        if (!days?.length) return;
+        setSelectedDate((prev) => {
+            // si prev sigue estando en la lista, no toques nada
+            const exists = days.some((d) => d.toDateString() === prev?.toDateString());
+            return exists ? prev : days[0];
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [days]);
+    useEffect(() => {
+        async function loadBusy() {
+            try {
+                const y = selectedDate.getFullYear();
+                const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
+                const d = String(selectedDate.getDate()).padStart(2, "0");
+                const fecha = `${y}-${m}-${d}`;
+
+                const resp = await fetch(`${API_BASE}/api/public/agenda/?fecha=${fecha}`);
+                if (!resp.ok) throw new Error("No se pudo consultar la agenda");
+                const data = await resp.json();
+                // slots visibles del día (labels como "08:00", "09:00", etc.)
+                const slotLabels = buildSlots(selectedDate).map((s) => s.label);
+
+                // Generamos set de ocupados expandiendo duración
+                const takenSet = new Set();
+
+                for (const c of (Array.isArray(data) ? data : data?.results || [])) {
+                    const start = (c.hora_inicio || "").slice(0, 5);
+                    const end = (c.hora_termina || "").slice(0, 5);
+
+                    if (!start) continue;
+
+                    // Si no viene hora_termina, al menos bloquea la hora inicial
+                    const sMin = toMinutes(start);
+                    const eMin = end ? toMinutes(end) : sMin + 60;
+
+                    for (const label of slotLabels) {
+                        const slotStart = toMinutes(label);
+                        const slotEnd = slotStart + 60; // si tus slots son de 60 min
+                        if (overlaps(slotStart, slotEnd, sMin, eMin)) {
+                            takenSet.add(label);
+                        }
+                    }
+                }
+
+                setBusySlots(Array.from(takenSet));
+            } catch {
+                setBusySlots([]);
+            }
+        }
+
+        setSelectedSlot(null);
+        loadBusy();
+    }, [selectedDate]);
+
+    useEffect(() => setSelectedSlot(null), [period]);
+
+    const confirmBooking = async () => {
+        if (!selectedService || !selectedSlot || !name || !phone) return;
+
+        setBooking(true);
+        setError("");
+        setMessage("");
+
+        try {
+            const y = selectedDate.getFullYear();
+            const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
+            const d = String(selectedDate.getDate()).padStart(2, "0");
+            const fecha = `${y}-${m}-${d}`;
+
+            const payload = {
+                nombre: name,
+                telefono: phone,
+                servicio_id: selectedService.id,
+                fecha,
+                hora_inicio: selectedSlot,
+
+                // hint (opcional)
+                profesional_hint: DEFAULT_PUBLIC_PROFESSIONAL,
+            };
+
+            const resp = await fetch(`${API_BASE}/api/public/citas/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            if (!resp.ok) {
+                setError("No se pudo registrar la cita. Intenta de nuevo o escribe por WhatsApp.");
+                return;
+            }
+            const created = await resp.json().catch(() => null);
+
+            setMessage("Cita registrada. Te contactaremos para confirmar.");
+
+            // ✅ si el servicio dura 2h (o más), bloquea TODAS las horas que se traslapan
+            const slotLabels = buildSlots(selectedDate).map((s) => s.label);
+            const startMin = toMinutes(selectedSlot);
+
+            // prioridad: lo que regrese backend (hora_termina), si no, usa duración del servicio
+            const endLabel = created?.hora_termina
+                ? String(created.hora_termina).slice(0, 5)
+                : addMinutesToLabel(selectedSlot, durationToMinutes(selectedService?.duration));
+            const endMin = toMinutes(endLabel) || startMin + 60;
+
+            const taken = new Set();
+            for (const label of slotLabels) {
+                const aStart = toMinutes(label);
+                const aEnd = aStart + 60;
+                if (overlaps(aStart, aEnd, startMin, endMin)) taken.add(label);
+            }
+
+            setBusySlots((prev) => {
+                const all = new Set(prev);
+                for (const x of taken) all.add(x);
+                return Array.from(all);
+            });
+            const text = encodeURIComponent(
+                `Hola, soy ${name}. Quiero confirmar mi cita de ${selectedService.name || selectedService.nombre} en ${CLINIC.name
+                } el ${formatDateLong(selectedDate)} a las ${selectedSlot}. Mi WhatsApp es ${phone}.`
+            );
+            window.open(`https://wa.me/522711224494?text=${text}`, "_blank");
+        } catch {
+            setError("Ocurrió un error al registrar la cita. Intenta de nuevo o escribe por WhatsApp.");
+        } finally {
+            setBooking(false);
+        }
+    };
+
+    return (
+        <section
+            id="agenda"
+            className="
+        mx-auto mt-14 w-full max-w-6xl
+        px-4 sm:px-6
+        overflow-x-hidden
+      "
+        >
+            <div className="mb-6 flex items-center gap-3">
+                <CalendarDays className="h-6 w-6" style={{ color: PRIMARY }} />
+                <TextAnimate animation="blurInUp" className="text-2xl font-bold text-slate-900" by="word">
+                    Agendar cita
+                </TextAnimate>
+            </div>
+
+            {loadingServices && <p className="mb-4 text-sm text-slate-500">Cargando servicios...</p>}
+            <div className="grid gap-6 lg:grid-cols-5">
+                {/* Columna izquierda */}
+                <div className="lg:col-span-3 min-w-0">
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-xl w-full min-w-0">
+                        {/* Paso 1 */}
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">1) Servicio</p>
+
+                            <div className="mt-2 grid gap-3 sm:grid-cols-2 min-w-0">
+                                <div className="min-w-0">
+                                    <label className="text-sm font-semibold text-slate-800">Selecciona</label>
+
+                                    <select
+                                        className="
+                      mt-2 w-full min-w-0
+                      rounded-2xl border border-slate-200 bg-white
+                      px-4 py-3 text-sm text-slate-800 shadow-sm outline-none
+                      focus:ring-2 focus:ring-[#004aad]/25
+                    "
+                                        value={selectedService?.id ?? ""}
+                                        onChange={(e) => setSelectedServiceId(e.target.value)}
+                                    >
+                                        {SERVICES.map((s) => (
+                                            <option key={s.id} value={s.id}>
+                                                {(s.name || s.nombre)} · ${(s.price ?? s.precio)}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    {!!(selectedService?.description || selectedService?.descripcion) && (
+                                        <p className="mt-2 text-xs text-slate-600 break-words">
+                                            {selectedService.description || selectedService.descripcion}
+                                        </p>
+                                    )}
+
+                                    <p className="mt-1 text-sm text-slate-600 break-words">
+                                        <b>{(selectedService?.name || selectedService?.nombre) || "—"}</b>
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {selectedService ? `$${selectedService.price ?? selectedService.precio} MXN` : ""}
+                                    </p>
+                                </div>
+
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 min-w-0">
+                                    <p className="text-sm font-semibold text-slate-800">Resumen</p>
+                                    <p className="mt-1 text-sm text-slate-600 break-words">
+                                        <b>{selectedService?.name || selectedService?.nombre || "—"}</b>
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                        {selectedService ? `$${selectedService.price ?? selectedService.precio} MXN` : ""}
+                                    </p>
+                                    <p className="mt-3 text-xs text-slate-500">Selecciona fecha y hora para continuar.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Paso 2: Fecha */}
+                        <div className="mt-8">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">2) Fecha</p>
+
+                            <div className="mt-3 w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                <div className="flex gap-2 pr-2">
+                                    {days.map((d) => {
+                                        const chip = formatDayChip(d);
+                                        const active = d.toDateString() === selectedDate.toDateString();
+
+                                        return (
+                                            <button
+                                                key={d.toDateString()}
+                                                onClick={() => setSelectedDate(d)}
+                                                className={[
+                                                    "shrink-0 rounded-2xl border px-4 py-3 text-left",
+                                                    active ? "border-[#004aad] bg-[#004aad]/5" : "border-slate-200 bg-white hover:bg-slate-50",
+                                                ].join(" ")}
+                                                style={{ minWidth: 86 }}
+                                            >
+                                                <p className="text-[10px] uppercase tracking-wide text-slate-500">{chip.dow}</p>
+                                                <p className="text-xl font-bold text-slate-900">{chip.day}</p>
+                                                <p className="text-[11px] text-slate-500">{chip.mon}</p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <p className="mt-2 text-sm text-slate-600 break-words">
+                                Seleccionado: <b className="text-slate-900">{formatDateLong(selectedDate)}</b>
+                            </p>
+                        </div>
+
+                        {/* Paso 3: Hora */}
+                        <div className="mt-8">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                                <div className="flex items-center gap-2">
+                                    <Clock3 className="h-5 w-5" style={{ color: PRIMARY }} />
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">3) Hora</p>
+                                </div>
+
+                                <div className="flex max-w-full overflow-x-auto rounded-full border border-slate-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                    <div className="flex gap-1">
+                                        {["Todo", "Mañana", "Tarde", "Noche"].map((p) => (
+                                            <button
+                                                key={p}
+                                                onClick={() => setPeriod(p)}
+                                                className={[
+                                                    "shrink-0 rounded-full px-3 py-1 text-xs font-semibold",
+                                                    period === p ? "bg-[#004aad] text-white" : "text-slate-700 hover:bg-slate-50",
+                                                ].join(" ")}
+                                            >
+                                                {p}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 grid gap-2 sm:[grid-template-columns:repeat(auto-fill,minmax(140px,1fr))] min-w-0">
+                                {filtered.map((s) => (
+                                    <button
+                                        key={s.label}
+                                        disabled={s.disabled}
+                                        onClick={() => setSelectedSlot(s.label)}
+                                        className={[
+                                            "rounded-2xl border p-3 text-left transition w-full min-w-0",
+                                            s.disabled
+                                                ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400 line-through"
+                                                : selectedSlot === s.label
+                                                    ? "border-[#004aad] bg-[#004aad]/5"
+                                                    : "border-slate-200 bg-white hover:bg-slate-50",
+                                        ].join(" ")}
+                                    >
+                                        <div className="text-lg font-bold text-slate-900">{s.label}</div>
+                                        <div className="mt-1 text-xs text-slate-500">{s.period}</div>
+                                    </button>
+                                ))}
+
+                                {!filtered.length && <p className="text-sm text-slate-500">No hay horarios disponibles para este día.</p>}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Columna derecha */}
+                <div className="lg:col-span-2 mt-6 lg:mt-0 min-w-0">
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-xl w-full min-w-0 lg:sticky lg:top-6">
+                        <p className="text-sm font-bold text-slate-900">Confirmar</p>
+
+                        <p className="mt-1 text-sm text-slate-600 break-words">
+                            {selectedService ? (
+                                <>
+                                    <b>{selectedService.name || selectedService.nombre}</b> · {formatDateLong(selectedDate)}
+                                    {selectedSlot ? (
+                                        <>
+                                            {" "}
+                                            · <b>{selectedSlot}</b>
+                                        </>
+                                    ) : null}
+                                </>
+                            ) : (
+                                "Selecciona un servicio"
+                            )}
+                        </p>
+
+                        <div className="mt-5 grid gap-3 min-w-0">
+                            <input
+                                type="text"
+                                placeholder="Tu nombre"
+                                className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#004aad]/25"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
+                            <input
+                                type="tel"
+                                placeholder="WhatsApp"
+                                className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#004aad]/25"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                            />
+
+                            <button
+                                onClick={confirmBooking}
+                                disabled={!selectedService || !selectedSlot || !name || !phone || booking}
+                                className={[
+                                    "inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-lg transition",
+                                    !selectedService || !selectedSlot || !name || !phone || booking
+                                        ? "bg-slate-300 text-slate-600 shadow-none"
+                                        : "bg-[#004aad] shadow-[#004aad]/25 hover:brightness-110",
+                                ].join(" ")}
+                            >
+                                <PhoneCall className="h-4 w-4" />
+                                {booking ? "Registrando..." : "Confirmar cita"}
+                            </button>
+
+                            {message && <p className="text-xs font-semibold text-emerald-700 break-words">{message}</p>}
+                            {error && <p className="text-xs font-semibold text-rose-700 break-words">{error}</p>}
+
+                            <p className="pt-2 text-[11px] text-slate-500 break-words">
+                                Al confirmar, registramos la cita y abrimos WhatsApp para confirmar detalles.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     );
 }

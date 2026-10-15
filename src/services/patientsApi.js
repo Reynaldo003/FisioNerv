@@ -1,80 +1,44 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
-//const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+import { apiFetch } from "./apiFetch";
 
-function cerrarSesion() {
-  localStorage.removeItem("auth.access");
-  localStorage.removeItem("auth.refresh");
-  localStorage.removeItem("auth.user");
-  window.location.href = "/login";
-}
-
-function mensajeError(
+function errorMessage(
   data,
-  fallback = "Ocurrió un error al comunicarse con el servidor.",
+  fallback = "Ocurrió un error al consultar el servidor.",
 ) {
-  if (!data) return fallback;
   if (typeof data === "string") return data;
-  if (data.detail) return data.detail;
-
-  const primeraClave = Object.keys(data)[0];
-  const valor = data[primeraClave];
-
-  if (Array.isArray(valor)) return valor.join(" ");
-  if (typeof valor === "string") return valor;
-  return fallback;
+  if (data?.detail) return data.detail;
+  const primero = Object.values(data || {})[0];
+  return Array.isArray(primero)
+    ? primero.join(" ")
+    : typeof primero === "string"
+      ? primero
+      : fallback;
 }
 
 export async function apiRequest(path, options = {}) {
-  const token = localStorage.getItem("auth.access");
-
-  if (!token) {
-    cerrarSesion();
-    throw new Error("Sesión no disponible.");
-  }
-
   const headers = new Headers(options.headers || {});
-  headers.set("Authorization", `Bearer ${token}`);
-
   let body = options.body;
-
   if (body && !(body instanceof FormData) && typeof body !== "string") {
     headers.set("Content-Type", "application/json");
     body = JSON.stringify(body);
   }
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-    body,
-  });
-
-  if (response.status === 401) {
-    cerrarSesion();
-    throw new Error("La sesión expiró.");
-  }
-
-  let data = null;
-  if (response.status !== 204) {
-    const contentType = response.headers.get("content-type") || "";
-    data = contentType.includes("application/json")
-      ? await response.json().catch(() => null)
-      : await response.text().catch(() => null);
-  }
-
+  const response = await apiFetch(path, { ...options, headers, body });
+  const data =
+    response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
-    const error = new Error(mensajeError(data));
+    const error = new Error(errorMessage(data));
     error.status = response.status;
     error.data = data;
     throw error;
   }
-
   return data;
 }
 
 export function normalizarLista(data) {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.results)) return data.results;
-  return [];
+  return Array.isArray(data)
+    ? data
+    : Array.isArray(data?.results)
+      ? data.results
+      : [];
 }
 
 export const pacientesApi = {
@@ -82,78 +46,48 @@ export const pacientesApi = {
   resumen: () => apiRequest("/api/pacientes/resumen/"),
   cumpleanos: (dias = 7) =>
     apiRequest(`/api/pacientes/cumpleanos/?dias=${dias}`),
-  expediente: (pacienteId) =>
-    apiRequest(`/api/pacientes/${pacienteId}/expediente/`),
-
-  crear: (payload) =>
-    apiRequest("/api/pacientes/", {
-      method: "POST",
-      body: payload,
-    }),
-
-  actualizar: (pacienteId, payload, eliminarCitasPosteriores = null) => {
-    let path = `/api/pacientes/${pacienteId}/`;
-
-    if (eliminarCitasPosteriores !== null) {
-      path += `?eliminar_citas_posteriores=${
-        eliminarCitasPosteriores ? "true" : "false"
-      }`;
-    }
-
-    return apiRequest(path, {
+  expediente: (id) => apiRequest(`/api/pacientes/${id}/expediente/`),
+  crear: (body) => apiRequest("/api/pacientes/", { method: "POST", body }),
+  actualizar: (id, body, eliminarCitasPosteriores = null) => {
+    const query =
+      eliminarCitasPosteriores === null
+        ? ""
+        : `?eliminar_citas_posteriores=${eliminarCitasPosteriores}`;
+    return apiRequest(`/api/pacientes/${id}/${query}`, {
       method: "PATCH",
-      body: payload,
+      body,
     });
   },
-
-  eliminar: (pacienteId, eliminarCitas = false) =>
-    apiRequest(
-      `/api/pacientes/${pacienteId}/?eliminar_citas=${eliminarCitas ? "true" : "false"}`,
-      {
-        method: "DELETE",
-      },
-    ),
-
-  subirFoto: (pacienteId, archivo) => {
-    const formData = new FormData();
-    formData.append("foto", archivo);
-
-    return apiRequest(`/api/pacientes/${pacienteId}/foto/`, {
+  eliminar: (id, eliminarCitas = false) =>
+    apiRequest(`/api/pacientes/${id}/?eliminar_citas=${eliminarCitas}`, {
+      method: "DELETE",
+    }),
+  subirFoto: (id, archivo) => {
+    const fd = new FormData();
+    fd.append("foto", archivo);
+    return apiRequest(`/api/pacientes/${id}/foto/`, {
       method: "POST",
-      body: formData,
+      body: fd,
     });
   },
-
-  eliminarFoto: (pacienteId) =>
-    apiRequest(`/api/pacientes/${pacienteId}/foto/`, {
-      method: "DELETE",
-    }),
-
-  subirDocumento: (pacienteId, archivo, tipo = "otro", descripcion = "") => {
-    const formData = new FormData();
-    formData.append("archivo", archivo);
-    formData.append("tipo", tipo);
-    formData.append("descripcion", descripcion);
-
-    return apiRequest(`/api/pacientes/${pacienteId}/documentos/`, {
+  eliminarFoto: (id) =>
+    apiRequest(`/api/pacientes/${id}/foto/`, { method: "DELETE" }),
+  subirDocumento: (id, archivo, tipo = "otro", descripcion = "") => {
+    const fd = new FormData();
+    fd.append("archivo", archivo);
+    fd.append("tipo", tipo);
+    fd.append("descripcion", descripcion);
+    return apiRequest(`/api/pacientes/${id}/documentos/`, {
       method: "POST",
-      body: formData,
+      body: fd,
     });
   },
-
-  eliminarDocumento: (pacienteId, documentoId) =>
-    apiRequest(`/api/pacientes/${pacienteId}/documentos/${documentoId}/`, {
+  eliminarDocumento: (id, documentoId) =>
+    apiRequest(`/api/pacientes/${id}/documentos/${documentoId}/`, {
       method: "DELETE",
     }),
-
-  crearRegistroClinico: (pacienteId, payload) =>
-    apiRequest(`/api/pacientes/${pacienteId}/historial/`, {
-      method: "POST",
-      body: payload,
-    }),
-
-  eliminarRegistroClinico: (pacienteId, registroId) =>
-    apiRequest(`/api/pacientes/${pacienteId}/historial/${registroId}/`, {
-      method: "DELETE",
-    }),
+  crearRegistroClinico: (id, body) =>
+    apiRequest(`/api/pacientes/${id}/historial/`, { method: "POST", body }),
+  eliminarRegistroClinico: (id, rid) =>
+    apiRequest(`/api/pacientes/${id}/historial/${rid}/`, { method: "DELETE" }),
 };

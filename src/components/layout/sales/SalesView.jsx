@@ -1,3 +1,4 @@
+//src/components/layout/sales/SalesView.jsx
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, CalendarDays, CreditCard, Download, FileSpreadsheet, Landmark, ReceiptText, RefreshCw, Search, Trash2, WalletCards, X } from "lucide-react";
 import { apiFetch } from "../../../services/apiFetch";

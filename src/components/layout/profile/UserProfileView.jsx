@@ -1,3 +1,4 @@
+//src/components/layout/profile/UserProfileView.jsx
 import { useEffect, useMemo, useState } from "react";
 import { BadgeCheck, Camera, Eye, EyeOff, KeyRound, Mail, Save, ShieldCheck, UserRound, X } from "lucide-react";
 import { apiFetch } from "../../../services/apiFetch";
