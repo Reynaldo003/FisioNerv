@@ -561,8 +561,8 @@ function AccessModal({ open, user, onClose, onSaved }) {
                                 disabled={!enabled}
                                 onClick={() => toggle(item.id)}
                                 className={`rounded-xl border px-3 py-3 text-left text-xs font-bold transition disabled:opacity-45 ${active
-                                        ? "border-blue-200 bg-blue-50 text-blue-700"
-                                        : "border-slate-200 bg-white text-slate-600"
+                                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                                    : "border-slate-200 bg-white text-slate-600"
                                     }`}
                             >
                                 {item.label}
@@ -746,8 +746,8 @@ function RoleModal({ open, role, onClose, onSaved }) {
                                     type="button"
                                     onClick={() => toggleInterface(item.id)}
                                     className={`rounded-xl border px-3 py-3 text-xs font-bold ${form.interfaces.includes(item.id)
-                                            ? "border-blue-200 bg-blue-50 text-blue-700"
-                                            : "border-slate-200 bg-white text-slate-600"
+                                        ? "border-blue-200 bg-blue-50 text-blue-700"
+                                        : "border-slate-200 bg-white text-slate-600"
                                         }`}
                                 >
                                     {item.label}
@@ -946,31 +946,33 @@ export function Equipo() {
         );
     }, [roleRows, roleQuery]);
 
-    async function removeUser() {
+    async function deactivateUser() {
         const user = confirmUser;
         setConfirmUser(null);
-
         if (!user) return;
-
         try {
-            const response = await apiFetch(
-                `/api/staff/${user.id}/`,
-                { method: "DELETE" }
-            );
-
-            if (!response.ok && response.status !== 204) {
-                throw new Error("No se pudo eliminar el usuario.");
-            }
-
-            setUsers((prev) =>
-                prev.filter((item) => item.id !== user.id)
-            );
+            const response = await apiFetch(`/api/staff/${user.id}/`, { method: "DELETE" });
+            const data = await readJson(response);
+            if (!response.ok) throw new Error(errorText(data, "No se pudo desactivar el usuario."));
+            setUsers((prev) => prev.map((item) => item.id === user.id ? data : item));
         } catch (error) {
-            setMessage({
-                open: true,
-                title: "Eliminar usuario",
-                message: error.message,
+            setMessage({ open: true, title: "Desactivar usuario", message: error.message });
+        }
+    }
+
+    async function reactivateUser(user) {
+        if (!user?.id) return;
+        try {
+            const response = await apiFetch(`/api/staff/${user.id}/`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: true }),
             });
+            const data = await readJson(response);
+            if (!response.ok) throw new Error(errorText(data, "No se pudo reactivar el usuario."));
+            setUsers((prev) => prev.map((item) => item.id === user.id ? data : item));
+        } catch (error) {
+            setMessage({ open: true, title: "Reactivar usuario", message: error.message });
         }
     }
 
@@ -1076,8 +1078,8 @@ export function Equipo() {
                                 type="button"
                                 onClick={() => setTab(id)}
                                 className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-bold ${tab === id
-                                        ? "bg-[#0a2f68] text-white"
-                                        : "text-slate-600 hover:bg-slate-50"
+                                    ? "bg-[#0a2f68] text-white"
+                                    : "text-slate-600 hover:bg-slate-50"
                                     }`}
                             >
                                 <Icon className="h-4 w-4" />
@@ -1221,16 +1223,25 @@ export function Equipo() {
                                             <Edit3 className="h-4 w-4" />
                                         </button>
 
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setConfirmUser(user)
-                                            }
-                                            className="grid h-9 w-9 place-items-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50"
-                                            title="Eliminar"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
+                                        {user.is_active === false ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => reactivateUser(user)}
+                                                className="grid h-9 w-9 place-items-center rounded-xl border border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                                                title="Reactivar"
+                                            >
+                                                <RefreshCw className="h-4 w-4" />
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setConfirmUser(user)}
+                                                className="grid h-9 w-9 place-items-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50"
+                                                title="Desactivar"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        )}
                                     </div>
                                 </article>
                             ))}
@@ -1309,9 +1320,9 @@ export function Equipo() {
                                                     <div className="flex items-center gap-3">
                                                         <span
                                                             className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${role.tipo ===
-                                                                    "sistema"
-                                                                    ? "bg-blue-50 text-blue-700"
-                                                                    : "bg-violet-50 text-violet-700"
+                                                                "sistema"
+                                                                ? "bg-blue-50 text-blue-700"
+                                                                : "bg-violet-50 text-violet-700"
                                                                 }`}
                                                         >
                                                             <ShieldCheck className="h-5 w-5" />
@@ -1342,9 +1353,9 @@ export function Equipo() {
                                                 <td className="px-4 py-4">
                                                     <span
                                                         className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold ${role.tipo ===
-                                                                "sistema"
-                                                                ? "border-blue-100 bg-blue-50 text-blue-700"
-                                                                : "border-violet-100 bg-violet-50 text-violet-700"
+                                                            "sistema"
+                                                            ? "border-blue-100 bg-blue-50 text-blue-700"
+                                                            : "border-violet-100 bg-violet-50 text-violet-700"
                                                             }`}
                                                     >
                                                         {role.tipo ===
@@ -1410,8 +1421,8 @@ export function Equipo() {
                                                 <td className="px-4 py-4">
                                                     <span
                                                         className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold ${role.activo
-                                                                ? "border-emerald-100 bg-emerald-50 text-emerald-700"
-                                                                : "border-slate-200 bg-slate-100 text-slate-500"
+                                                            ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+                                                            : "border-slate-200 bg-slate-100 text-slate-500"
                                                             }`}
                                                     >
                                                         {role.activo
@@ -1541,33 +1552,27 @@ export function Equipo() {
 
             <Modal
                 open={Boolean(confirmUser)}
-                title="Eliminar usuario"
-                subtitle="Esta acción no se puede deshacer."
+                title="Desactivar usuario"
+                subtitle="La cuenta quedará inactiva, pero se conservará todo su historial."
                 onClose={() => setConfirmUser(null)}
             >
                 <div className="p-5 text-sm text-slate-600">
-                    ¿Eliminar a{" "}
-                    <b>{confirmUser?.username}</b> del
-                    equipo?
+                    ¿Desactivar a <b>{confirmUser?.username}</b>? Sus citas, pagos y registros históricos seguirán disponibles, pero ya no podrá iniciar sesión ni aparecerá como profesional disponible para nuevas citas.
                 </div>
-
                 <div className="flex justify-end gap-2 border-t border-slate-100 p-4">
                     <button
                         type="button"
-                        onClick={() =>
-                            setConfirmUser(null)
-                        }
+                        onClick={() => setConfirmUser(null)}
                         className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600"
                     >
                         Cancelar
                     </button>
-
                     <button
                         type="button"
-                        onClick={removeUser}
+                        onClick={deactivateUser}
                         className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white"
                     >
-                        Eliminar
+                        Desactivar
                     </button>
                 </div>
             </Modal>

@@ -649,7 +649,7 @@ function GoalModal({
   );
 }
 
-function AlertSection({ panel, canSeeMoney }) {
+function AlertSection({ panel, canSeeMoney, onOpenPendingPayment }) {
   const noShows = panel?.alertas?.no_asistencias || [];
   const birthdays = panel?.alertas?.cumpleanos || [];
   const pendingPayments = panel?.alertas?.cobros_pendientes || [];
@@ -759,18 +759,20 @@ function AlertSection({ panel, canSeeMoney }) {
           <div className="mt-3 space-y-2">
             {pendingPayments.length ? (
               pendingPayments.slice(0, 5).map((item) => (
-                <div
+                <button
+                  type="button"
                   key={item.cita_id}
-                  className="rounded-xl bg-slate-50 px-3 py-2"
+                  onClick={() => onOpenPendingPayment?.(item)}
+                  className="block w-full rounded-xl bg-slate-50 px-3 py-2 text-left transition hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-300"
                 >
-                  <p className="truncate text-[11px] font-semibold text-slate-700">
-                    {item.paciente}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="min-w-0 truncate text-[11px] font-semibold text-slate-700">{item.paciente}</p>
+                    <span className="shrink-0 text-[9px] font-black uppercase tracking-wide text-amber-700">Cobrar</span>
+                  </div>
                   <p className="mt-0.5 truncate text-[10px] text-slate-500">
-                    {item.fecha} · {String(item.hora || "").slice(0, 5)} ·
-                    pendiente de liquidación
+                    {item.fecha} · {String(item.hora || "").slice(0, 5)} · pendiente de liquidación
                   </p>
-                </div>
+                </button>
               ))
             ) : (
               <p className="text-[11px] text-slate-400">
@@ -2610,7 +2612,20 @@ export function AgendaView({
                 }}
               />
 
-              <AlertSection panel={panel} canSeeMoney={canSeeMoney} />
+              <AlertSection
+                panel={panel}
+                canSeeMoney={canSeeMoney}
+                onOpenPendingPayment={(item) => {
+                  const appointment = sourceAppointments.find(
+                    (current) => !isBlockItem(current) && String(current.id) === String(item.cita_id),
+                  );
+                  if (!appointment) {
+                    setUiMessage({ open: true, title: "Cobro pendiente", message: "No se encontró la cita asociada a este cobro." });
+                    return;
+                  }
+                  onOpenAppointment?.({ ...appointment, _openSection: "pago" });
+                }}
+              />
 
               {panelLoading && (
                 <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs font-semibold text-blue-700">

@@ -1,8 +1,14 @@
+<<<<<<< HEAD
 const API_BASE = (
   import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud"
 ).replace(/\/$/, "");
 let renovacion = null;
 let instalado = false;
+=======
+//src/services/patientsApi.js
+const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
+//const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+>>>>>>> c93dcba62b4afbd9ccbec57d22f48196aa852f34
 
 export function cerrarSesion() {
   localStorage.removeItem("auth.access");
