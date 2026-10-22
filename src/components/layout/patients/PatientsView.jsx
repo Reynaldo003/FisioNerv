@@ -1,6 +1,6 @@
 // src/components/layout/patients/PatientsView.jsx
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   BadgeCheck,
@@ -310,10 +310,9 @@ export function PatientsView({
   onPatientOpened,
 }) {
   const canSeePatientContact =
-    role !== "practicante" &&
-    Boolean(
-      permissions?.puede_ver_contacto_paciente
-    );
+    String(role || "").trim().toLowerCase() !== "practicante" &&
+    permissions?.puede_ver_contacto_paciente === true;
+  const lastRequestedPatientRef = useRef(null);
   const [patients, setPatients] = useState([]);
   const [citas, setCitas] = useState([]);
   const [professionals, setProfessionals] = useState([]);
@@ -822,21 +821,38 @@ export function PatientsView({
 
     setProfileOpen(true);
 
-    await loadPatientProfile(patient.id);
+    const expediente = await loadPatientProfile(patient.id);
+    if (!expediente) {
+      setProfileOpen(false);
+      setSelectedPatient(null);
+    }
+    return Boolean(expediente);
   };
 
+  // Abre el expediente solicitado desde ReservationModal sin depender de
+  // que el paciente aparezca en la lista local (paginación/permisos/filtros).
   useEffect(() => {
-    if (!patientIdToOpen || loading) return;
+    if (patientIdToOpen == null || patientIdToOpen === "") {
+      lastRequestedPatientRef.current = null;
+      return;
+    }
+    if (loading) return;
+
+    const id = Number(patientIdToOpen);
+    if (!Number.isSafeInteger(id) || id < 1) {
+      onPatientOpened?.();
+      return;
+    }
+    if (lastRequestedPatientRef.current === id) return;
+    lastRequestedPatientRef.current = id;
 
     const patient = enhancedPatients.find(
-      (item) => Number(item.id) === Number(patientIdToOpen),
-    );
+      (item) => Number(item.id) === id,
+    ) || { id, nombres: "", apellido_pat: "", apellido_mat: "" };
 
-    if (!patient) return;
-
-    handleOpenProfile(patient);
-    onPatientOpened?.(patient.id);
-  }, [patientIdToOpen, loading, enhancedPatients]);
+    void handleOpenProfile(patient);
+    onPatientOpened?.(id);
+  }, [patientIdToOpen, loading, enhancedPatients, onPatientOpened]);
 
 
   const handleDeletePatient = (patient) => {

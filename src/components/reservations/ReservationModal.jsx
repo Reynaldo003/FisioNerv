@@ -514,10 +514,14 @@ export function ReservationModal({
         const professionalList = normalizeList(
           professionalsData
         );
-        const patientList = normalizeList(patientsData);
-
-        const puedeVerContacto =
-          puedeVerContactoPaciente(meData);
+        const puedeVerContacto = puedeVerContactoPaciente(meData);
+        // Defensa adicional: no guardar contacto en el estado de React
+        // cuando el usuario no tiene permiso (especialmente practicante).
+        const patientList = normalizeList(patientsData).map((patient) => {
+          if (puedeVerContacto) return patient;
+          const { telefono, correo, ...sinContacto } = patient;
+          return sinContacto;
+        });
 
         setMe(meData);
         setServices(serviceList);
@@ -1374,8 +1378,8 @@ export function ReservationModal({
   };
 
   const handleOpenPatientProfile = () => {
-    if (!form.patientId || saving) return;
-    onOpenPatientProfile?.(form.patientId);
+    if (!form.patientId || saving || typeof onOpenPatientProfile !== "function") return;
+    onOpenPatientProfile(form.patientId);
   };
 
   const handleDelete = async () => {
@@ -1456,7 +1460,7 @@ export function ReservationModal({
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600">
                     {isEditing ? "Edición de reservación" : "Nueva reservación"}
                   </p>
-                  {isEditing && form.patientId ? (
+                  {form.patientId && typeof onOpenPatientProfile === "function" ? (
                     <button
                       type="button"
                       onClick={handleOpenPatientProfile}
