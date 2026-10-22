@@ -1377,10 +1377,35 @@ export function ReservationModal({
     }
   };
 
+
   const handleOpenPatientProfile = () => {
-    if (!form.patientId || saving || typeof onOpenPatientProfile !== "function") return;
-    onOpenPatientProfile(form.patientId);
+    if (saving) return;
+
+    const patientId = Number(
+      form.patientId || appointment?.patientId
+    );
+
+    if (!Number.isInteger(patientId) || patientId <= 0) {
+      setMessage({
+        open: true,
+        title: "Expediente del paciente",
+        message: "No se encontró un paciente registrado para esta cita.",
+      });
+      return;
+    }
+
+    if (typeof onOpenPatientProfile !== "function") {
+      setMessage({
+        open: true,
+        title: "Navegación no disponible",
+        message: "Falta conectar la apertura del expediente en Administrativa.jsx.",
+      });
+      return;
+    }
+
+    onOpenPatientProfile(patientId);
   };
+
 
   const handleDelete = async () => {
     if (!form.id || saving) return;
