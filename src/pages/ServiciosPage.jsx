@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Clock3, RefreshCw, Search, ShieldCheck } from "lucide-react";
-import { ContactSection, PageIntro, ProcessSection, SectionHeading, ServicesSection, SPECIALTIES } from "../components/PublicSections";
+import { PageIntro, ProcessSection, SectionHeading, ServicesSection, SPECIALTIES } from "../components/PublicSections";
 import { usePublicContent } from "../shared/PublicContent";
 import { useImagenesSitio } from "../shared/useImagenesSitio";
 
@@ -39,6 +39,6 @@ export default function ServiciosPage() {
       {!loadingServices && servicesError && <div className="pub-empty" role="alert"><RefreshCw size={30} /><h3>No pudimos cargar el catálogo</h3><p>{servicesError}</p><button className="pub-button pub-button-white" onClick={reloadServices}>Volver a cargar servicios</button></div>}
       {!loadingServices && !servicesError && !filtered.length && <div className="pub-empty"><Search size={30} /><h3>No encontramos ese servicio</h3><p>Prueba con otro término o escríbenos para orientarte.</p><button className="pub-button pub-button-white" onClick={() => setSearch("")}>Ver todos los servicios</button></div>}
     </div><p className="pub-form-note"><ShieldCheck size={15} />El tratamiento se define de manera individual después de tu valoración clínica.</p></section>
-    <ProcessSection /><ContactSection />
+    <ProcessSection />
   </>;
 }
