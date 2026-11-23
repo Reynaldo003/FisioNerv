@@ -24,31 +24,42 @@ function pickServiceImage(s) {
   return img || "/servicios/valoracion.png"; // ✅ default local permitido
 }
 
-export function useServicios() {
+const directRequest = (path, options) => fetch(`${API_BASE}${path}`, options);
+
+export function useServicios(request = directRequest, useFallback = true) {
   const [servicesFromApi, setServicesFromApi] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
+  const [servicesError, setServicesError] = useState("");
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadServices() {
       try {
         setLoadingServices(true);
-        const resp = await fetch(`${API_BASE}/api/servicios/`);
+        setServicesError("");
+        const resp = await request("/api/servicios/", { signal: controller.signal });
         if (!resp.ok) throw new Error("No se pudieron cargar los servicios");
         const data = await resp.json();
-        setServicesFromApi(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : data?.results;
+        if (!Array.isArray(list)) throw new Error("El catálogo de servicios no tiene un formato válido.");
+        if (!controller.signal.aborted) setServicesFromApi(list);
       } catch (e) {
+        if (controller.signal.aborted) return;
         console.error("Error cargando servicios:", e);
         setServicesFromApi([]);
+        setServicesError("No pudimos cargar los servicios de la clínica. Vuelve a intentarlo.");
       } finally {
-        setLoadingServices(false);
+        if (!controller.signal.aborted) setLoadingServices(false);
       }
     }
     loadServices();
-  }, []);
+    return () => controller.abort();
+  }, [request, reload]);
 
   const SERVICES = useMemo(() => {
     // si no hay API, usa fallback tal cual (tu fallback ya trae imágenes locales si así lo definiste)
-    if (!servicesFromApi.length) return FALLBACK_SERVICES;
+    if (!servicesFromApi.length) return useFallback ? FALLBACK_SERVICES : [];
 
     return servicesFromApi.map((s) => {
       const ui = SERVICE_UI_MAP?.[s.nombre] || {};
@@ -68,7 +79,7 @@ export function useServicios() {
         // (opcional) si quieres conservar specialty u otras props, agrégalas aquí
       };
     });
-  }, [servicesFromApi]);
+  }, [servicesFromApi, useFallback]);
 
-  return { SERVICES, loadingServices };
+  return { SERVICES, loadingServices, servicesError, reloadServices: () => setReload((value) => value + 1) };
 }

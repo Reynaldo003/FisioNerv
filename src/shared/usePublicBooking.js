@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildSlots, nextDays } from "../lib/schedule";
-import { API_BASE, CLINIC } from "./clinicData";
+import { CLINIC } from "./clinicData";
+import { publicApiFetch } from "../services/publicApi";
 
 export function bookingDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -53,7 +54,7 @@ export function usePublicBooking(service) {
     setAvailability({ date, status: "loading", ranges: [] });
     async function load() {
       try {
-        const response = await fetch(`${API_BASE}/api/public/agenda/?fecha=${date}`, { signal: controller.signal });
+        const response = await publicApiFetch(`/api/public/agenda/?fecha=${date}`, { signal: controller.signal });
         if (!response.ok) throw new Error("No se pudo consultar la agenda.");
         const data = await response.json();
         if (!controller.signal.aborted) setAvailability({ date, status: "ready", ranges: busyRanges(data) });
@@ -84,7 +85,7 @@ export function usePublicBooking(service) {
     setBooking(true);
     setError("");
     try {
-      const response = await fetch(`${API_BASE}/api/public/citas/`, {
+      const response = await publicApiFetch("/api/public/citas/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre: name.trim(), telefono: phone.trim(), servicio_id: service.id, fecha: date, hora_inicio: time, profesional_hint: "L.F.T Edgar Mauricio Medina Cruz" }),

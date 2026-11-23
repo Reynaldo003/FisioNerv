@@ -20,7 +20,7 @@ function validPhone(value) {
 }
 
 export default function AgendaPage() {
-  const { services: availableServices, loadingServices } = usePublicContent();
+  const { services: availableServices, loadingServices, servicesError, reloadServices } = usePublicContent();
   const services = useMemo(() => {
     const initialVisit = (item) => /valoraci[oó]n inicial/i.test(item.name || item.nombre || "");
     return [...availableServices].sort((a, b) => Number(initialVisit(b)) - Number(initialVisit(a)));
@@ -127,7 +127,7 @@ export default function AgendaPage() {
                 <p>{item.description || item.descripcion || "Atención personalizada para tu recuperación."}</p>
                 <span className="pub-booking-service-bottom"><span><Clock3 size={12} />{item.tag || "Atención personalizada"}</span><b>{money(item.price ?? item.precio)}</b></span>
               </label>)}</fieldset>}
-            {!loadingServices && !services.length && <div className="pub-empty"><p>No hay servicios disponibles en este momento. Escríbenos para orientarte.</p></div>}
+            {!loadingServices && !services.length && <div className="pub-empty" role="alert"><p>{servicesError || "No hay servicios disponibles en este momento. Escríbenos para orientarte."}</p>{servicesError && <button className="pub-button pub-button-white" onClick={reloadServices}>Volver a cargar servicios</button>}</div>}
             <div className="pub-booking-hint"><HeartHandshake size={22} /><p><strong>¿Es tu primera visita?</strong> Una valoración inicial nos ayuda a conocer tu caso y diseñar tu plan.</p></div>
           </>}
 

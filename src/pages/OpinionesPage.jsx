@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, HeartHandshake, LoaderCircle, ShieldCheck, Star } from "lucide-react";
 import { PageIntro, ReviewsSection } from "../components/PublicSections";
-import { API_BASE } from "../shared/clinicData";
+import { publicApiFetch } from "../services/publicApi";
 
 export default function OpinionesPage() {
   const [name, setName] = useState("");
@@ -17,7 +17,7 @@ export default function OpinionesPage() {
     setSubmitting(true);
     setStatus(null);
     try {
-      const response = await fetch(`${API_BASE}/api/comentarios/`, {
+      const response = await publicApiFetch("/api/comentarios/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clinica: 1, nombre_completo: name.trim(), calificacion: rating, descripcion: comment.trim() }),

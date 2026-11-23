@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, Clock3, Search, ShieldCheck } from "lucide-react";
+import { ArrowRight, Clock3, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { ContactSection, PageIntro, ProcessSection, SectionHeading, ServicesSection, SPECIALTIES } from "../components/PublicSections";
 import { usePublicContent } from "../shared/PublicContent";
 import { useImagenesSitio } from "../shared/useImagenesSitio";
@@ -18,7 +18,7 @@ function serviceImage(service, fallback) {
 }
 
 export default function ServiciosPage() {
-  const { services, loadingServices } = usePublicContent();
+  const { services, loadingServices, servicesError, reloadServices } = usePublicContent();
   const { obtenerImagen } = useImagenesSitio();
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState("");
@@ -36,7 +36,8 @@ export default function ServiciosPage() {
         const name = service.name || service.nombre;
         return <article className="pub-catalog-card" key={service.id}><div className="pub-catalog-image"><img src={serviceImage(service, fallback)} alt={name} loading="lazy" onError={(event) => { if (!event.currentTarget.dataset.fallback) { event.currentTarget.dataset.fallback = "1"; event.currentTarget.src = "/servicios/valoracion-inicial.jpeg"; } }} /></div><div className="pub-catalog-copy"><span className="pub-catalog-tag"><Clock3 size={13} />{service.tag || "Atención personalizada"}</span><h3>{name}</h3><p>{service.description || service.descripcion || "Valoración y tratamiento personalizados según tu condición, tus objetivos y tu ritmo de recuperación."}</p><div className="pub-catalog-bottom"><span><strong>{money(service.price ?? service.precio)}</strong><small>MXN</small></span><Link className="pub-text-link" to={`/agenda?servicio=${encodeURIComponent(name)}`}>Agendar<ArrowRight size={16} /></Link></div></div></article>;
       })}
-      {!loadingServices && !filtered.length && <div className="pub-empty"><Search size={30} /><h3>No encontramos ese servicio</h3><p>Prueba con otro término o escríbenos para orientarte.</p><button className="pub-button pub-button-white" onClick={() => setSearch("")}>Ver todos los servicios</button></div>}
+      {!loadingServices && servicesError && <div className="pub-empty" role="alert"><RefreshCw size={30} /><h3>No pudimos cargar el catálogo</h3><p>{servicesError}</p><button className="pub-button pub-button-white" onClick={reloadServices}>Volver a cargar servicios</button></div>}
+      {!loadingServices && !servicesError && !filtered.length && <div className="pub-empty"><Search size={30} /><h3>No encontramos ese servicio</h3><p>Prueba con otro término o escríbenos para orientarte.</p><button className="pub-button pub-button-white" onClick={() => setSearch("")}>Ver todos los servicios</button></div>}
     </div><p className="pub-form-note"><ShieldCheck size={15} />El tratamiento se define de manera individual después de tu valoración clínica.</p></section>
     <ProcessSection /><ContactSection />
   </>;

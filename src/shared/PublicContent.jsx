@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useServicios } from "./useServicios";
-import { API_BASE } from "./clinicData";
+import { publicApiFetch } from "../services/publicApi";
 
 const PublicContentContext = createContext(null);
 
@@ -13,7 +13,7 @@ const therapist = {
 };
 
 export function PublicContentProvider({ children }) {
-  const { SERVICES, loadingServices } = useServicios();
+  const { SERVICES, loadingServices, servicesError, reloadServices } = useServicios(publicApiFetch, false);
   const [team, setTeam] = useState([therapist]);
   const [reviews, setReviews] = useState([]);
   const [loadingTeam, setLoadingTeam] = useState(true);
@@ -24,7 +24,7 @@ export function PublicContentProvider({ children }) {
     const controller = new AbortController();
     async function loadTeam() {
       try {
-        const response = await fetch(`${API_BASE}/api/public/team/`, { signal: controller.signal });
+        const response = await publicApiFetch("/api/public/team/", { signal: controller.signal });
         if (!response.ok) throw new Error("Equipo no disponible");
         const data = await response.json();
         const list = Array.isArray(data) ? data : data.results || [];
@@ -46,7 +46,7 @@ export function PublicContentProvider({ children }) {
     }
     async function loadReviews() {
       try {
-        const response = await fetch(`${API_BASE}/api/comentarios/public_list/`, { signal: controller.signal });
+        const response = await publicApiFetch("/api/comentarios/public_list/", { signal: controller.signal });
         if (!response.ok) throw new Error("Opiniones no disponibles");
         const data = await response.json();
         if (!controller.signal.aborted) setReviews(Array.isArray(data) ? data : data.results || []);
@@ -61,7 +61,7 @@ export function PublicContentProvider({ children }) {
     return () => controller.abort();
   }, []);
 
-  return <PublicContentContext.Provider value={{ services: SERVICES, loadingServices, team, loadingTeam, reviews, loadingReviews, reviewsError }}>{children}</PublicContentContext.Provider>;
+  return <PublicContentContext.Provider value={{ services: SERVICES, loadingServices, servicesError, reloadServices, team, loadingTeam, reviews, loadingReviews, reviewsError }}>{children}</PublicContentContext.Provider>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

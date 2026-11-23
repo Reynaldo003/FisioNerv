@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { COLLAB_IMAGES } from "./clinicData";
+import { publicApiFetch } from "../services/publicApi";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
 const ContextoImagenes = createContext(null);
 
 export function ImagenesSitioProvider({ children }) {
@@ -11,7 +11,7 @@ export function ImagenesSitioProvider({ children }) {
         const controlador = new AbortController();
         async function cargarImagenes() {
             try {
-                const respuesta = await fetch(`${API_BASE}/api/public/imagenes-sitio/`, {
+                const respuesta = await publicApiFetch("/api/public/imagenes-sitio/", {
                     signal: controlador.signal,
                 });
                 if (!respuesta.ok) throw new Error("No se pudo cargar el catálogo de imágenes.");
