@@ -3,15 +3,14 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { PhoneCall, Menu, X, Instagram, Facebook, MapPin, Clock3 } from "lucide-react";
 import { motion } from "framer-motion";
 import { ImagenesSitioProvider, useImagenesSitio } from "../shared/useImagenesSitio";
+import PublicLayout from "./PublicLayout";
 
 // Utiliza <Outlet /> cuando SiteLayout sea una ruta padre en React Router.
 // También permite children si tu App ya compone las páginas directamente.
 export default function SiteLayout({ children }) {
     return (
         <ImagenesSitioProvider>
-            <HeaderNav />
-            <main>{children ?? <Outlet />}</main>
-            <Footer />
+            <PublicLayout>{children}</PublicLayout>
         </ImagenesSitioProvider>
     );
 }

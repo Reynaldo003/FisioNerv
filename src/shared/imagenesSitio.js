@@ -3,6 +3,13 @@ import { COLLAB_IMAGES } from "./clinicData";
 export const IMAGENES_FIJAS = [
   // Página de inicio
   {
+    clave: "inicio.profesional",
+    titulo: "Profesional de portada (fondo transparente)",
+    grupo: "inicio",
+    orden: 0,
+    respaldo: "/fisio.png",
+  },
+  {
     clave: "inicio.hero",
     titulo: "Portada principal",
     grupo: "inicio",
@@ -53,6 +60,19 @@ export const IMAGENES_FIJAS = [
   },
 
   // Identidad visual
+  ...[
+    ["neurologica", "Rehabilitación neurológica", "/servicios/subsecuentes.jpeg"],
+    ["traumatologica", "Traumatología y ortopedia", "/foto10.jpeg"],
+    ["oncologica", "Rehabilitación oncológica", "/foto21.jpeg"],
+    ["manual", "Terapia manual y ejercicio", "/foto5.jpeg"],
+  ].map(([id, titulo, respaldo], index) => ({
+    clave: `inicio.servicio.${id}`,
+    titulo: `Tratamiento destacado · ${titulo}`,
+    grupo: "inicio",
+    orden: 8 + index,
+    respaldo,
+  })),
+
   {
     clave: "marca.icono",
     titulo: "Icono de FisioNerv",
@@ -88,7 +108,7 @@ export const IMAGENES_FIJAS = [
     titulo: "Imagen predeterminada de servicios",
     grupo: "servicios",
     orden: 1,
-    respaldo: "/servicios/valoracion.png",
+    respaldo: "/servicios/valoracion-inicial.jpeg",
   },
 
   // Convenios

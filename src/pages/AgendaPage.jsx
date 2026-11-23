@@ -1,422 +1,196 @@
-import { useMemo, useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { CalendarDays, Clock3, PhoneCall } from "lucide-react";
-import { nextDays, formatDateLong, formatDayChip, buildSlots } from "@/lib/schedule";
-import { TextAnimate } from "@/components/ui/text-animate";
-import { CLINIC, PRIMARY } from "../shared/clinicData";
-import { useServicios } from "../shared/useServicios";
+import { useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, HeartHandshake, Info, LoaderCircle, MapPin, MessageCircle, Phone, RefreshCw, ShieldCheck, Stethoscope, UserRound } from "lucide-react";
+import { usePublicContent } from "../shared/PublicContent";
+import { bookingDateKey, usePublicBooking } from "../shared/usePublicBooking";
+import { useImagenesSitio } from "../shared/useImagenesSitio";
+import { CLINIC } from "../shared/clinicData";
+import "./agenda.css";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "https://api.fisionerv.cloud";
+const money = (value) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 }).format(Number(value || 0));
+const longDate = (date) => date.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+const stepLabels = ["Tu servicio", "Fecha y hora", "Tus datos"];
 
-// Solo como “hint” (el backend ya lo fuerza)
-const DEFAULT_PUBLIC_PROFESSIONAL = "L.F.T Edgar Mauricio Medina Cruz";
+function validPhone(value) {
+  if (!/^[+\d\s().-]+$/.test(value)) return false;
+  let digits = value.replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("52")) digits = digits.slice(2);
+  else if (digits.length === 13 && digits.startsWith("521")) digits = digits.slice(3);
+  return /^\d{10}$/.test(digits);
+}
 
 export default function AgendaPage() {
-    const { SERVICES, loadingServices } = useServicios();
-    const [searchParams] = useSearchParams();
-    const servicioPorUrl = searchParams.get("servicio");
-    const includeSunday = typeof window !== "undefined" && localStorage.getItem("agenda.includeSunday") === "1";
-    const days = useMemo(() => {
-        const list = nextDays(14);
-        if (includeSunday) return list;
-        return list.filter((d) => d.getDay() !== 0);
-    }, [includeSunday]);
+  const { services: availableServices, loadingServices } = usePublicContent();
+  const services = useMemo(() => {
+    const initialVisit = (item) => /valoraci[oó]n inicial/i.test(item.name || item.nombre || "");
+    return [...availableServices].sort((a, b) => Number(initialVisit(b)) - Number(initialVisit(a)));
+  }, [availableServices]);
+  const { obtenerImagen } = useImagenesSitio();
+  const [params] = useSearchParams();
+  const [serviceId, setServiceId] = useState(null);
+  const service = services.find((item) => String(item.id) === serviceId)
+    || services.find((item) => (item.name || item.nombre) === params.get("servicio"))
+    || services[0];
+  const booking = usePublicBooking(service);
+  const [step, setStep] = useState(0);
+  const [week, setWeek] = useState(0);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const flowRef = useRef(null);
+  const headingRef = useRef(null);
+  const successRef = useRef(null);
+  const clinicianPhoto = obtenerImagen("inicio.profesional", "/fisio.png");
+  const canContinue = step === 0 ? Boolean(service) && !loadingServices : Boolean(booking.selectedSlot);
+  const shownDays = booking.days.slice(week * 7, week * 7 + 7);
 
-    const [selectedServiceId, setSelectedServiceId] = useState(null);
-    const selectedService = useMemo(() => {
-        return SERVICES.find((s) => String(s.id) === selectedServiceId)
-            || SERVICES.find((s) => (s.name || s.nombre) === servicioPorUrl)
-            || SERVICES[0]
-            || null;
-    }, [SERVICES, selectedServiceId, servicioPorUrl]);
-    function toMinutes(hhmm) {
-        const [h = "0", m = "0"] = String(hhmm || "").split(":");
-        return (Number(h) || 0) * 60 + (Number(m) || 0);
+  function goToStep(target) {
+    if (booking.booking || (target > 0 && (!service || loadingServices)) || (target > 1 && !booking.selectedSlot)) return;
+    setStep(target);
+    requestAnimationFrame(() => {
+      headingRef.current?.focus({ preventScroll: true });
+      if (window.innerWidth < 900 || flowRef.current?.getBoundingClientRect().top < 100) {
+        flowRef.current?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+      }
+    });
+  }
+
+  async function confirm(event) {
+    event.preventDefault();
+    if (booking.booking) return;
+    if (!booking.selectedSlot) { goToStep(1); return; }
+    const errors = {};
+    if (name.trim().length < 2) errors.name = "Escribe tu nombre completo.";
+    if (!validPhone(phone)) errors.phone = "Escribe un número de WhatsApp de 10 dígitos. Puedes incluir +52.";
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      document.getElementById(errors.name ? "booking-name" : "booking-phone")?.focus();
+      return;
     }
-
-    function overlaps(aStart, aEnd, bStart, bEnd) {
-        return aStart < bEnd && bStart < aEnd;
+    const result = await booking.submit({ name, phone });
+    if (result?.conflict) goToStep(1);
+    else if (result?.whatsapp) {
+      window.open(result.whatsapp, "_blank", "noopener,noreferrer");
+      requestAnimationFrame(() => {
+        successRef.current?.focus({ preventScroll: true });
+        successRef.current?.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+      });
     }
-    function durationToMinutes(durationStr) {
-        if (!durationStr) return 60;
-        const [h = "0", m = "0", s = "0"] = String(durationStr).split(":");
-        return Number(h) * 60 + Number(m) + Number(s) / 60;
-    }
+  }
 
-    function addMinutesToLabel(label, mins) {
-        const total = toMinutes(label) + Number(mins || 0);
-        const hh = String(Math.floor(total / 60) % 24).padStart(2, "0");
-        const mm = String(total % 60).padStart(2, "0");
-        return `${hh}:${mm}`;
-    }
+  return <section className="pub-booking-page pub-container" id="agenda">
+    <div className="pub-booking-intro">
+      <span className="pub-eyebrow"><span className="pub-status-dot" />Agenda en línea</span>
+      <h1>Un momento para ti.<br /><span>Un paso para sentirte mejor.</span></h1>
+      <p>Elige tu atención y encuentra un horario. Nosotros te acompañamos con lo demás.</p>
+    </div>
 
-    const [selectedDate, setSelectedDate] = useState(days[0]);
-    const [period, setPeriod] = useState("Todo");
-    const [selectedSlot, setSelectedSlot] = useState(null);
-    const [busySlots, setBusySlots] = useState([]);
+    {booking.confirmation ? <div className="pub-booking-success" ref={successRef} tabIndex={-1}>
+      <span className="pub-booking-success-icon"><CheckCircle2 size={42} /></span>
+      <span className="pub-eyebrow">Cita registrada</span>
+      <h2>¡Listo, {booking.confirmation.name.split(" ")[0]}!</h2>
+      <p>Recibimos tu solicitud de cita. Te contactaremos para confirmar los detalles de tu atención.</p>
+      <div className="pub-booking-success-details">
+        <span><Stethoscope size={18} />{booking.confirmation.service}</span>
+        <span><CalendarDays size={18} />{booking.confirmation.date}</span>
+        <span><Clock3 size={18} />{booking.confirmation.time} h</span>
+      </div>
+      <a className="pub-button" href={booking.confirmation.whatsapp} target="_blank" rel="noreferrer"><MessageCircle size={18} />Continuar por WhatsApp<ArrowRight size={17} /></a>
+      <p className="pub-booking-success-note">Si WhatsApp no se abrió, puedes continuar con el botón de arriba.</p>
+      <div className="pub-booking-success-actions"><Link className="pub-text-link" to="/">Volver al inicio</Link><button className="pub-text-link" onClick={() => { booking.startAgain(); setStep(0); }}>Agendar otra cita<ArrowRight size={15} /></button></div>
+    </div> : <div className="pub-booking-layout">
+      <div className="pub-booking-flow" ref={flowRef}>
+        <nav className="pub-booking-steps" aria-label="Pasos para agendar">
+          {stepLabels.map((label, index) => <button
+            key={label}
+            className={`${index === step ? "is-current" : ""} ${index < step ? "is-complete" : ""}`}
+            aria-current={index === step ? "step" : undefined}
+            disabled={booking.booking || (index > 0 && (!service || loadingServices)) || (index > 1 && !booking.selectedSlot)}
+            onClick={() => goToStep(index)}
+          ><span>{index < step ? <Check size={15} /> : `0${index + 1}`}</span><strong>{label}</strong></button>)}
+        </nav>
 
-    const [name, setName] = useState("");
-    const [phone, setPhone] = useState("");
-    const [booking, setBooking] = useState(false);
-    const [message, setMessage] = useState("");
-    const [error, setError] = useState("");
-    const slots = useMemo(() => buildSlots(selectedDate), [selectedDate]);
+        <div className="pub-booking-stage" key={step}>
+          <div className="pub-booking-step-heading">
+            <span className="pub-booking-step-caption">PASO 0{step + 1} DE 03</span>
+            <h2 ref={headingRef} tabIndex={-1}>{["¿Cómo podemos ayudarte?", "Elige tu fecha y horario.", "Ya casi. Cuéntanos de ti."][step]}</h2>
+            <p>{["Selecciona el servicio que necesitas para tu recuperación.", "Encuentra un espacio que se adapte a tu día.", "Con estos datos podremos confirmar tu cita contigo."][step]}</p>
+          </div>
+          {booking.error && <p role="alert" className="pub-message pub-message-error">{booking.error}</p>}
 
-    const filtered = useMemo(() => {
-        const busySet = new Set(busySlots);
-        return slots
-            .filter((s) => (period === "Todo" ? true : s.period === period))
-            .map((s) => ({ ...s, disabled: s.disabled || busySet.has(s.label) }));
-    }, [slots, period, busySlots]);
-    useEffect(() => {
-        if (!days?.length) return;
-        setSelectedDate((prev) => {
-            // si prev sigue estando en la lista, no toques nada
-            const exists = days.some((d) => d.toDateString() === prev?.toDateString());
-            return exists ? prev : days[0];
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [days]);
-    useEffect(() => {
-        async function loadBusy() {
-            try {
-                const y = selectedDate.getFullYear();
-                const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
-                const d = String(selectedDate.getDate()).padStart(2, "0");
-                const fecha = `${y}-${m}-${d}`;
+          {step === 0 && <>
+            {loadingServices ? <div className="pub-booking-services" aria-label="Cargando servicios" aria-busy="true">{[0, 1, 2, 3].map((index) => <div key={index} className="pub-booking-service-skeleton pub-skeleton" />)}</div>
+              : <fieldset className="pub-booking-services"><legend className="sr-only">Selecciona un servicio</legend>{services.map((item) => <label className={`pub-booking-service ${item.id === service?.id ? "is-selected" : ""}`} key={item.id}>
+                <input type="radio" name="booking-service" className="pub-booking-radio" checked={item.id === service?.id} onChange={() => { setServiceId(String(item.id)); booking.clearTime(); }} />
+                <span className="pub-booking-service-top"><span className="pub-icon-tile"><Stethoscope size={21} /></span><span className="pub-booking-radio-indicator">{item.id === service?.id && <Check size={12} />}</span></span>
+                <strong>{item.name || item.nombre}</strong>
+                <p>{item.description || item.descripcion || "Atención personalizada para tu recuperación."}</p>
+                <span className="pub-booking-service-bottom"><span><Clock3 size={12} />{item.tag || "Atención personalizada"}</span><b>{money(item.price ?? item.precio)}</b></span>
+              </label>)}</fieldset>}
+            {!loadingServices && !services.length && <div className="pub-empty"><p>No hay servicios disponibles en este momento. Escríbenos para orientarte.</p></div>}
+            <div className="pub-booking-hint"><HeartHandshake size={22} /><p><strong>¿Es tu primera visita?</strong> Una valoración inicial nos ayuda a conocer tu caso y diseñar tu plan.</p></div>
+          </>}
 
-                const resp = await fetch(`${API_BASE}/api/public/agenda/?fecha=${fecha}`);
-                if (!resp.ok) throw new Error("No se pudo consultar la agenda");
-                const data = await resp.json();
-                // slots visibles del día (labels como "08:00", "09:00", etc.)
-                const slotLabels = buildSlots(selectedDate).map((s) => s.label);
+          {step === 1 && <>
+            <div className="pub-booking-date-header"><h3><CalendarDays size={17} />Selecciona una fecha</h3><div className="pub-booking-week-controls"><button className="pub-icon-button" aria-label="Fechas anteriores" disabled={week === 0} onClick={() => setWeek(week - 1)}><ChevronLeft size={17} /></button><span>{week === 0 ? "Próximos días" : "Más fechas"}</span><button className="pub-icon-button" aria-label="Fechas siguientes" disabled={(week + 1) * 7 >= booking.days.length} onClick={() => setWeek(week + 1)}><ChevronRight size={17} /></button></div></div>
+            <div className="pub-booking-dates" role="group" aria-label="Fechas disponibles">{shownDays.map((date) => {
+              const key = bookingDateKey(date);
+              return <button className={booking.date === key ? "is-selected" : ""} key={key} aria-label={longDate(date)} aria-pressed={booking.date === key} onClick={() => booking.chooseDate(key)}><span>{date.toLocaleDateString("es-MX", { weekday: "short" }).replace(".", "")}</span><strong>{date.getDate()}</strong><small>{date.toLocaleDateString("es-MX", { month: "short" }).replace(".", "")}</small></button>;
+            })}</div>
+            <div className="pub-booking-hours-header"><h3><Clock3 size={17} />Elige tu horario</h3><div className="pub-booking-periods" role="group" aria-label="Filtrar horarios">{["Todo", "Mañana", "Tarde", "Noche"].map((period) => <button key={period} aria-pressed={booking.period === period} className={booking.period === period ? "is-selected" : ""} onClick={() => booking.choosePeriod(period)}>{period === "Todo" ? "Todos" : period}</button>)}</div></div>
+            {booking.availabilityStatus === "loading" ? <div className="pub-booking-slots" aria-label="Consultando disponibilidad" aria-busy="true">{[0, 1, 2, 3, 4, 5, 6, 7].map((index) => <div key={index} className="pub-booking-slot-skeleton pub-skeleton" />)}</div>
+              : booking.availabilityStatus === "error" ? <div className="pub-booking-availability-error" role="alert"><Info size={24} /><h4>No pudimos consultar los horarios.</h4><p>Vuelve a intentarlo para ver la disponibilidad de este día.</p><button className="pub-text-link" onClick={booking.retryAvailability}><RefreshCw size={15} />Volver a consultar</button></div>
+                : <><div className="pub-booking-slots">{booking.filteredSlots.map((slot) => <button key={slot.label} disabled={slot.disabled} className={booking.selectedSlot?.label === slot.label ? "is-selected" : ""} aria-label={`${slot.label}${slot.disabled ? ", no disponible" : ""}`} aria-pressed={booking.selectedSlot?.label === slot.label} onClick={() => booking.chooseTime(slot.label)}>{slot.label}{booking.selectedSlot?.label === slot.label && <Check size={14} />}</button>)}</div><p className="pub-booking-availability-note" aria-live="polite"><span className="pub-status-dot" />{booking.slots.some((slot) => !slot.disabled) ? "Los horarios en gris no están disponibles para este servicio." : "No hay horarios disponibles este día. Puedes elegir otra fecha."}</p></>}
+          </>}
 
-                // Generamos set de ocupados expandiendo duración
-                const takenSet = new Set();
-
-                for (const c of (Array.isArray(data) ? data : data?.results || [])) {
-                    const start = (c.hora_inicio || "").slice(0, 5);
-                    const end = (c.hora_termina || "").slice(0, 5);
-
-                    if (!start) continue;
-
-                    // Si no viene hora_termina, al menos bloquea la hora inicial
-                    const sMin = toMinutes(start);
-                    const eMin = end ? toMinutes(end) : sMin + 60;
-
-                    for (const label of slotLabels) {
-                        const slotStart = toMinutes(label);
-                        const slotEnd = slotStart + 60; // si tus slots son de 60 min
-                        if (overlaps(slotStart, slotEnd, sMin, eMin)) {
-                            takenSet.add(label);
-                        }
-                    }
-                }
-
-                setBusySlots(Array.from(takenSet));
-            } catch {
-                setBusySlots([]);
-            }
-        }
-
-        setSelectedSlot(null);
-        loadBusy();
-    }, [selectedDate]);
-
-    useEffect(() => setSelectedSlot(null), [period]);
-
-    const confirmBooking = async () => {
-        if (!selectedService || !selectedSlot || !name || !phone) return;
-
-        setBooking(true);
-        setError("");
-        setMessage("");
-
-        try {
-            const y = selectedDate.getFullYear();
-            const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
-            const d = String(selectedDate.getDate()).padStart(2, "0");
-            const fecha = `${y}-${m}-${d}`;
-
-            const payload = {
-                nombre: name,
-                telefono: phone,
-                servicio_id: selectedService.id,
-                fecha,
-                hora_inicio: selectedSlot,
-
-                // hint (opcional)
-                profesional_hint: DEFAULT_PUBLIC_PROFESSIONAL,
-            };
-
-            const resp = await fetch(`${API_BASE}/api/public/citas/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-
-            if (!resp.ok) {
-                setError("No se pudo registrar la cita. Intenta de nuevo o escribe por WhatsApp.");
-                return;
-            }
-            const created = await resp.json().catch(() => null);
-
-            setMessage("Cita registrada. Te contactaremos para confirmar.");
-
-            // ✅ si el servicio dura 2h (o más), bloquea TODAS las horas que se traslapan
-            const slotLabels = buildSlots(selectedDate).map((s) => s.label);
-            const startMin = toMinutes(selectedSlot);
-
-            // prioridad: lo que regrese backend (hora_termina), si no, usa duración del servicio
-            const endLabel = created?.hora_termina
-                ? String(created.hora_termina).slice(0, 5)
-                : addMinutesToLabel(selectedSlot, durationToMinutes(selectedService?.duration));
-            const endMin = toMinutes(endLabel) || startMin + 60;
-
-            const taken = new Set();
-            for (const label of slotLabels) {
-                const aStart = toMinutes(label);
-                const aEnd = aStart + 60;
-                if (overlaps(aStart, aEnd, startMin, endMin)) taken.add(label);
-            }
-
-            setBusySlots((prev) => {
-                const all = new Set(prev);
-                for (const x of taken) all.add(x);
-                return Array.from(all);
-            });
-            const text = encodeURIComponent(
-                `Hola, soy ${name}. Quiero confirmar mi cita de ${selectedService.name || selectedService.nombre} en ${CLINIC.name
-                } el ${formatDateLong(selectedDate)} a las ${selectedSlot}. Mi WhatsApp es ${phone}.`
-            );
-            window.open(`https://wa.me/522711224494?text=${text}`, "_blank");
-        } catch {
-            setError("Ocurrió un error al registrar la cita. Intenta de nuevo o escribe por WhatsApp.");
-        } finally {
-            setBooking(false);
-        }
-    };
-
-    return (
-        <section
-            id="agenda"
-            className="
-        mx-auto mt-14 w-full max-w-6xl
-        px-4 sm:px-6
-        overflow-x-hidden
-      "
-        >
-            <div className="mb-6 flex items-center gap-3">
-                <CalendarDays className="h-6 w-6" style={{ color: PRIMARY }} />
-                <TextAnimate animation="blurInUp" className="text-2xl font-bold text-slate-900" by="word">
-                    Agendar cita
-                </TextAnimate>
+          {step === 2 && <>
+            <div className="pub-booking-mobile-review">
+              <div><span>Tu cita</span><button type="button" disabled={booking.booking} onClick={() => goToStep(1)}>Editar</button></div>
+              <strong>{service?.name || service?.nombre}</strong>
+              <p><CalendarDays size={14} />{longDate(booking.selectedDate)} · {booking.selectedSlot?.label} h</p>
+              <b>{money(service?.price ?? service?.precio)} <small>MXN</small></b>
             </div>
+            <form id="public-booking-form" onSubmit={confirm} noValidate>
+            <fieldset disabled={booking.booking}>
+              <div className="pub-field">
+                <label htmlFor="booking-name">Nombre completo</label>
+                <div className="pub-booking-input"><UserRound size={18} /><input id="booking-name" name="name" autoComplete="name" placeholder="¿Cómo te llamas?" value={name} maxLength={150} aria-invalid={Boolean(fieldErrors.name)} aria-describedby={fieldErrors.name ? "booking-name-error" : undefined} onChange={(event) => { setName(event.target.value); setFieldErrors((previous) => ({ ...previous, name: "" })); }} /></div>
+                {fieldErrors.name && <span className="pub-booking-field-error" id="booking-name-error">{fieldErrors.name}</span>}
+              </div>
+              <div className="pub-field">
+                <label htmlFor="booking-phone">Tu WhatsApp</label>
+                <div className="pub-booking-input"><Phone size={18} /><input id="booking-phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="271 123 4567" value={phone} maxLength={20} aria-invalid={Boolean(fieldErrors.phone)} aria-describedby={fieldErrors.phone ? "booking-phone-error" : "booking-phone-hint"} onChange={(event) => { setPhone(event.target.value); setFieldErrors((previous) => ({ ...previous, phone: "" })); }} /></div>
+                {fieldErrors.phone ? <span className="pub-booking-field-error" id="booking-phone-error">{fieldErrors.phone}</span> : <span className="pub-booking-field-hint" id="booking-phone-hint">10 dígitos. También puedes incluir +52.</span>}
+              </div>
+            </fieldset>
+            <div className="pub-booking-confirm-note"><ShieldCheck size={22} /><div><strong>Todo listo para dar el primer paso.</strong><p>Al confirmar registraremos tu cita y abriremos WhatsApp para coordinar los detalles contigo.</p></div></div>
+            </form>
+          </>}
+        </div>
 
-            {loadingServices && <p className="mb-4 text-sm text-slate-500">Cargando servicios...</p>}
-            <div className="grid gap-6 lg:grid-cols-5">
-                {/* Columna izquierda */}
-                <div className="lg:col-span-3 min-w-0">
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-xl w-full min-w-0">
-                        {/* Paso 1 */}
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">1) Servicio</p>
+        <div className="pub-booking-flow-footer">
+          {step > 0 ? <button className="pub-text-link" disabled={booking.booking} onClick={() => goToStep(step - 1)}><ArrowLeft size={15} />Atrás</button> : <span><ShieldCheck size={14} />Atención con enfoque humano</span>}
+          {step < 2 ? <button key="booking-next" className="pub-button" type="button" disabled={!canContinue} onClick={(event) => { event.preventDefault(); goToStep(step + 1); }}>{step === 0 ? "Elegir fecha y hora" : "Continuar con mis datos"}<ArrowRight size={17} /></button>
+            : <button key="booking-confirm" className="pub-button" type="submit" form="public-booking-form" disabled={booking.booking} aria-busy={booking.booking}>{booking.booking ? <><LoaderCircle size={17} className="animate-spin" />Registrando…</> : <>Confirmar mi cita<ArrowRight size={17} /></>}</button>}
+        </div>
+      </div>
 
-                            <div className="mt-2 grid gap-3 sm:grid-cols-2 min-w-0">
-                                <div className="min-w-0">
-                                    <label className="text-sm font-semibold text-slate-800">Selecciona</label>
-
-                                    <select
-                                        className="
-                      mt-2 w-full min-w-0
-                      rounded-2xl border border-slate-200 bg-white
-                      px-4 py-3 text-sm text-slate-800 shadow-sm outline-none
-                      focus:ring-2 focus:ring-[#004aad]/25
-                    "
-                                        value={selectedService?.id ?? ""}
-                                        onChange={(e) => setSelectedServiceId(e.target.value)}
-                                    >
-                                        {SERVICES.map((s) => (
-                                            <option key={s.id} value={s.id}>
-                                                {(s.name || s.nombre)} · ${(s.price ?? s.precio)}
-                                            </option>
-                                        ))}
-                                    </select>
-
-                                    {!!(selectedService?.description || selectedService?.descripcion) && (
-                                        <p className="mt-2 text-xs text-slate-600 break-words">
-                                            {selectedService.description || selectedService.descripcion}
-                                        </p>
-                                    )}
-
-                                    <p className="mt-1 text-sm text-slate-600 break-words">
-                                        <b>{(selectedService?.name || selectedService?.nombre) || "—"}</b>
-                                    </p>
-                                    <p className="text-xs text-slate-500">
-                                        {selectedService ? `$${selectedService.price ?? selectedService.precio} MXN` : ""}
-                                    </p>
-                                </div>
-
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 min-w-0">
-                                    <p className="text-sm font-semibold text-slate-800">Resumen</p>
-                                    <p className="mt-1 text-sm text-slate-600 break-words">
-                                        <b>{selectedService?.name || selectedService?.nombre || "—"}</b>
-                                    </p>
-                                    <p className="text-xs text-slate-500">
-                                        {selectedService ? `$${selectedService.price ?? selectedService.precio} MXN` : ""}
-                                    </p>
-                                    <p className="mt-3 text-xs text-slate-500">Selecciona fecha y hora para continuar.</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Paso 2: Fecha */}
-                        <div className="mt-8">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">2) Fecha</p>
-
-                            <div className="mt-3 w-full overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                <div className="flex gap-2 pr-2">
-                                    {days.map((d) => {
-                                        const chip = formatDayChip(d);
-                                        const active = d.toDateString() === selectedDate.toDateString();
-
-                                        return (
-                                            <button
-                                                key={d.toDateString()}
-                                                onClick={() => setSelectedDate(d)}
-                                                className={[
-                                                    "shrink-0 rounded-2xl border px-4 py-3 text-left",
-                                                    active ? "border-[#004aad] bg-[#004aad]/5" : "border-slate-200 bg-white hover:bg-slate-50",
-                                                ].join(" ")}
-                                                style={{ minWidth: 86 }}
-                                            >
-                                                <p className="text-[10px] uppercase tracking-wide text-slate-500">{chip.dow}</p>
-                                                <p className="text-xl font-bold text-slate-900">{chip.day}</p>
-                                                <p className="text-[11px] text-slate-500">{chip.mon}</p>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            <p className="mt-2 text-sm text-slate-600 break-words">
-                                Seleccionado: <b className="text-slate-900">{formatDateLong(selectedDate)}</b>
-                            </p>
-                        </div>
-
-                        {/* Paso 3: Hora */}
-                        <div className="mt-8">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <Clock3 className="h-5 w-5" style={{ color: PRIMARY }} />
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">3) Hora</p>
-                                </div>
-
-                                <div className="flex max-w-full overflow-x-auto rounded-full border border-slate-200 bg-white p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                    <div className="flex gap-1">
-                                        {["Todo", "Mañana", "Tarde", "Noche"].map((p) => (
-                                            <button
-                                                key={p}
-                                                onClick={() => setPeriod(p)}
-                                                className={[
-                                                    "shrink-0 rounded-full px-3 py-1 text-xs font-semibold",
-                                                    period === p ? "bg-[#004aad] text-white" : "text-slate-700 hover:bg-slate-50",
-                                                ].join(" ")}
-                                            >
-                                                {p}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-4 grid gap-2 sm:[grid-template-columns:repeat(auto-fill,minmax(140px,1fr))] min-w-0">
-                                {filtered.map((s) => (
-                                    <button
-                                        key={s.label}
-                                        disabled={s.disabled}
-                                        onClick={() => setSelectedSlot(s.label)}
-                                        className={[
-                                            "rounded-2xl border p-3 text-left transition w-full min-w-0",
-                                            s.disabled
-                                                ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400 line-through"
-                                                : selectedSlot === s.label
-                                                    ? "border-[#004aad] bg-[#004aad]/5"
-                                                    : "border-slate-200 bg-white hover:bg-slate-50",
-                                        ].join(" ")}
-                                    >
-                                        <div className="text-lg font-bold text-slate-900">{s.label}</div>
-                                        <div className="mt-1 text-xs text-slate-500">{s.period}</div>
-                                    </button>
-                                ))}
-
-                                {!filtered.length && <p className="text-sm text-slate-500">No hay horarios disponibles para este día.</p>}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Columna derecha */}
-                <div className="lg:col-span-2 mt-6 lg:mt-0 min-w-0">
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-xl w-full min-w-0 lg:sticky lg:top-6">
-                        <p className="text-sm font-bold text-slate-900">Confirmar</p>
-
-                        <p className="mt-1 text-sm text-slate-600 break-words">
-                            {selectedService ? (
-                                <>
-                                    <b>{selectedService.name || selectedService.nombre}</b> · {formatDateLong(selectedDate)}
-                                    {selectedSlot ? (
-                                        <>
-                                            {" "}
-                                            · <b>{selectedSlot}</b>
-                                        </>
-                                    ) : null}
-                                </>
-                            ) : (
-                                "Selecciona un servicio"
-                            )}
-                        </p>
-
-                        <div className="mt-5 grid gap-3 min-w-0">
-                            <input
-                                type="text"
-                                placeholder="Tu nombre"
-                                className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#004aad]/25"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                            />
-                            <input
-                                type="tel"
-                                placeholder="WhatsApp"
-                                className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#004aad]/25"
-                                value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                            />
-
-                            <button
-                                onClick={confirmBooking}
-                                disabled={!selectedService || !selectedSlot || !name || !phone || booking}
-                                className={[
-                                    "inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-lg transition",
-                                    !selectedService || !selectedSlot || !name || !phone || booking
-                                        ? "bg-slate-300 text-slate-600 shadow-none"
-                                        : "bg-[#004aad] shadow-[#004aad]/25 hover:brightness-110",
-                                ].join(" ")}
-                            >
-                                <PhoneCall className="h-4 w-4" />
-                                {booking ? "Registrando..." : "Confirmar cita"}
-                            </button>
-
-                            {message && <p className="text-xs font-semibold text-emerald-700 break-words">{message}</p>}
-                            {error && <p className="text-xs font-semibold text-rose-700 break-words">{error}</p>}
-
-                            <p className="pt-2 text-[11px] text-slate-500 break-words">
-                                Al confirmar, registramos la cita y abrimos WhatsApp para confirmar detalles.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    );
+      <aside className="pub-booking-sidebar" aria-label="Resumen de tu cita">
+        <div className="pub-booking-summary">
+          <span className="pub-eyebrow">Tu próximo paso</span><h2>Un espacio para<br /><span>tu bienestar.</span></h2>
+          <div className="pub-booking-clinician"><span className="pub-booking-avatar">{clinicianPhoto ? <img src={clinicianPhoto} alt="" /> : <Stethoscope size={24} />}</span><div><strong>L.F.T. Edgar Mauricio<br />Medina Cruz</strong><span>Fisioterapia y rehabilitación</span></div></div>
+          <div className="pub-booking-summary-service"><div><span>Tu servicio</span>{step > 0 && <button disabled={booking.booking} onClick={() => goToStep(0)}>Cambiar</button>}</div><h3>{service?.name || service?.nombre || "Selecciona tu servicio"}</h3>{service?.tag && <p><Clock3 size={13} />{service.tag}</p>}</div>
+          <dl className="pub-booking-summary-details">
+            <div><CalendarDays size={17} /><div><dt>Fecha</dt><dd>{step > 0 || booking.selectedSlot ? longDate(booking.selectedDate) : "Por elegir"}</dd></div>{step === 2 && <button disabled={booking.booking} onClick={() => goToStep(1)} aria-label="Cambiar fecha y horario">Editar</button>}</div>
+            <div><Clock3 size={17} /><div><dt>Horario</dt><dd>{booking.selectedSlot ? `${booking.selectedSlot.label} h` : "Por elegir"}</dd></div></div>
+            <div><MapPin size={17} /><div><dt>Ubicación</dt><dd>{CLINIC.address}</dd></div></div>
+          </dl>
+          <div className="pub-booking-total"><span>Costo del servicio</span><strong>{service ? money(service.price ?? service.precio) : "—"}<small>MXN</small></strong></div>
+          <p className="pub-booking-no-charge"><ShieldCheck size={13} />El registro en línea no realiza ningún cobro.</p>
+        </div>
+        <a className="pub-booking-help" href={`https://wa.me/${CLINIC.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"><span className="pub-icon-circle"><MessageCircle size={21} /></span><div><strong>¿Te ayudamos a elegir?</strong><span>Escríbenos por WhatsApp<ArrowRight size={13} /></span></div></a>
+      </aside>
+    </div>}
+    <p className="pub-booking-bottom-note"><HeartHandshake size={16} />Cada recuperación comienza con una conversación. Gracias por confiar en FisioNerv.</p>
+  </section>;
 }

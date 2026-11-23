@@ -1,277 +1,43 @@
-import { useMemo, useState, useEffect } from "react";
-import { HandHeart, Stethoscope, ClipboardList, TrendingUp, CheckCircle2 } from "lucide-react";
-import { useServicios } from "../shared/useServicios";
-import { PRIMARY } from "../shared/clinicData";
+import { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { ArrowRight, Clock3, Search, ShieldCheck } from "lucide-react";
+import { ContactSection, PageIntro, ProcessSection, SectionHeading, ServicesSection, SPECIALTIES } from "../components/PublicSections";
+import { usePublicContent } from "../shared/PublicContent";
 import { useImagenesSitio } from "../shared/useImagenesSitio";
 
-// ✅ SOLO DEFAULT LOCAL (permitido)
-const DEFAULT_SERVICE_IMG = "/servicios/valoracion.png";
+const money = (value) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(Number(value || 0));
 
-function guessSpecialty(serviceName = "") {
-    const n = String(serviceName || "").toLowerCase();
-    if (n.includes("neuro") || n.includes("neurol")) return "neurologica";
-    if (n.includes("deport") || n.includes("rendimiento")) return "deportiva";
-    if (n.includes("geri") || n.includes("adulto mayor")) return "geriatrica";
-    if (n.includes("pedi") || n.includes("niñ") || n.includes("infan")) return "pediatrica";
-    if (n.includes("reuma") || n.includes("artr") || n.includes("fibrom")) return "reumatologica";
-    if (n.includes("pulmon") || n.includes("cardiac") || n.includes("cardio")) return "cardiorresp";
-    return "ortopedica";
-}
-
-function moneyMXN(n) {
-    const num = Number(n || 0);
-    if (!Number.isFinite(num)) return "—";
-    return `MXN $${num.toLocaleString("es-MX")}`;
-}
-
-function pickImg(s, imagenPredeterminada) {
-    const img =
-        (s?.mediaSrc || s?.imagen_url || s?.imagen || "").toString().trim();
-
-    return img || imagenPredeterminada;
+function serviceImage(service, fallback) {
+  const image = service.mediaSrc || service.imagen_url || service.imagen;
+  if (image && !["/valoracion.png", "/seguimiento.png", "/servicios/valoracion.png"].includes(image)) return image;
+  const name = (service.name || service.nombre || "").toLowerCase();
+  if (name.includes("nutri")) return "/servicios/nutricional.jpeg";
+  if (name.includes("dental")) return "/servicios/dental.jpeg";
+  if (name.includes("subsecuente")) return "/servicios/subsecuentes.jpeg";
+  return fallback;
 }
 
 export default function ServiciosPage() {
-    const { SERVICES, loadingServices } = useServicios();
-    const { obtenerImagen } = useImagenesSitio();
-    const imagenPredeterminada = obtenerImagen("servicios.placeholder", DEFAULT_SERVICE_IMG);
-    const normalized = useMemo(() => {
-        return (SERVICES || []).map((s, idx) => {
-            const idRaw = s.id ?? idx;
-            const id = String(idRaw);
+  const { services, loadingServices } = usePublicContent();
+  const { obtenerImagen } = useImagenesSitio();
+  const [params, setParams] = useSearchParams();
+  const [search, setSearch] = useState("");
+  const selectedId = params.get("enfoque");
+  const selected = SPECIALTIES.find((item) => item.id === selectedId);
+  const fallback = obtenerImagen("servicios.placeholder", "/servicios/valoracion-inicial.jpeg") || "/servicios/valoracion-inicial.jpeg";
+  const filtered = services.filter((service) => `${service.name || service.nombre} ${service.description || service.descripcion || ""}`.toLowerCase().includes(search.toLowerCase()));
 
-            const name = s.nombre ?? s.name ?? "Servicio";
-            const description = s.descripcion ?? s.description ?? "";
-            const price = s.precio ?? s.price ?? 0;
-            const duration = s.duracion ?? s.duration ?? "";
-            const tag = s.tag ?? "";
-
-            const mediaSrc = pickImg(s, imagenPredeterminada);
-
-            return {
-                id,
-                name,
-                description,
-                price,
-                tag,
-                duration,
-                mediaSrc,
-                specialty: s.specialty || guessSpecialty(name),
-            };
-        });
-    }, [SERVICES, imagenPredeterminada]);
-
-    return (
-        <section className="mx-auto mt-14 max-w-6xl px-4">
-            {loadingServices && <p className="mb-4 text-sm text-slate-500">Cargando servicios...</p>}
-            <ServiciosHeader PRIMARY={PRIMARY} />
-            <ServiciosVarianteMenu SERVICES={normalized} PRIMARY={PRIMARY} imagenPredeterminada={imagenPredeterminada} />
-        </section>
-    );
-}
-
-function ServiciosHeader({ PRIMARY }) {
-    return (
-        <div className="mb-10">
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-lg dark:border-neutral-700 dark:bg-neutral-900/40">
-                <div className="flex items-start gap-3">
-                    <HandHeart className="mt-1 h-6 w-6" style={{ color: PRIMARY }} />
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                            Servicios
-                        </h2>
-
-                        <p className="mt-4 max-w-4xl text-base leading-6 text-slate-600 dark:text-white/70">
-                            En Fisionerv transformamos la evidencia científica en un trato cercano,
-                            claro y profundamente humano. Valoramos cada caso con rigor, diseñamos
-                            planes de rehabilitación personalizados y acompañamos a nuestros pacientes
-                            paso a paso para recuperar movilidad, función y calidad de vida.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="my-6 h-px w-full bg-slate-200/70 dark:bg-white/10" />
-
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                    {HIGHLIGHTS.map((item) => (
-                        <span
-                            key={item}
-                            className="inline-flex items-center gap-2 rounded-full border border-slate-200
-              bg-slate-50 px-4 py-2 text-am font-semibold text-slate-700
-              dark:border-neutral-700 dark:bg-white/10 dark:text-white/80"
-                        >
-                            <CheckCircle2 className="h-4 w-4" style={{ color: PRIMARY }} />
-                            {item}
-                        </span>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-const HIGHLIGHTS = [
-    "Atención personalizada",
-    "Resultados clínicos medibles",
-    "Fisioterapeutas especializados",
-    "Instalaciones de calidad y en actualización",
-    "Actualización constante",
-];
-
-function ServiciosVarianteMenu({ SERVICES, PRIMARY, imagenPredeterminada }) {
-    const [selectedId, setSelectedId] = useState(SERVICES[0]?.id ?? null);
-
-    useEffect(() => {
-        if (!SERVICES?.length) return;
-        const exists = SERVICES.some((s) => String(s.id) === String(selectedId));
-        if (!selectedId || !exists) setSelectedId(String(SERVICES[0].id));
-    }, [SERVICES, selectedId]);
-
-    const selected = useMemo(() => {
-        if (!SERVICES?.length) return null;
-        const sid = String(selectedId ?? "");
-        return SERVICES.find((s) => String(s.id) === sid) || SERVICES[0];
-    }, [selectedId, SERVICES]);
-
-    return (
-        <div className="grid gap-6 lg:grid-cols-5">
-            <div className="lg:col-span-2">
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900/40">
-                    <div className="border-b border-slate-200 px-4 py-4 dark:border-neutral-700">
-                        <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                            Catálogo de servicios
-                        </p>
-                        <p className="mt-1 text-base text-slate-500 dark:text-white/60">
-                            Selecciona un servicio para ver detalles.
-                        </p>
-                    </div>
-
-                    <div className="max-h-[570px] overflow-auto">
-                        {SERVICES.map((s) => {
-                            const active = String(s.id) === String(selectedId);
-                            return (
-                                <button
-                                    key={s.id}
-                                    onClick={() => setSelectedId(String(s.id))}
-                                    className={`w-full border-b px-4 py-3 text-left transition last:border-b-0 ${active
-                                        ? "bg-slate-900/5 border-slate-200 dark:border-neutral-700"
-                                        : "border-slate-200 hover:bg-slate-50 dark:border-neutral-700 dark:hover:bg-white/5"
-                                        }`}
-                                >
-                                    <div className="flex items-center justify-between gap-3">
-                                        <p className="line-clamp-1 text-base font-semibold text-slate-900 dark:text-white">
-                                            {s.name}
-                                        </p>
-                                        <span className="text-base text-slate-500 dark:text-white/60">
-                                            {s.tag || s.duration || "—"}
-                                        </span>
-                                    </div>
-                                    <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">
-                                        {moneyMXN(s.price)}
-                                    </p>
-                                </button>
-                            );
-                        })}
-
-                        {!SERVICES.length && (
-                            <div className="p-4 text-sm text-slate-600 dark:text-white/70">
-                                Aún no hay servicios configurados.
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div className="lg:col-span-3">
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900/40">
-                    <div className="aspect-[16/9] w-full overflow-hidden">
-                        {(selected?.mediaSrc || imagenPredeterminada) && (
-                            <img
-                                src={selected?.mediaSrc || imagenPredeterminada}
-                                alt={selected?.name || "Servicio"}
-                                className="h-full w-full object-cover"
-                                loading="lazy"
-                                onError={(e) => {
-                                    const imagen = e.currentTarget;
-                                    if (imagenPredeterminada && imagen.src !== new URL(imagenPredeterminada, window.location.href).href) {
-                                        imagen.src = imagenPredeterminada;
-                                    }
-                                }}
-                            />
-                        )}
-                    </div>
-
-                    <div className="p-5">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                                <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                                    {selected?.name || "Servicio"}
-                                </p>
-                                <p className="mt-1 text-base text-slate-600 dark:text-white/70">
-                                    {selected?.description ||
-                                        "Valoración clínica detallada y plan personalizado según tu condición, objetivos y ritmo de recuperación."}
-                                </p>
-                            </div>
-
-                            <div className="text-right">
-                                <p className="text-base font-semibold text-slate-900 dark:text-white">
-                                    {moneyMXN(selected?.price)}
-                                </p>
-                                <p className="mt-1 text-sm text-slate-500 dark:text-white/60">
-                                    {selected?.tag || selected?.duration || "—"}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                            <DetailChip
-                                icon={<Stethoscope className="h-4 w-4" />}
-                                title="Evaluación clínica"
-                                desc="Analizamos causa, función y objetivos."
-                            />
-                            <DetailChip
-                                icon={<ClipboardList className="h-4 w-4" />}
-                                title="Plan individual"
-                                desc="Nada genérico; todo se adapta a ti."
-                            />
-                            <DetailChip
-                                icon={<TrendingUp className="h-4 w-4" />}
-                                title="Progreso medible"
-                                desc="Metas, ajustes y seguimiento."
-                            />
-                        </div>
-
-                        <div className="mt-6 flex flex-wrap gap-3">
-                            <a
-                                href={`/agenda?servicio=${encodeURIComponent(selected?.name || "")}`}
-                                className="inline-flex items-center justify-center rounded-2xl bg-[#004aad] px-6 py-3 text-sm font-semibold text-white shadow hover:brightness-110"
-                            >
-                                Agendar este servicio
-                            </a>
-                            <a
-                                href="/agenda"
-                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-50 dark:border-white/15 dark:bg-transparent dark:text-white"
-                            >
-                                Agendar valoración
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function DetailChip({ icon, title, desc }) {
-    return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-neutral-700 dark:bg-black/20">
-            <div className="flex items-center gap-2">
-                <span className="text-[#004aad]">{icon}</span>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    {title}
-                </p>
-            </div>
-            <p className="mt-1 text-sm text-slate-600 dark:text-white/70">{desc}</p>
-        </div>
-    );
+  return <>
+    <PageIntro eyebrow="Nuestros servicios" title="Tu recuperación merece" accent="un plan a tu medida." description="Conoce nuestros enfoques de rehabilitación y encuentra el primer paso para recuperar tu movimiento." />
+    <ServicesSection detailed selected={selectedId} onSelect={(id) => setParams({ enfoque: id }, { preventScrollReset: true })} />
+    {selected && <section className="pub-container" style={{ paddingInline: "24px", scrollMarginTop: "110px" }} aria-live="polite"><div className="pub-specialty-detail"><div><span className="pub-eyebrow">Un enfoque para ti</span><h3 style={{ marginTop: "12px" }}>{selected.title}</h3><p>{selected.detail}</p></div><Link className="pub-button" to="/agenda">Agendar valoración<ArrowRight size={17} /></Link></div></section>}
+    <section className="pub-section pub-container" id="catalogo"><SectionHeading eyebrow="Encuentra tu atención" title="Catálogo de" accent="servicios" description="Consulta nuestros servicios, su duración y precio. Si no sabes cuál elegir, empieza por una valoración." /><div className="pub-catalog-toolbar"><label className="pub-search"><Search size={19} /><input type="search" placeholder="Buscar un servicio…" aria-label="Buscar un servicio" value={search} onChange={(event) => setSearch(event.target.value)} /></label><span className="pub-catalog-count" aria-live="polite">{loadingServices ? "Cargando servicios…" : `${filtered.length} servicios disponibles`}</span></div><div className="pub-catalog-grid">
+      {loadingServices ? [0, 1, 2].map((i) => <div className="pub-team-skeleton pub-skeleton" key={i} />) : filtered.map((service) => {
+        const name = service.name || service.nombre;
+        return <article className="pub-catalog-card" key={service.id}><div className="pub-catalog-image"><img src={serviceImage(service, fallback)} alt={name} loading="lazy" onError={(event) => { if (!event.currentTarget.dataset.fallback) { event.currentTarget.dataset.fallback = "1"; event.currentTarget.src = "/servicios/valoracion-inicial.jpeg"; } }} /></div><div className="pub-catalog-copy"><span className="pub-catalog-tag"><Clock3 size={13} />{service.tag || "Atención personalizada"}</span><h3>{name}</h3><p>{service.description || service.descripcion || "Valoración y tratamiento personalizados según tu condición, tus objetivos y tu ritmo de recuperación."}</p><div className="pub-catalog-bottom"><span><strong>{money(service.price ?? service.precio)}</strong><small>MXN</small></span><Link className="pub-text-link" to={`/agenda?servicio=${encodeURIComponent(name)}`}>Agendar<ArrowRight size={16} /></Link></div></div></article>;
+      })}
+      {!loadingServices && !filtered.length && <div className="pub-empty"><Search size={30} /><h3>No encontramos ese servicio</h3><p>Prueba con otro término o escríbenos para orientarte.</p><button className="pub-button pub-button-white" onClick={() => setSearch("")}>Ver todos los servicios</button></div>}
+    </div><p className="pub-form-note"><ShieldCheck size={15} />El tratamiento se define de manera individual después de tu valoración clínica.</p></section>
+    <ProcessSection /><ContactSection />
+  </>;
 }
