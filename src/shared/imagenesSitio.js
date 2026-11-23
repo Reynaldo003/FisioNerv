@@ -7,7 +7,7 @@ export const IMAGENES_FIJAS = [
     titulo: "Profesional de portada (fondo transparente)",
     grupo: "inicio",
     orden: 0,
-    respaldo: "/fisio_fondo.png",
+    respaldo: "/mauricio-portrait-hq.webp",
   },
   {
     clave: "inicio.hero",

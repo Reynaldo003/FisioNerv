@@ -94,7 +94,6 @@
 .pub-trust-icon { display: grid; place-items: center; height: 37px; width: 37px; border: 1px solid #cde7f4; border-radius: 50%; background: #ffffffa8; color: #009eac; }
 .pub-hero-portrait { position: absolute; top: 35px; bottom: 86px; left: 37%; width: 33%; max-width: 385px; overflow: hidden; z-index: 1; }
 .pub-hero-person { position: absolute; top: 0; left: 0; height: auto; width: 100%; max-width: none; filter: drop-shadow(10px 5px 15px #0b304517); }
-.pub-hero-person-hd { top: auto; bottom: 0; left: 50%; width: 269.47%; height: auto; transform: translateX(-43.3%); mask-image: url("/mauricio-portrait-mask.svg"); mask-size: 100% 100%; mask-repeat: no-repeat; }
 .pub-therapist-label { position: absolute; top: 210px; left: 61%; width: 150px; padding: 17px 12px 11px; border: 1px solid #fff; border-radius: 12px; background: #ffffffd9; box-shadow: 0 8px 30px #1541750c; z-index: 3; backdrop-filter: blur(10px); line-height: 1.45; }
 .pub-therapist-label strong { display: block; font-size: 10px; }
 .pub-therapist-label > span:not(.pub-plus) { display: block; font-size: 9px; color: var(--pub-muted); margin-top: 5px; }
