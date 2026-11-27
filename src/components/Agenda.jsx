@@ -189,7 +189,7 @@ export default function AgendaV2({ CLINIC, SERVICES = [], PRIMARY = "#004aad" })
                 `Hola, soy ${name}. Quiero confirmar mi cita de ${selectedService.name || selectedService.nombre} en ${CLINIC.name
                 } el ${formatDateLong(selectedDate)} a las ${selectedSlot}. Mi WhatsApp es ${phone}.`
             );
-            window.open(`https://wa.me/522711224494?text=${text}`, "_blank");
+            window.open(`https://wa.me/522711650406?text=${text}`, "_blank");
         } catch {
             setError("Ocurrió un error al registrar la cita. Intenta de nuevo o escribe por WhatsApp.");
         } finally {

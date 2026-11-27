@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, HeartHandshake, Info, LoaderCircle, MapPin, MessageCircle, Phone, RefreshCw, ShieldCheck, Stethoscope, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, HeartHandshake, Info, LoaderCircle, MapPin, Phone, RefreshCw, ShieldCheck, Stethoscope, UserRound } from "lucide-react";
+import { WhatsAppIcon } from "../components/ui/WhatsAppIcon";
 import { usePublicContent } from "../shared/PublicContent";
 import { bookingDateKey, usePublicBooking } from "../shared/usePublicBooking";
 import { useImagenesSitio } from "../shared/useImagenesSitio";
@@ -95,7 +96,7 @@ export default function AgendaPage() {
         <span><CalendarDays size={18} />{booking.confirmation.date}</span>
         <span><Clock3 size={18} />{booking.confirmation.time} h</span>
       </div>
-      <a className="pub-button" href={booking.confirmation.whatsapp} target="_blank" rel="noreferrer"><MessageCircle size={18} />Continuar por WhatsApp<ArrowRight size={17} /></a>
+      <a className="pub-button" href={booking.confirmation.whatsapp} target="_blank" rel="noreferrer"><WhatsAppIcon size={18} />Continuar por WhatsApp<ArrowRight size={17} /></a>
       <p className="pub-booking-success-note">Si WhatsApp no se abrió, puedes continuar con el botón de arriba.</p>
       <div className="pub-booking-success-actions"><Link className="pub-text-link" to="/">Volver al inicio</Link><button className="pub-text-link" onClick={() => { booking.startAgain(); setStep(0); }}>Agendar otra cita<ArrowRight size={15} /></button></div>
     </div> : <div className="pub-booking-layout">
@@ -188,7 +189,7 @@ export default function AgendaPage() {
           <div className="pub-booking-total"><span>Costo del servicio</span><strong>{service ? money(service.price ?? service.precio) : "—"}<small>MXN</small></strong></div>
           <p className="pub-booking-no-charge"><ShieldCheck size={13} />El registro en línea no realiza ningún cobro.</p>
         </div>
-        <a className="pub-booking-help" href={`https://wa.me/${CLINIC.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer"><span className="pub-icon-circle"><MessageCircle size={21} /></span><div><strong>¿Te ayudamos a elegir?</strong><span>Escríbenos por WhatsApp<ArrowRight size={13} /></span></div></a>
+        <a className="pub-booking-help" href={`https://wa.me/${CLINIC.whatsapp}`} target="_blank" rel="noreferrer"><span className="pub-icon-circle"><WhatsAppIcon size={21} /></span><div><strong>¿Te ayudamos a elegir?</strong><span>Escríbenos por WhatsApp<ArrowRight size={13} /></span></div></a>
       </aside>
     </div>}
     <p className="pub-booking-bottom-note"><HeartHandshake size={16} />Cada recuperación comienza con una conversación. Gracias por confiar en FisioNerv.</p>

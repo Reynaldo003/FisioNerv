@@ -5,6 +5,7 @@ import { useImagenesSitio } from "../shared/useImagenesSitio";
 import { usePublicContent } from "../shared/PublicContent";
 import { CLINIC } from "../shared/clinicData";
 import { PortalModal } from "./ui/PortalModal";
+import { WhatsAppIcon } from "./ui/WhatsAppIcon";
 import PartnerMarquee from "./PartnerMarquee";
 
 function FeatureIcon({ icon, size = 24 }) {
@@ -29,15 +30,11 @@ export function PageIntro({ eyebrow, title, accent, description }) {
 
 export function HeroSection() {
   const { obtenerImagen } = useImagenesSitio();
-  const portrait = obtenerImagen("inicio.profesional", "/mauricio-portrait-clean.webp");
-  const portraitSource = ["/fisio.png", "/mauricio-portrait-hq.webp"].includes(portrait) ? "/mauricio-portrait-clean.webp" : portrait;
-  const cleanPortrait = portraitSource === "/mauricio-portrait-clean.webp";
   const background = obtenerImagen("inicio.hero", "/fisio_fondo.png");
   return <section className="pub-hero pub-container">
     {background && <img className="pub-hero-background" src={background} alt="" fetchPriority="high" />}
     <div className="pub-hero-wash" /><div className="pub-hero-orbit" />
     <div className="pub-hero-copy"><span className="pub-eyebrow"><span className="pub-status-dot" />Fisioterapia avanzada en Córdoba, Ver.</span><h1>Recupera tu <br />movimiento,<br /><span>vive sin dolor.</span></h1><p>Tratamientos de fisioterapia basados en evidencia, con atención personalizada y un equipo que te acompaña en cada paso.</p><div className="pub-hero-benefits"><span><Heart size={18} />Menos dolor</span><span><Activity size={18} />Más movilidad</span><span><Sparkles size={18} />Más bienestar</span></div><div className="pub-hero-actions"><Link className="pub-button" to="/agenda">Agendar cita<ArrowRight size={17} /></Link><Link className="pub-button pub-button-white" to="/servicios">Conoce nuestros servicios</Link></div><div className="pub-hero-trust"><span className="pub-trust-icon"><ShieldCheck size={23} /></span><div><strong>Tu recuperación, en buenas manos</strong><span>Atención profesional con enfoque humano.</span></div></div></div>
-    {portrait && <div className={`pub-hero-portrait ${cleanPortrait ? "pub-hero-portrait-clean" : ""}`}><img className={`pub-hero-person ${cleanPortrait ? "pub-hero-person-clean" : ""}`} src={portraitSource} alt="L.F.T. Edgar Mauricio Medina Cruz, fisioterapeuta" fetchPriority="high" decoding="async" /></div>}
     <div className="pub-therapist-label"><span className="pub-plus">+</span><strong>L.F.T. Edgar Mauricio<br />Medina Cruz</strong><span>Rehabilitación neurológica,<br />traumatología y ortopedia.</span><small>Céd. Prof. 14168874</small></div>
     <div className="pub-hero-card"><span className="pub-icon-tile"><CalendarCheck2 /></span><h2>Tu primer paso <br />para sentirte mejor.</h2><p>Empecemos por escucharte. En tu valoración conoceremos tu caso y lo que quieres recuperar.</p><ol><li><span>01</span>Elige tu servicio</li><li><span>02</span>Encuentra tu horario</li><li><span>03</span>Confirma tu valoración</li></ol><Link className="pub-button" to="/agenda">Quiero agendar<ArrowRight size={17} /></Link><small><ShieldCheck size={13} />Agenda segura · Confirmación por WhatsApp</small></div>
     <div className="pub-benefit-strip">{[[Users, "Atención personalizada", "Enfocada en tus objetivos"], [ClipboardCheck, "Planes de tratamiento", "A tu medida"], [Brain, "Equipo especializado", "Con experiencia clínica"], [Building2, "Instalaciones cómodas", "Un espacio para tu bienestar"]].map(([Icon, title, description]) => <div key={title}><span className="pub-icon-circle"><FeatureIcon icon={Icon} size={25} /></span><span><strong>{title}</strong><small>{description}</small></span></div>)}</div>
@@ -141,7 +138,7 @@ export function PartnersSection({ full = false }) {
     {full && <div className="pub-partner-note">
       <HeartHandshake size={30} />
       <div><h3>¿Formas parte de alguno de nuestros convenios?</h3><p>Contáctanos para conocer los beneficios disponibles y los detalles de tu atención.</p></div>
-      <a className="pub-button" href="https://wa.me/522711224494?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20los%20convenios%20de%20FisioNerv." target="_blank" rel="noreferrer">Consultar beneficios<ArrowRight size={17} /></a>
+      <a className="pub-button" href={`https://wa.me/${CLINIC.whatsapp}?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20los%20convenios%20de%20FisioNerv.`} target="_blank" rel="noreferrer">Consultar beneficios<ArrowRight size={17} /></a>
     </div>}
   </section>;
 }
@@ -180,7 +177,7 @@ export function ContactSection({ full = false }) {
           </div>
           <div>
             <span className="pub-icon-circle"><Phone size={22} /></span>
-            <div><h3>Llámanos</h3><a href={`tel:${CLINIC.phone.replace(/\s/g, "")}`}>{CLINIC.phone}</a></div>
+            <div><h3>Llámanos</h3>{CLINIC.phones.map((phone) => <a key={phone} href={`tel:${phone.replace(/\s/g, "")}`}>{phone}</a>)}</div>
           </div>
         </div>
       </div>
@@ -192,7 +189,7 @@ export function ContactSection({ full = false }) {
       <h2>¿Listo para <br />recuperar <br />tu bienestar?</h2>
       <p>Agenda tu cita hoy y da el primer paso hacia una vida con más movimiento.</p>
       <Link className="pub-button pub-button-white" to="/agenda">Agendar cita ahora<ArrowRight size={18} /></Link>
-      <a className="pub-contact-whatsapp" href="https://wa.me/522711224494" target="_blank" rel="noreferrer"><MessageCircle size={17} />También estamos en WhatsApp</a>
+      <a className="pub-contact-whatsapp" href={`https://wa.me/${CLINIC.whatsapp}`} target="_blank" rel="noreferrer"><WhatsAppIcon size={17} />También estamos en WhatsApp</a>
     </div>
   </section>;
 }

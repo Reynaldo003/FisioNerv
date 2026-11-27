@@ -3,13 +3,6 @@ import { COLLAB_IMAGES } from "./clinicData";
 export const IMAGENES_FIJAS = [
   // Página de inicio
   {
-    clave: "inicio.profesional",
-    titulo: "Profesional de portada (fondo transparente)",
-    grupo: "inicio",
-    orden: 0,
-    respaldo: "/mauricio-portrait-clean.webp",
-  },
-  {
     clave: "inicio.hero",
     titulo: "Portada principal",
     grupo: "inicio",

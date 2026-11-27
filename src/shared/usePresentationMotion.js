@@ -8,7 +8,6 @@ const REVEALS = [
   { selector: ".pub-hero-benefits", type: "text", delay: 230 },
   { selector: ".pub-hero-actions", type: "text", delay: 300 },
   { selector: ".pub-hero-trust", type: "text", delay: 360 },
-  { selector: ".pub-hero-portrait", type: "image", delay: 130 },
   { selector: ".pub-hero-card", type: "card", delay: 240 },
   { selector: ".pub-therapist-label", type: "text", delay: 380 },
   { selector: ".pub-benefit-strip > div", type: "text", stagger: 70 },

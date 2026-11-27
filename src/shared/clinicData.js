@@ -8,7 +8,9 @@ export const CLINIC = {
   name: "Fisionerv",
   tagline: "Clínica de fisioterapia",
   address: "Calle 15 entre Av. 2 y 4, Córdoba, Veracruz",
-  phone: "+52 271 122 4494",
+  phone: "+52 271 165 0406",
+  phones: ["+52 271 165 0406", "+52 271 165 4030"],
+  whatsapp: "522711650406",
   mapQuery: "Fisionerv, Calle 15 entre Avenidas 2 y 4, Córdoba, Veracruz",
   hours: {
     mon: "8:00-21:00",

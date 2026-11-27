@@ -105,7 +105,7 @@ export function usePublicBooking(service) {
       const serviceName = service.name || service.nombre;
       const dateLabel = selectedDate.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
       const text = `Hola, soy ${name.trim()}. Quiero confirmar mi cita de ${serviceName} en ${CLINIC.name} el ${dateLabel} a las ${time}. Mi WhatsApp es ${phone.trim()}.`;
-      const whatsapp = `https://wa.me/${CLINIC.phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+      const whatsapp = `https://wa.me/${CLINIC.whatsapp}?text=${encodeURIComponent(text)}`;
       const result = { name: name.trim(), service: serviceName, date: dateLabel, time, price: service.price ?? service.precio, whatsapp };
       setConfirmation(result);
       const start = minutes(time);
