@@ -27,6 +27,13 @@ function busyRanges(data) {
   });
 }
 
+function busyAgendas(data) {
+  if (Array.isArray(data?.agendas)) {
+    return data.agendas.map((agenda) => busyRanges(agenda?.ocupaciones || []));
+  }
+  return [busyRanges(data)];
+}
+
 export function usePublicBooking(service) {
   const includeSunday = localStorage.getItem("agenda.includeSunday") === "1";
   const days = useMemo(() => nextDays(14).filter((date) => includeSunday || date.getDay() !== 0), [includeSunday]);
@@ -35,7 +42,7 @@ export function usePublicBooking(service) {
   const [period, setPeriod] = useState("Todo");
   const [retry, setRetry] = useState(0);
   const [now, setNow] = useState(() => new Date());
-  const [availability, setAvailability] = useState({ date: "", status: "loading", ranges: [] });
+  const [availability, setAvailability] = useState({ date: "", status: "loading", agendas: [] });
   const [booking, setBooking] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState(null);
@@ -51,15 +58,15 @@ export function usePublicBooking(service) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setAvailability({ date, status: "loading", ranges: [] });
+    setAvailability({ date, status: "loading", agendas: [] });
     async function load() {
       try {
         const response = await publicApiFetch(`/api/public/agenda/?fecha=${date}`, { signal: controller.signal });
         if (!response.ok) throw new Error("No se pudo consultar la agenda.");
         const data = await response.json();
-        if (!controller.signal.aborted) setAvailability({ date, status: "ready", ranges: busyRanges(data) });
+        if (!controller.signal.aborted) setAvailability({ date, status: "ready", agendas: busyAgendas(data) });
       } catch (failure) {
-        if (failure.name !== "AbortError") setAvailability({ date, status: "error", ranges: [] });
+        if (failure.name !== "AbortError") setAvailability({ date, status: "error", agendas: [] });
       }
     }
     load();
@@ -69,11 +76,13 @@ export function usePublicBooking(service) {
   const slots = useMemo(() => buildSlots(selectedDate).map((slot) => {
     const start = minutes(slot.label);
     const end = start + duration;
-    const occupied = availability.ranges.some((range) => start < range.end && range.start < end);
+    const occupied = availability.agendas.length > 0 && availability.agendas.every((ranges) => (
+      ranges.some((range) => start < range.end && range.start < end)
+    ));
     return { ...slot, disabled: slot.disabled || date < bookingDateKey(now) || end > 21 * 60 || occupied || availabilityStatus !== "ready" };
-  }), [selectedDate, duration, availability.ranges, availabilityStatus, date, now]);
+  }), [selectedDate, duration, availability.agendas, availabilityStatus, date, now]);
   const selectedSlot = slots.find((slot) => slot.label === time && !slot.disabled) || null;
-  const filteredSlots = slots.filter((slot) => period === "Todo" || slot.period === period);
+  const filteredSlots = slots.filter((slot) => !slot.disabled && (period === "Todo" || slot.period === period));
 
   function chooseDate(value) { setDate(value); setTime(null); setError(""); }
   function chooseTime(value) { setTime(value); setError(""); }
@@ -88,7 +97,7 @@ export function usePublicBooking(service) {
       const response = await publicApiFetch("/api/public/citas/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre: name.trim(), telefono: phone.trim(), servicio_id: service.id, fecha: date, hora_inicio: time, profesional_hint: "L.F.T Edgar Mauricio Medina Cruz" }),
+        body: JSON.stringify({ nombre: name.trim(), telefono: phone.trim(), servicio_id: service.id, fecha: date, hora_inicio: time }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
@@ -108,8 +117,6 @@ export function usePublicBooking(service) {
       const whatsapp = `https://wa.me/${CLINIC.whatsapp}?text=${encodeURIComponent(text)}`;
       const result = { name: name.trim(), service: serviceName, date: dateLabel, time, price: service.price ?? service.precio, whatsapp };
       setConfirmation(result);
-      const start = minutes(time);
-      setAvailability((previous) => ({ ...previous, ranges: [...previous.ranges, { start, end: data?.hora_termina ? minutes(data.hora_termina) : start + duration }] }));
       return result;
     } catch {
       setError("No pudimos conectar con la clínica. Tus datos siguen aquí para que puedas intentarlo de nuevo.");
