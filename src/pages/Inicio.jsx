@@ -1,5 +1,5 @@
-import { AboutSection, HeroSection, PartnersSection, ProcessSection, RecoverySection, ReviewsSection, ServicesSection, ValuesBand } from "../components/PublicSections";
+import { HeroSection, HomeHighlightsSection, HomeStatementSection, PartnersSection, ReviewsSection, ServicesSection } from "../components/PublicSections";
 
 export default function Inicio() {
-  return <><HeroSection /><ServicesSection /><ValuesBand /><AboutSection /><RecoverySection /><ReviewsSection /><ProcessSection /><PartnersSection /></>;
+  return <><HeroSection /><HomeStatementSection /><ServicesSection /><HomeHighlightsSection /><ReviewsSection /><PartnersSection /></>;
 }

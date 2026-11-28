@@ -27,7 +27,7 @@ export default function ServiciosPage() {
   const fallback = obtenerImagen("servicios.placeholder", "/servicios/valoracion-inicial.jpeg") || "/servicios/valoracion-inicial.jpeg";
   const filtered = services.filter((service) => `${service.name || service.nombre} ${service.description || service.descripcion || ""}`.toLowerCase().includes(search.toLowerCase()));
 
-  return <>
+  return <div className="pub-services-page">
     <PageIntro eyebrow="Nuestros servicios" title="Tu recuperación merece" accent="un plan a tu medida." description="Conoce nuestros enfoques de rehabilitación y encuentra el primer paso para recuperar tu movimiento." />
     <ServicesSection detailed selected={selectedId} onSelect={(id) => setParams({ enfoque: id }, { preventScrollReset: true })} />
     {selected && <section className="pub-container" style={{ paddingInline: "24px", scrollMarginTop: "110px" }} aria-live="polite"><div className="pub-specialty-detail"><div><span className="pub-eyebrow">Un enfoque para ti</span><h3 style={{ marginTop: "12px" }}>{selected.title}</h3><p>{selected.detail}</p></div><Link className="pub-button" to="/agenda">Agendar valoración<ArrowRight size={17} /></Link></div></section>}
@@ -40,5 +40,5 @@ export default function ServiciosPage() {
       {!loadingServices && !servicesError && !filtered.length && <div className="pub-empty"><Search size={30} /><h3>No encontramos ese servicio</h3><p>Prueba con otro término o escríbenos para orientarte.</p><button className="pub-button pub-button-white" onClick={() => setSearch("")}>Ver todos los servicios</button></div>}
     </div><p className="pub-form-note"><ShieldCheck size={15} />El tratamiento se define de manera individual después de tu valoración clínica.</p></section>
     <ProcessSection />
-  </>;
+  </div>;
 }

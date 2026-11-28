@@ -231,3 +231,43 @@
   .pub-booking-success > .pub-button { width: 100%; font-size: 11px; gap: 8px; padding-inline: 12px; }
   .pub-booking-success-actions { gap: 17px; flex-wrap: wrap; }
 }
+
+/* Acabado editorial de la agenda pública */
+.pub-booking-page { padding-top: 0; }
+.pub-booking-intro { min-height: 360px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; margin-bottom: 26px; padding: 62px; overflow: hidden; position: relative; isolation: isolate; text-align: left; color: white; background: linear-gradient(118deg, #062f68, #0059b7 62%, #087eaf); }
+.pub-booking-intro::after { content: ""; position: absolute; right: -170px; bottom: -260px; width: 430px; height: 430px; border: 1px solid #ffffff35; border-radius: 50%; box-shadow: 0 0 0 48px #ffffff08, 0 0 0 96px #ffffff06; z-index: -1; }
+.pub-booking-intro > .pub-eyebrow { color: #b5f4fb; background: #ffffff12; border: 1px solid #ffffff24; }
+.pub-booking-intro h1 { max-width: 850px; margin-top: 20px; color: white; font-size: clamp(46px, 5vw, 68px); line-height: 1.02; letter-spacing: -2.4px; }
+.pub-booking-intro h1 > span { color: #6edcff; }
+.pub-booking-intro > p { max-width: 580px; margin: 22px 0 0; color: #e1efff; font-size: 15px; }
+.pub-booking-flow, .pub-booking-summary { border-radius: 4px; box-shadow: none; }
+.pub-booking-flow { border-color: #d8e6f1; }
+.pub-booking-steps { padding: 25px 30px; }
+.pub-booking-stage { padding: 34px 36px 30px; }
+.pub-booking-step-heading h2 { font-size: 31px; }
+.pub-booking-service { border-radius: 3px; }
+.pub-booking-service .pub-icon-tile, .pub-booking-radio-indicator { border-radius: 2px; }
+.pub-booking-flow-footer .pub-button, .pub-booking-input, .pub-booking-confirm-note, .pub-booking-hint, .pub-booking-help { border-radius: 3px; }
+.pub-booking-summary { padding: 31px; background: white; }
+.pub-booking-avatar { width: 45px; height: 45px; border-radius: 2px; }
+.pub-booking-clinician { margin-top: 6px; }
+.pub-booking-clinician strong { font-size: 13px; }
+.pub-booking-dates > button, .pub-booking-slots > button, .pub-booking-periods { border-radius: 3px; }
+.pub-booking-periods button { border-radius: 2px; }
+.pub-booking-success { border-radius: 4px; box-shadow: none; }
+
+@media (max-width: 899px) {
+  .pub-booking-intro { min-height: 330px; padding: 50px 42px; }
+  .pub-booking-intro h1 { font-size: clamp(44px, 7vw, 60px); }
+  .pub-booking-clinician { padding-top: 0; }
+}
+@media (max-width: 640px) {
+  .pub-booking-page { padding-top: 0; }
+  .pub-booking-intro { min-height: 370px; justify-content: flex-end; margin-bottom: 16px; padding: 48px 22px 44px; }
+  .pub-booking-intro h1 { margin-top: 18px; font-size: 41px; line-height: 1.03; letter-spacing: -1.7px; }
+  .pub-booking-intro > p { margin-top: 18px; padding: 0; color: #e1efff; font-size: 13px; }
+  .pub-booking-intro::after { right: -190px; bottom: -180px; width: 300px; height: 300px; }
+  .pub-booking-flow { border-radius: 3px; }
+  .pub-booking-stage { padding: 25px 19px; }
+  .pub-booking-summary { border-radius: 3px; }
+}

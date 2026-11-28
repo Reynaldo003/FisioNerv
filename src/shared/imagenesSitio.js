@@ -7,7 +7,7 @@ export const IMAGENES_FIJAS = [
     titulo: "Portada principal",
     grupo: "inicio",
     orden: 1,
-    respaldo: "/fisio_fondo.png",
+    respaldo: null,
   },
   {
     clave: "inicio.clinica",

@@ -4,7 +4,6 @@ import { ArrowLeft, ArrowRight, CalendarDays, Check, CheckCircle2, ChevronLeft, 
 import { WhatsAppIcon } from "../components/ui/WhatsAppIcon";
 import { usePublicContent } from "../shared/PublicContent";
 import { bookingDateKey, usePublicBooking } from "../shared/usePublicBooking";
-import { useImagenesSitio } from "../shared/useImagenesSitio";
 import { CLINIC } from "../shared/clinicData";
 import "./agenda.css";
 
@@ -26,7 +25,6 @@ export default function AgendaPage() {
     const initialVisit = (item) => /valoraci[oó]n inicial/i.test(item.name || item.nombre || "");
     return [...availableServices].sort((a, b) => Number(initialVisit(b)) - Number(initialVisit(a)));
   }, [availableServices]);
-  const { obtenerImagen } = useImagenesSitio();
   const [params] = useSearchParams();
   const [serviceId, setServiceId] = useState(null);
   const service = services.find((item) => String(item.id) === serviceId)
@@ -41,7 +39,6 @@ export default function AgendaPage() {
   const flowRef = useRef(null);
   const headingRef = useRef(null);
   const successRef = useRef(null);
-  const clinicianPhoto = obtenerImagen("inicio.profesional", "/fisio.png");
   const canContinue = step === 0 ? Boolean(service) && !loadingServices : Boolean(booking.selectedSlot);
   const shownDays = booking.days.slice(week * 7, week * 7 + 7);
 
@@ -179,7 +176,7 @@ export default function AgendaPage() {
       <aside className="pub-booking-sidebar" aria-label="Resumen de tu cita">
         <div className="pub-booking-summary">
           <span className="pub-eyebrow">Tu próximo paso</span><h2>Un espacio para<br /><span>tu bienestar.</span></h2>
-          <div className="pub-booking-clinician"><span className="pub-booking-avatar">{clinicianPhoto ? <img src={clinicianPhoto} alt="" /> : <Stethoscope size={24} />}</span><div><strong>L.F.T. Edgar Mauricio<br />Medina Cruz</strong><span>Fisioterapia y rehabilitación</span></div></div>
+          <div className="pub-booking-clinician"><span className="pub-booking-avatar"><Stethoscope size={23} /></span><div><strong>Atención especializada</strong><span>Fisioterapia y rehabilitación</span></div></div>
           <div className="pub-booking-summary-service"><div><span>Tu servicio</span>{step > 0 && <button disabled={booking.booking} onClick={() => goToStep(0)}>Cambiar</button>}</div><h3>{service?.name || service?.nombre || "Selecciona tu servicio"}</h3>{service?.tag && <p><Clock3 size={13} />{service.tag}</p>}</div>
           <dl className="pub-booking-summary-details">
             <div><CalendarDays size={17} /><div><dt>Fecha</dt><dd>{step > 0 || booking.selectedSlot ? longDate(booking.selectedDate) : "Por elegir"}</dd></div>{step === 2 && <button disabled={booking.booking} onClick={() => goToStep(1)} aria-label="Cambiar fecha y horario">Editar</button>}</div>

@@ -1,6 +1,6 @@
 import { createElement, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, ArrowRight, Award, Brain, Building2, CalendarCheck2, Check, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Clock3, Heart, HeartHandshake, MapPin, MessageCircle, MoveUpRight, Phone, Ribbon, ShieldCheck, Sparkles, Star, Stethoscope, Target, TrendingUp, Users, X } from "lucide-react";
+import { Activity, ArrowRight, Award, Brain, Building2, CalendarCheck2, Check, CheckCircle2, ChevronLeft, ChevronRight, ClipboardCheck, Clock3, Heart, HeartHandshake, MapPin, MessageCircle, MoveUpRight, Phone, Ribbon, Star, Stethoscope, Target, TrendingUp, Users, X } from "lucide-react";
 import { useImagenesSitio } from "../shared/useImagenesSitio";
 import { usePublicContent } from "../shared/PublicContent";
 import { CLINIC } from "../shared/clinicData";
@@ -29,25 +29,36 @@ export function PageIntro({ eyebrow, title, accent, description }) {
 }
 
 export function HeroSection() {
-  const { obtenerImagen } = useImagenesSitio();
-  const background = obtenerImagen("inicio.hero", "/fisio_fondo.png");
+  const { estado, obtenerImagen } = useImagenesSitio();
+  const [backgroundReady, setBackgroundReady] = useState(false);
+  const background = estado === "listo" ? obtenerImagen("inicio.hero", null) : null;
   return <section className="pub-hero pub-container">
-    {background && <img className="pub-hero-background" src={background} alt="" fetchPriority="high" />}
+    {background && <img className={`pub-hero-background ${backgroundReady ? "is-loaded" : ""}`} src={background} alt="" fetchPriority="high" onLoad={() => setBackgroundReady(true)} />}
     <div className="pub-hero-wash" /><div className="pub-hero-orbit" />
-    <div className="pub-hero-copy"><span className="pub-eyebrow"><span className="pub-status-dot" />Fisioterapia avanzada en Córdoba, Ver.</span><h1>Recupera tu <br />movimiento,<br /><span>vive sin dolor.</span></h1><p>Tratamientos de fisioterapia basados en evidencia, con atención personalizada y un equipo que te acompaña en cada paso.</p><div className="pub-hero-benefits"><span><Heart size={18} />Menos dolor</span><span><Activity size={18} />Más movilidad</span><span><Sparkles size={18} />Más bienestar</span></div><div className="pub-hero-actions"><Link className="pub-button" to="/agenda">Agendar cita<ArrowRight size={17} /></Link><Link className="pub-button pub-button-white" to="/servicios">Conoce nuestros servicios</Link></div><div className="pub-hero-trust"><span className="pub-trust-icon"><ShieldCheck size={23} /></span><div><strong>Tu recuperación, en buenas manos</strong><span>Atención profesional con enfoque humano.</span></div></div></div>
-    <div className="pub-therapist-label"><span className="pub-plus">+</span><strong>L.F.T. Edgar Mauricio<br />Medina Cruz</strong><span>Rehabilitación neurológica,<br />traumatología y ortopedia.</span><small>Céd. Prof. 14168874</small></div>
-    <div className="pub-hero-card"><span className="pub-icon-tile"><CalendarCheck2 /></span><h2>Tu primer paso <br />para sentirte mejor.</h2><p>Empecemos por escucharte. En tu valoración conoceremos tu caso y lo que quieres recuperar.</p><ol><li><span>01</span>Elige tu servicio</li><li><span>02</span>Encuentra tu horario</li><li><span>03</span>Confirma tu valoración</li></ol><Link className="pub-button" to="/agenda">Quiero agendar<ArrowRight size={17} /></Link><small><ShieldCheck size={13} />Agenda segura · Confirmación por WhatsApp</small></div>
-    <div className="pub-benefit-strip">{[[Users, "Atención personalizada", "Enfocada en tus objetivos"], [ClipboardCheck, "Planes de tratamiento", "A tu medida"], [Brain, "Equipo especializado", "Con experiencia clínica"], [Building2, "Instalaciones cómodas", "Un espacio para tu bienestar"]].map(([Icon, title, description]) => <div key={title}><span className="pub-icon-circle"><FeatureIcon icon={Icon} size={25} /></span><span><strong>{title}</strong><small>{description}</small></span></div>)}</div>
+    <div className="pub-hero-copy"><span className="pub-eyebrow"><span className="pub-status-dot" />Fisioterapia en Córdoba, Veracruz</span><h1>Recupera tu movilidad y vuelve a vivir <span>sin dolor.</span></h1><p>Atención especializada para que regreses a lo que amas.</p><div className="pub-hero-direct"><div className="pub-hero-proof"><strong>Tu plan</strong><span>A tu medida</span></div><div className="pub-hero-actions"><Link className="pub-button" to="/agenda">Agendar mi valoración<ArrowRight size={17} /></Link><Link className="pub-hero-link" to="/servicios">Conocer tratamientos</Link></div></div></div>
+  </section>;
+}
+
+export function HomeStatementSection() {
+  const { obtenerImagen } = useImagenesSitio();
+  const logo = obtenerImagen("marca.logo_oscuro", "/logo_b&w.png");
+  return <section className="pub-home-statement pub-container">
+    {logo && <img src={logo} alt="FisioNerv" loading="lazy" />}
+    <p>Combinamos experiencia clínica, movimiento y atención humana para ayudarte a recuperar tu independencia.</p>
   </section>;
 }
 
 export function ServicesSection({ detailed = false, selected, onSelect }) {
   const { obtenerImagen } = useImagenesSitio();
-  return <section className="pub-section pub-container" id="tratamientos">
-    {!detailed && <SectionHeading eyebrow="Nuestros servicios" title="Soluciones para cada etapa" accent="de tu recuperación" description="Tratamientos especializados para mejorar tu movilidad, reducir el dolor y potenciar tu calidad de vida." to="/servicios" action="Ver todos los servicios" />}
-    <div className="pub-services-grid">
-      {SPECIALTIES.map(({ id, title, description, image, icon }) => {
+  return <section className={`pub-section pub-container ${detailed ? "" : "pub-services-home"}`} id="tratamientos">
+    {!detailed && <SectionHeading eyebrow="Tratamientos" title="Atención para volver" accent="a moverte." description="Elige el enfoque que necesitas." to="/servicios" action="Ver todos" />}
+    <div className={detailed ? "pub-services-grid" : "pub-services-editorial"}>
+      {SPECIALTIES.map(({ id, title, description, image, icon }, index) => {
         const source = obtenerImagen(`inicio.servicio.${id}`, image);
+        if (!detailed) return <Link className="pub-service-editorial" to={`/servicios?enfoque=${id}`} key={id}>
+          <span className="pub-service-editorial-image">{source && <img src={source} alt="" loading="lazy" />}</span>
+          <span className="pub-service-editorial-copy"><small>0{index + 1}</small><strong>{title}</strong><span>{description}</span><b>Conocer más <ArrowRight size={16} /></b></span>
+        </Link>;
         return <article className={`pub-service-card ${selected === id ? "is-selected" : ""}`} key={id}>
           <div className="pub-service-image">
             {source && <img src={source} alt={title} loading="lazy" />}
@@ -83,10 +94,26 @@ export function RecoverySection() {
   return <section className="pub-section pub-container" id="recuperacion"><SectionHeading eyebrow="Movimiento que transforma" title="Volver a lo que amas" accent="empieza aquí." description="Cada persona tiene un proceso único. El tuyo merece un plan que te acompañe de principio a fin." /><div className="pub-recovery-grid"><div className="pub-recovery-photo">{stages[active].image && <img src={stages[active].image} alt={active === 0 ? "Valoración y educación del paciente en FisioNerv" : "Ejercicio terapéutico acompañado en FisioNerv"} loading="lazy" />}<div className="pub-recovery-tabs" role="group" aria-label="Etapas del acompañamiento">{stages.map((stage, index) => <button key={stage.label} aria-pressed={active === index} className={active === index ? "active" : ""} onClick={() => setActive(index)}>{stage.label}{index === active && <Check size={15} />}</button>)}</div><div className="pub-photo-caption"><span>UN PROCESO CONTIGO</span><p>{stages[active].text}</p></div></div><div className="pub-recovery-copy"><span className="pub-icon-circle"><TrendingUp size={28} /></span><h3>Metas reales.<br />Progreso que importa.</h3><p>Trabajamos para que el movimiento vuelva a formar parte de tu vida.</p><div>{[["Menos dolor", "Entiende tu cuerpo y encuentra herramientas para cuidarlo."], ["Mayor movilidad", "Recupera capacidades para tus actividades cotidianas."], ["Más confianza", "Avanza con un plan adaptado a tu condición."], ["Regreso a tus actividades", "Volver a hacer lo que disfrutas es nuestro objetivo."]].map(([title, description]) => <div className="pub-check-item" key={title}><CheckCircle2 size={25} /><div><h4>{title}</h4><p>{description}</p></div></div>)}</div><Link className="pub-text-link" to="/agenda">Hablemos de tu recuperación<ArrowRight size={17} /></Link></div></div></section>;
 }
 
+export function HomeHighlightsSection() {
+  const { obtenerImagen } = useImagenesSitio();
+  const highlights = [
+    { icon: ClipboardCheck, title: "Valoramos, no adivinamos.", text: "Escuchamos tu historia y evaluamos tu movimiento antes de definir el tratamiento.", image: obtenerImagen("inicio.quienes.1", "/foto20.jpeg"), alt: "Valoración personalizada en FisioNerv" },
+    { icon: HeartHandshake, title: "Un plan hecho para ti.", text: "Cada sesión responde a tus objetivos, tu condición y tu ritmo de recuperación.", image: obtenerImagen("inicio.quienes.2", "/foto21.jpeg"), alt: "Ejercicio terapéutico acompañado en FisioNerv" },
+    { icon: TrendingUp, title: "Progreso que vuelve a tu vida.", text: "Trabajamos para que recuperes confianza, independencia y las actividades que disfrutas.", image: obtenerImagen("inicio.sala", "/sala.png"), alt: "Instalaciones de FisioNerv" },
+  ];
+  return <section className="pub-home-highlights pub-container" id="acompanamiento">
+    {highlights.map(({ icon: Icon, title, text, image, alt }, index) => <article className={`pub-home-banner ${index % 2 ? "is-reversed" : ""}`} key={title}>
+      <div className="pub-home-banner-image">{image && <img src={image} alt={alt} loading="lazy" />}</div>
+      <div className="pub-home-banner-copy"><span><FeatureIcon icon={Icon} size={28} /></span><div><small>0{index + 1}</small><h2>{title}</h2><p>{text}</p></div></div>
+    </article>)}
+    <div className="pub-home-highlights-cta"><p>Tu recuperación puede empezar hoy.</p><Link className="pub-button" to="/agenda">Agendar valoración<ArrowRight size={17} /></Link></div>
+  </section>;
+}
+
 export function TeamSection({ full = false }) {
   const { team, loadingTeam } = usePublicContent();
   const [selected, setSelected] = useState(null);
-  return <section className="pub-section pub-container">
+  return <section className={`pub-section pub-container ${full ? "pub-team-section-full" : ""}`}>
     <SectionHeading eyebrow="Nuestro equipo" title="Profesionales que" accent="te acompañan" description="Un equipo comprometido con tu bienestar, tu movimiento y tu confianza." to={!full ? "/equipo" : undefined} action="Conoce al equipo" />
     <div className="pub-team-grid">
       {loadingTeam ? Array.from({ length: 2 }, (_, i) => <div key={i} className="pub-team-skeleton pub-skeleton" />) : (full ? team : team.slice(0, 2)).map((person) => <article className="pub-team-card" key={person.id}>
@@ -119,14 +146,14 @@ export function TeamSection({ full = false }) {
 export function ReviewsSection({ full = false }) {
   const { reviews, loadingReviews, reviewsError } = usePublicContent();
   const track = useRef(null);
-  const displayed = full ? reviews : reviews.slice(0, 9);
+  const displayed = full ? reviews : reviews.slice(0, 2);
   return <section className="pub-section pub-reviews-section pub-container"><SectionHeading eyebrow="Opiniones" title="Lo que dicen" accent="nuestros pacientes" description="Experiencias de personas que han confiado en nosotros para su recuperación." to={!full ? "/opiniones" : "#tu-opinion"} action={!full ? "Ver más opiniones" : "Compartir mi experiencia"} />{loadingReviews ? <div className="pub-reviews-track">{[0, 1, 2].map((i) => <div className="pub-review-skeleton pub-skeleton" key={i} />)}</div> : displayed.length ? <><div ref={track} className={`pub-reviews-track ${full ? "pub-reviews-all" : ""}`}>{displayed.map((review, index) => <figure key={review.id || index} className="pub-review-card"><div className="pub-review-person"><span>{review.nombre_completo?.trim().charAt(0).toUpperCase() || "P"}</span><div><figcaption>{review.nombre_completo}</figcaption><div className="pub-stars" aria-label={`${review.calificacion} de 5 estrellas`}>{Array.from({ length: 5 }, (_, star) => <Star key={star} size={16} fill={star < Number(review.calificacion) ? "currentColor" : "none"} />)}</div></div></div><blockquote>“{review.descripcion}”</blockquote><span className="pub-review-verified"><CheckCircle2 size={13} />Opinión de nuestra comunidad</span></figure>)}</div>{!full && displayed.length > 3 && <div className="pub-carousel-actions"><button className="pub-icon-button" aria-label="Opiniones anteriores" onClick={() => track.current.scrollBy({ left: -360, behavior: "smooth" })}><ChevronLeft /></button><span>Experiencias que nos motivan</span><button className="pub-icon-button" aria-label="Opiniones siguientes" onClick={() => track.current.scrollBy({ left: 360, behavior: "smooth" })}><ChevronRight /></button></div>}</> : <div className="pub-reviews-empty"><span className="pub-icon-circle"><MessageCircle size={30} /></span><div><h3>{reviewsError ? "Tu experiencia también cuenta" : "Tu historia puede inspirar a alguien más"}</h3><p>{reviewsError ? "Las opiniones no están disponibles en este momento. Puedes compartir cómo ha sido tu atención." : "¿Ya nos conoces? Cuéntanos cómo ha sido tu proceso en FisioNerv."}</p></div><Link className="pub-text-link" to="/opiniones#tu-opinion">Escribir una opinión<ArrowRight size={17} /></Link></div>}</section>;
 }
 
 export function PartnersSection({ full = false }) {
   const { obtenerGaleriaConvenios } = useImagenesSitio();
   const images = obtenerGaleriaConvenios().map((src) => /^(?:https?:\/\/|\/)/.test(src) ? src : `/${src}`);
-  return <section className="pub-section pub-partners-section pub-container">
+  return <section className={`pub-section pub-partners-section pub-container ${full ? "pub-partners-section-full" : ""}`}>
     <SectionHeading eyebrow="Convenios" title="Trabajamos con aliados" accent="de confianza" description="Centros y aliados que complementan tu proceso de recuperación." to={!full ? "/convenios" : undefined} action="Ver convenios" />
     {full ? <div className="pub-partners-grid pub-partners-full">
       {images.map((src, index) => <div className="pub-partner" key={`${src}-${index}`}>
@@ -195,7 +222,7 @@ export function ContactSection({ full = false }) {
 }
 
 export function ProcessSection() {
-  return <section className="pub-section pub-container"><SectionHeading eyebrow="Así trabajamos" title="Un plan claro." accent="Un paso a la vez." description="De la primera valoración al regreso a tus actividades, estamos contigo." centered /><div className="pub-process-grid">{[[Stethoscope, "01", "Te conocemos", "Escuchamos tu historia y evaluamos tu movimiento, dolor y función."], [ClipboardCheck, "02", "Creamos tu plan", "Definimos objetivos y un tratamiento adaptado a tus necesidades."], [TrendingUp, "03", "Avanzamos juntos", "Damos seguimiento a tu progreso y ajustamos cada etapa del tratamiento."]].map(([Icon, number, title, text]) => <article key={number}><span className="pub-process-number">{number}</span><span className="pub-icon-tile"><FeatureIcon icon={Icon} size={27} /></span><h3>{title}</h3><p>{text}</p></article>)}</div></section>;
+  return <section className="pub-section pub-process-section pub-container"><SectionHeading eyebrow="Así trabajamos" title="Un plan claro." accent="Un paso a la vez." description="De la primera valoración al regreso a tus actividades, estamos contigo." centered /><div className="pub-process-grid">{[[Stethoscope, "01", "Te conocemos", "Escuchamos tu historia y evaluamos tu movimiento, dolor y función."], [ClipboardCheck, "02", "Creamos tu plan", "Definimos objetivos y un tratamiento adaptado a tus necesidades."], [TrendingUp, "03", "Avanzamos juntos", "Damos seguimiento a tu progreso y ajustamos cada etapa del tratamiento."]].map(([Icon, number, title, text]) => <article key={number}><span className="pub-process-number">{number}</span><span className="pub-icon-tile"><FeatureIcon icon={Icon} size={27} /></span><h3>{title}</h3><p>{text}</p></article>)}</div></section>;
 }
 
 export function NetworkPattern() {

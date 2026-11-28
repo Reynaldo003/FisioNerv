@@ -6,6 +6,7 @@ const ContextoImagenes = createContext(null);
 
 export function ImagenesSitioProvider({ children }) {
     const [imagenes, setImagenes] = useState([]);
+    const [estado, setEstado] = useState("cargando");
 
     useEffect(() => {
         const controlador = new AbortController();
@@ -17,10 +18,12 @@ export function ImagenesSitioProvider({ children }) {
                 if (!respuesta.ok) throw new Error("No se pudo cargar el catálogo de imágenes.");
                 const datos = await respuesta.json();
                 setImagenes(Array.isArray(datos) ? datos : datos.results || []);
+                setEstado("listo");
             } catch (error) {
                 if (error.name !== "AbortError") {
                     // Si la API no está disponible, se conservan las imágenes de public/.
                     console.error("Imágenes del sitio:", error);
+                    setEstado("error");
                 }
             }
         }
@@ -56,12 +59,13 @@ export function ImagenesSitioProvider({ children }) {
                 .sort((a, b) => a.orden - b.orden)
                 .map((item) => item.src);
         }
-        return { imagenes, obtenerImagen, obtenerGaleriaConvenios };
-    }, [imagenes]);
+        return { estado, imagenes, obtenerImagen, obtenerGaleriaConvenios };
+    }, [estado, imagenes]);
 
     return <ContextoImagenes.Provider value={valor}>{children}</ContextoImagenes.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useImagenesSitio() {
     const contexto = useContext(ContextoImagenes);
     if (!contexto) throw new Error("useImagenesSitio debe usarse dentro de ImagenesSitioProvider.");
